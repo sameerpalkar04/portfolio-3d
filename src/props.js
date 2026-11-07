@@ -10,19 +10,27 @@ const roundedRect = (w, h, r) => {
   return s
 }
 
-// A phone lying face up (≈ 71.5 × 147 × 7.8 mm), screen off. Origin at the bottom centre.
+// A phone lying face up (≈ 71.5 × 147 × 7.8 mm), screen off. Origin at the bottom centre; the top
+// (camera island) is local -Z. PHONE describes the display so the lock screen can be laid exactly over it.
+export const PHONE = { W: .0715, L: .147, T: .0078, R: .0112, displayW: .0715 - .0046, displayL: .147 - .0046, displayR: .0112 - .0023 }
 export function createPhone() {
   const phone = new THREE.Group(); phone.name = 'desk-phone'
-  const W = .0715, L = .147, T = .0078
-  const body = new THREE.Mesh(new RoundedBoxGeometry(W, T, L, 4, .0095),
-    new THREE.MeshStandardMaterial({ color: '#c9c5bd', metalness: .85, roughness: .32 }))
-  body.position.y = T / 2; body.castShadow = true; body.receiveShadow = true; phone.add(body)
-  const screenGeo = new THREE.ShapeGeometry(roundedRect(W - .003, L - .003, .0085), 8); screenGeo.rotateX(-Math.PI / 2)
-  const screen = new THREE.Mesh(screenGeo, new THREE.MeshPhysicalMaterial({ color: '#07080a', roughness: .06, metalness: 0, clearcoat: 1, clearcoatRoughness: .04 }))
-  screen.position.y = T + .0004; phone.add(screen)
+  const { W, L, T, R } = PHONE, bevel = .0011
+  // titanium frame: a rounded slab with softened edges
+  const bodyGeo = new THREE.ExtrudeGeometry(roundedRect(W - bevel * 2, L - bevel * 2, R - bevel), { depth: T - bevel * 2, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 3, curveSegments: 14 })
+  bodyGeo.rotateX(-Math.PI / 2); bodyGeo.translate(0, bevel, 0)
+  const body = new THREE.Mesh(bodyGeo, new THREE.MeshStandardMaterial({ color: '#5b2a34', metalness: .75, roughness: .36 }))
+  body.castShadow = true; body.receiveShadow = true; phone.add(body)
+  // cover glass (black bezel) and the display beneath it, both following the frame's corners
+  const glassGeo = new THREE.ShapeGeometry(roundedRect(W - .0018, L - .0018, R - .0009), 14); glassGeo.rotateX(-Math.PI / 2)
+  const glass = new THREE.Mesh(glassGeo, new THREE.MeshPhysicalMaterial({ color: '#050506', roughness: .08, metalness: 0, clearcoat: 1, clearcoatRoughness: .04 }))
+  glass.position.y = T + .0002; phone.add(glass)
+  const displayGeo = new THREE.ShapeGeometry(roundedRect(PHONE.displayW, PHONE.displayL, PHONE.displayR), 14); displayGeo.rotateX(-Math.PI / 2)
+  const display = new THREE.Mesh(displayGeo, new THREE.MeshPhysicalMaterial({ color: '#0b0c10', roughness: .05, metalness: 0, clearcoat: 1, clearcoatRoughness: .03 }))
+  display.position.y = T + .0003; phone.add(display)
   const islandGeo = new THREE.ShapeGeometry(roundedRect(.019, .0055, .00275), 6); islandGeo.rotateX(-Math.PI / 2)
   const island = new THREE.Mesh(islandGeo, new THREE.MeshBasicMaterial({ color: '#000000' }))
-  island.position.set(0, T + .0006, -L / 2 + .0095); phone.add(island)
+  island.position.set(0, T + .0005, -L / 2 + .0095); phone.add(island)
   return phone
 }
 
@@ -304,6 +312,7 @@ export function createShelfContents({ top, back, front, from, to, alongZ, maxHei
           if (p + w > b) break
           const color = FILE_COLORS[Math.floor(rand() * FILE_COLORS.length)]
           const box = new THREE.Mesh(alongZ ? new THREE.BoxGeometry(d, h, w) : new THREE.BoxGeometry(w, h, d), mat(color, .55))
+          box.name = 'box-file'
           place(box, p + w / 2, d / 2 + .01, top + h / 2)
           // spine label and finger hole on the room-facing side
           const label = new THREE.Mesh(new THREE.PlaneGeometry(w * .62, h * .28), labelMat)
@@ -336,4 +345,22 @@ export function createShelfContents({ top, back, front, from, to, alongZ, maxHei
     }
   }
   return group
+}
+
+// ---- Plug-in style wall night light ------------------------------------------------
+// Slim brass-framed panel with an opal diffuser and a small motion-sensor dot.
+// Origin at the wall, facing +Z. Returns { group, glow, lightPoint }.
+export function createNightLight() {
+  const group = new THREE.Group(); group.name = 'night-light'
+  const W = .065, H = .115, D = .014
+  const brass = new THREE.MeshStandardMaterial({ color: '#c49a4a', roughness: .32, metalness: .8 })
+  const frame = new THREE.Mesh(new RoundedBoxGeometry(W, H, D, 3, .005), brass)
+  frame.position.z = D / 2; group.add(frame)
+  const glow = new THREE.MeshStandardMaterial({ color: '#fbf4e6', emissive: '#ffcf8a', emissiveIntensity: 0, roughness: .5 })
+  const panel = new THREE.Mesh(new THREE.PlaneGeometry(W * .72, H * .66), glow)
+  panel.position.set(0, H * .1, D + .0006); group.add(panel)
+  const sensor = new THREE.Mesh(new THREE.CircleGeometry(.0055, 20), new THREE.MeshPhysicalMaterial({ color: '#1a1a1a', roughness: .1, clearcoat: 1 }))
+  sensor.position.set(0, -H * .36, D + .0006); group.add(sensor)
+  frame.castShadow = true
+  return { group, glow, lightPoint: new THREE.Vector3(0, H * .1, D + .02) }
 }

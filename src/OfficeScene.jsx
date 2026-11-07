@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { createExteriorMaterial, WINDOW_UV } from './exteriorShader'
 import { buildCollisionGrid, createWalkTester } from './collision'
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
-import { createPhone, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents } from './props'
+import { PHONE, createPhone, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight } from './props'
 import { createDesktopTexture, BEACH_PHOTO_URL } from './screens'
 
 const MODEL_URL = '/models/home-office.glb'
@@ -18,10 +18,23 @@ const SPOT_RATIOS = [
 ]
 
 const EYE_HEIGHT = 1.58         // metres above the floor (standing adult)
-const DEFAULT_FOV = 66
+const DEFAULT_FOV = 80          // opening view: fully zoomed out (the widest the scroll allows)
 const SUN_DAY = 4.6             // direct sunlight strength in day mode
 const WALK_SPEED = 1.9          // metres per second
-const DAY_NIGHT_SECONDS = 3.2   // length of the day ↔ night transition
+// Time of day → how dark it is outside (0 day … 1 night) and how warm/golden the light is.
+// Lamps follow the darkness, the sky passes through a golden dusk around sunrise and sunset.
+const DAY_KEYS = [ // [hour, night, warmth]
+  [0, 1, 0], [5, 1, 0], [6, .5, .9], [7.5, .15, .45], [9, 0, 0], [14, 0, 0], [16.5, .05, .3],
+  [18, .5, 1], [19.5, .78, .4], [20.5, .86, .12], [22, 1, 0], [24, 1, 0],
+]
+export function lightAt(hour) {
+  const h = ((hour % 24) + 24) % 24
+  for (let i = 0; i < DAY_KEYS.length - 1; i++) {
+    const [h0, n0, w0] = DAY_KEYS[i], [h1, n1, w1] = DAY_KEYS[i + 1]
+    if (h >= h0 && h <= h1) { const t = (h - h0) / (h1 - h0 || 1); return { night: n0 + (n1 - n0) * t, warm: w0 + (w1 - w0) * t } }
+  }
+  return { night: 1, warm: 0 }
+}
 // Plain cloth-bound colours that replace the printed book covers.
 const BOOK_COLORS = ['#2f3e46', '#b5523b', '#d9a441', '#6b8f71', '#e6dfd2', '#3b3b3d', '#8c5e3c', '#9fb2c4', '#c97c5d', '#5b4b6b', '#a4a08a', '#1f4e5f']
 
@@ -81,7 +94,7 @@ function createScene(canvas, handlers) {
   // window falls as crisp patches on the seat, floor and chair.
   sun.shadow.mapSize.set(2048,2048); sun.shadow.camera.left=-90; sun.shadow.camera.right=90; sun.shadow.camera.top=90; sun.shadow.camera.bottom=-90; sun.shadow.camera.far=180; sun.shadow.bias=-.0004; sun.shadow.normalBias=.03
   scene.add(sun)
-  const sunDay = new THREE.Color('#ffe7c4'), moonColor = new THREE.Color('#9fb6ff')
+  const sunDay = new THREE.Color('#ffe7c4'), moonColor = new THREE.Color('#9fb6ff'), sunGold = new THREE.Color('#ff9a52')
   const fill = new THREE.AmbientLight('#dce7f2',.36); scene.add(fill)
   // Extra warm lights that only switch on at night: { light, max, glow?: material, glowMax }
   const nightLights = []
@@ -140,7 +153,9 @@ function createScene(canvas, handlers) {
 
   let model = null, bounds = null, roomBounds = null, walkBounds = null, floorY = 0, desk = null, spots = [], meshColliders = [], ground = null, groundMaterial = null, windowGlassMaterials = [], loadError = false
   let grid = null, computer = null
-  const state = { x: 0, z: 0, yaw: -Math.PI/2, pitch: 0, nearby: false, system: false }
+  // Explorable spots (computer, phone, files, books, speaker) and an optional walk-to tween.
+  let hotspots = [], travel = null
+  const state = { x: 0, z: 0, yaw: -Math.PI/2, pitch: 0, nearby: false, system: false, hotspot: null }
 
   const { isFree, nearestFree } = createWalkTester(() => grid, () => walkBounds)
 
@@ -313,7 +328,7 @@ function createScene(canvas, handlers) {
       const roomMidX = (roomBounds.min.x + roomBounds.max.x) / 2, towardChair = Math.sign(roomMidX - b.getCenter(new THREE.Vector3()).x) || -1
       const lampCenter = b.getCenter(new THREE.Vector3())
       phone.position.set(lampCenter.x + towardChair * ((b.max.x - b.min.x) / 2 + .1), b.min.y + .001, lampCenter.z - .06)
-      phone.rotation.y = Math.PI / 2 + .22 // long side pointing away from whoever sits at the desk
+      phone.rotation.y = towardChair * Math.PI / 2 + .12 // top of the phone points away from whoever stands at the desk
       scene.add(phone)
     }
     // A fabric speaker on the low cabinet, next to the vase of white roses.
@@ -347,8 +362,24 @@ function createScene(canvas, handlers) {
       const stripMat = new THREE.MeshStandardMaterial({ color: '#fff3dc', emissive: '#ffcf8f', emissiveIntensity: 0 })
       const strip = new THREE.Mesh(new THREE.BoxGeometry(Math.max(windowBox.max.x-windowBox.min.x, windowBox.max.z-windowBox.min.z)*.9, .015, .02), stripMat)
       strip.position.set(c.x+inward.x*.62, floorY+.47, c.z+inward.z*.62); strip.rotation.y = Math.atan2(inward.x, inward.z); scene.add(strip)
-      const seatGlow = new THREE.PointLight('#ffcf8f', 0, 1.8, 1.8); seatGlow.position.set(c.x+inward.x*.75, floorY+.3, c.z+inward.z*.75); scene.add(seatGlow)
-      nightLights.push({ light: seatGlow, max: .9, glow: stripMat, glowMax: 2.2 })
+      nightLights.push({ light: null, max: 0, glow: stripMat, glowMax: 2.2 })
+      // Night light on the front of the window-seat base: a small brass-framed panel that is
+      // visible (switched off) by day and at night throws a warm pool across the floor.
+      // find the seat base's front face: cast from just in front of it (past the chair) toward the window
+      const probe = new THREE.Vector3(c.x + inward.x * 1.15, floorY + .24, c.z + inward.z * 1.15)
+      const faceHit = new THREE.Raycaster(probe, inward.clone().negate(), 0, 1.2).intersectObject(model, true).find((h) => h.object.visible)
+      if (faceHit) {
+        const { group: nightLamp, glow: nightGlow, lightPoint } = createNightLight()
+        nightLamp.position.set(faceHit.point.x + inward.x * .002, floorY + .24, faceHit.point.z + inward.z * .002)
+        nightLamp.position.addScaledVector(new THREE.Vector3(inward.z, 0, -inward.x), -.32) // off-centre, on the walkway side away from the chair
+        nightLamp.rotation.y = Math.atan2(inward.x, inward.z); scene.add(nightLamp); nightLamp.updateMatrixWorld(true)
+        const origin = nightLamp.localToWorld(lightPoint.clone())
+        const pool = new THREE.SpotLight('#ffc983', 0, 2.6, .9, .85, 1.6); pool.position.copy(origin)
+        pool.target.position.set(origin.x + inward.x * 1.1, floorY, origin.z + inward.z * 1.1); scene.add(pool); scene.add(pool.target)
+        nightLights.push({ light: pool, max: 3.2, glow: nightGlow, glowMax: 2.6 })
+        const halo = new THREE.PointLight('#ffcf8f', 0, .7, 2); halo.position.copy(origin).addScaledVector(inward, .03); scene.add(halo)
+        nightLights.push({ light: halo, max: .35 })
+      }
     }
     // Picture light above the beach photo: bar lamp on the wall, washing the print at night.
     const print = find('Cube.030')
@@ -440,9 +471,40 @@ function createScene(canvas, handlers) {
     grid = buildCollisionGrid(meshColliders, roomBounds, floorY)
     const imac = find('Apple iMac 27 - display')
     if (imac) { const p = imac.getWorldPosition(new THREE.Vector3()); computer = { x: p.x, z: p.z } }
-    const start = nearestFree(spots[0].x, spots[0].z)
+    // Explorable spots: what each object opens, and where to stand to use it.
+    {
+      const centerX=(walkBounds.min.x+walkBounds.max.x)/2
+      const at=(obj)=>obj?new THREE.Box3().setFromObject(obj).getCenter(new THREE.Vector3()):null
+      // The files: a run of box files on the shelves, away from the speaker and the book stack.
+      const filesSpot=()=>{
+        const files=[]; scene.traverse((m)=>{ if(m.name==='box-file') files.push(m.getWorldPosition(new THREE.Vector3())) })
+        if(!files.length) return null
+        const avoid=[at(scene.getObjectByName('cabinet-speaker')),at(find('Line023'))].filter(Boolean)
+        const score=(p)=>avoid.reduce((sum,a)=>sum+Math.min(1.5,Math.hypot(p.x-a.x,p.z-a.z)),0)-p.y*.4
+        const best=files.reduce((a,b)=>score(b)>score(a)?b:a)
+        const run=files.filter((p)=>Math.abs(p.y-best.y)<.05&&p.distanceTo(best)<.45)
+        return run.reduce((s,p)=>s.add(p),new THREE.Vector3()).divideScalar(run.length)
+      }
+      const spots=[
+        { id:'projects', app:'projects', label:'Computer', pos:at(imac) },
+        { id:'contact', app:'contact', label:'Phone', pos:at(scene.getObjectByName('desk-phone')) },
+        { id:'resume', app:'resume', label:'Files', pos:filesSpot() },
+        { id:'about', app:'about', label:'Books', pos:at(find('Line023')) },
+        { id:'music', app:'music', label:'Speaker', pos:at(scene.getObjectByName('cabinet-speaker')) },
+      ]
+      hotspots=spots.filter((h)=>h.pos).map((h)=>{
+        // stand in the walkway about an arm's length back from the object, facing it
+        const v=nearestFree(h.pos.x+THREE.MathUtils.clamp(centerX-h.pos.x,-1.15,1.15),h.pos.z+.15)
+        return {...h,view:v}
+      })
+    }
+    // Opening view: stand at the door end of the room, centred, looking straight down the
+    // room toward the window (shelves on the left, desk on the right).
+    const windowAt = find('Window') ? new THREE.Box3().setFromObject(find('Window')).getCenter(new THREE.Vector3()) : new THREE.Vector3(spots[3].x, 0, spots[3].z)
+    const farEnd = Math.abs(walkBounds.max.z - windowAt.z) > Math.abs(walkBounds.min.z - windowAt.z) ? walkBounds.max.z - .2 : walkBounds.min.z + .2
+    const start = nearestFree((roomBounds.min.x + roomBounds.max.x) / 2, farEnd)
     state.x=start.x;state.z=start.z
-    state.yaw=Math.atan2(-(desk.x-state.x),-(desk.z-state.z));state.pitch=0
+    state.yaw=Math.atan2(-(windowAt.x-state.x),-(windowAt.z-state.z));state.pitch=0
     if(windowNode){
       const windowBox=new THREE.Box3().setFromObject(windowNode),windowCenter=windowBox.getCenter(new THREE.Vector3())
       const inward=new THREE.Vector3(state.x-windowCenter.x,0,state.z-windowCenter.z).normalize()
@@ -459,48 +521,86 @@ function createScene(canvas, handlers) {
     }
     handlers.onPosition?.({ x:state.x,z:state.z,minX:walkBounds.min.x,maxX:walkBounds.max.x,minZ:walkBounds.min.z,maxZ:walkBounds.max.z })
     handlers.onReady?.()
-  }, undefined, (error) => { console.error('Unable to load the home-office model.',error); loadError=true; handlers.onReady?.() })
+  }, (xhr) => { if (xhr.total) handlers.onProgress?.(xhr.loaded / xhr.total, xhr.loaded, xhr.total) }, (error) => { console.error('Unable to load the home-office model.',error); loadError=true; handlers.onReady?.() })
 
+  // Phone close-up: the camera glides down to look straight onto the phone lying on the desk.
+  let focus=null
+  const tmpM=new THREE.Matrix4(), tmpV=new THREE.Vector3(), tmpQ=new THREE.Quaternion()
+  const phoneView=()=>{
+    const phone=scene.getObjectByName('desk-phone'); if(!phone)return null
+    phone.updateWorldMatrix(true,false)
+    const center=new THREE.Vector3(0,PHONE.T,0).applyMatrix4(phone.matrixWorld)
+    const up=new THREE.Vector3(0,0,-1).transformDirection(phone.matrixWorld); up.y=0; up.normalize()
+    const r=canvas.getBoundingClientRect(), fov=36, half=Math.tan(THREE.MathUtils.degToRad(fov/2))
+    const reserved=r.width<=720?150:104 // keep clear of the bottom bar
+    const usableH=Math.max(200,r.height-reserved-40), screenFrac=usableH/r.height
+    const L=PHONE.L, W=PHONE.W
+    const hForLength=(L/2)/(half*screenFrac*.97), hForWidth=(W/2)/(half*(r.width/r.height)*.9)
+    const h=Math.max(hForLength,hForWidth)
+    // shift the view so the phone sits in the space above the bar
+    const shiftPx=(reserved-40)/2, shift=(shiftPx/(r.height/2))*h*half
+    const pos=center.clone().addScaledVector(up,-shift); pos.y+=h
+    const look=pos.clone(); look.y-=1
+    tmpM.lookAt(pos,look,up)
+    return {pos,quat:new THREE.Quaternion().setFromRotationMatrix(tmpM),fov}
+  }
+  const enterSystem=()=>{
+    if(!state.hotspot||state.system)return
+    state.system=true; keys.clear(); travel=null
+    if(state.hotspot.id==='contact'){
+      const to=phoneView()
+      if(to)focus={phase:'in',t:0,from:{pos:camera.position.clone(),quat:camera.quaternion.clone(),fov:camera.fov},to,savedFov:camera.fov}
+    }
+    handlers.onSystem(true,state.hotspot.app)
+  }
+  const exitSystem=()=>{
+    if(!state.system)return
+    state.system=false
+    if(focus)focus={...focus,phase:'out',t:0,from:{pos:camera.position.clone(),quat:camera.quaternion.clone(),fov:camera.fov}}
+    handlers.onSystem(false)
+  }
   const keys = new Set()
   const onDown = (event) => {
     const key=event.key.toLowerCase()
-    if (state.system && ['backspace','delete'].includes(key)) { event.preventDefault(); state.system=false; handlers.onSystem(false); return }
-    if (!state.system && key==='enter' && state.nearby) { event.preventDefault(); state.system=true; handlers.onSystem(true); return }
-    if (!state.system && ['arrowup','arrowdown','arrowleft','arrowright'].includes(key)) { event.preventDefault(); keys.add(key) }
+    if (state.system && ['backspace','delete','escape'].includes(key)) { event.preventDefault(); exitSystem(); return }
+    if (!state.system && key==='enter' && state.hotspot) { event.preventDefault(); enterSystem(); return }
+    if (!state.system && ['arrowup','arrowdown','arrowleft','arrowright'].includes(key)) { event.preventDefault(); keys.add(key); travel=null }
   }
   const onUp=(event)=>keys.delete(event.key.toLowerCase()), clearKeys=()=>keys.clear()
   window.addEventListener('keydown',onDown); window.addEventListener('keyup',onUp); window.addEventListener('blur',clearKeys)
   let pointer=null
-  const pointerDown=(event)=>{ if(event.button!==0)return; pointer={id:event.pointerId,x:event.clientX,y:event.clientY}; canvas.setPointerCapture?.(event.pointerId) }
-  const pointerMove=(event)=>{ if(!pointer||pointer.id!==event.pointerId||state.system)return; const dx=event.clientX-pointer.x,dy=event.clientY-pointer.y; pointer.x=event.clientX;pointer.y=event.clientY;state.yaw-=dx*.003;state.pitch=THREE.MathUtils.clamp(state.pitch-dy*.002,-.45,.32) }
+  const pointerDown=(event)=>{ if(event.button!==0)return; travel=null; pointer={id:event.pointerId,x:event.clientX,y:event.clientY}; canvas.setPointerCapture?.(event.pointerId) }
   const pointerUp=()=>{pointer=null}
+  const pointerMove=(event)=>{ if(!pointer||pointer.id!==event.pointerId||state.system)return; const dx=event.clientX-pointer.x,dy=event.clientY-pointer.y; pointer.x=event.clientX;pointer.y=event.clientY;state.yaw-=dx*.003;state.pitch=THREE.MathUtils.clamp(state.pitch-dy*.002,-.75,.32) }
+
   canvas.addEventListener('pointerdown',pointerDown);canvas.addEventListener('pointermove',pointerMove);canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',pointerUp)
   const onWheel=(event)=>{event.preventDefault();camera.fov=THREE.MathUtils.clamp(camera.fov+Math.sign(event.deltaY)*2,46,80);camera.updateProjectionMatrix()}
   canvas.addEventListener('wheel',onWheel,{passive:false})
   const resize=()=>{const r=canvas.getBoundingClientRect();renderer.setSize(r.width,r.height,false);camera.aspect=r.width/Math.max(r.height,1);camera.updateProjectionMatrix()}
   const observer=new ResizeObserver(resize);observer.observe(canvas);resize()
-  const localHour=new Date().getHours(), startsAtNight=localHour<6||localHour>=18
-  // `progress` moves at a constant rate toward the target; `night` is its eased value.
-  let frame=0,last=performance.now(),uiTime=0,nightTarget=startsAtNight?1:0,progress=nightTarget,night=nightTarget
+  const nowHour=new Date().getHours()+new Date().getMinutes()/60
+  // `light` eases toward `lightTarget` (set from the time of day); `night` is the eased darkness.
+  let frame=0,last=performance.now(),uiTime=0,lightTarget=lightAt(nowHour),light={...lightTarget},progress=light.night,night=light.night
   const walkDirection=new THREE.Vector3()
   const tick=(now)=>{
     const dt=Math.min((now-last)/1000,.04);last=now;uiTime+=dt
-    const stepAmount=dt/DAY_NIGHT_SECONDS
-    progress=progress<nightTarget?Math.min(nightTarget,progress+stepAmount):Math.max(nightTarget,progress-stepAmount)
+    light.night=THREE.MathUtils.damp(light.night,lightTarget.night,2.2,dt); light.warm=THREE.MathUtils.damp(light.warm,lightTarget.warm,2.2,dt)
+    progress=light.night
     night=progress*progress*(3-2*progress)
+    const warm=light.warm
     scene.background.copy(dayColor).lerp(nightColor,night);scene.fog.color.copy(scene.background)
     exteriorMaterials.forEach((material)=>{material.uniforms.nightMix.value=progress;material.uniforms.time.value=now/1000})
     const lerp=THREE.MathUtils.lerp
     hemi.intensity=lerp(.95,.22,night);fill.intensity=lerp(.3,.12,night)
-    sun.intensity=lerp(SUN_DAY,.3,night);sun.color.copy(sunDay).lerp(moonColor,night)
+    sun.intensity=lerp(SUN_DAY,.3,night)*(1-warm*.25);sun.color.copy(sunDay).lerp(sunGold,warm).lerp(moonColor,night*(1-warm*.5))
     // Lamps come on during dusk, before it is fully dark.
     const lampsOn=THREE.MathUtils.smoothstep(progress,.3,.85)
     dayFillLights.forEach((entry)=>{entry.light.intensity=entry.max*(1-night)})
     // Shelf LEDs: a faint glow by day, full mood lighting at night.
     moodLights.forEach((entry)=>{const k=lerp(.12,1,lampsOn);entry.light.intensity=entry.max*k;entry.glow.emissiveIntensity=entry.glowMax*k})
     alwaysOnLights.forEach((entry)=>{entry.light.intensity=lerp(entry.day,entry.night,night)})
-    nightLights.forEach((entry)=>{entry.light.intensity=entry.max*lampsOn;if(entry.glow)entry.glow.emissiveIntensity=entry.glowMax*lampsOn})
-    if(windowSun){windowSun.intensity=lerp(2.1,.22,night);windowSun.color.copy(sunDay).lerp(moonColor,night)}
+    nightLights.forEach((entry)=>{if(entry.light)entry.light.intensity=entry.max*lampsOn;if(entry.glow)entry.glow.emissiveIntensity=entry.glowMax*lampsOn})
+    if(windowSun){windowSun.intensity=lerp(2.1,.22,night);windowSun.color.copy(sunDay).lerp(sunGold,warm).lerp(moonColor,night*(1-warm*.5))}
     if (groundMaterial) groundMaterial.color.setRGB(1-.62*night,1-.58*night,1-.5*night)
     const turn=Number(keys.has('arrowright'))-Number(keys.has('arrowleft')), forward=Number(keys.has('arrowup'))-Number(keys.has('arrowdown'))
     if(turn&&!state.system)state.yaw-=turn*1.6*dt
@@ -515,24 +615,76 @@ function createScene(canvas, handlers) {
       else if(isFree(state.x,nextZ))state.z=nextZ
       if(walkBounds){state.x=THREE.MathUtils.clamp(state.x,walkBounds.min.x,walkBounds.max.x);state.z=THREE.MathUtils.clamp(state.z,walkBounds.min.z,walkBounds.max.z)}
     }
-    // Near the desk: within reach of the iMac (or the desk spot if the iMac isn't found).
-    const target=computer||desk, reach=computer?1.6:1.5
-    const distance=target?Math.hypot(state.x-target.x,state.z-target.z):Infinity,isNearby=distance<reach
-    if(isNearby!==state.nearby){state.nearby=isNearby;handlers.onNearby(isNearby)}
+    // Walking to a spot from the shortcut buttons: ease position and view over ~1.2 s.
+    if(travel){
+      travel.t=Math.min(1,travel.t+dt/travel.duration); const e=travel.t<.5?4*travel.t**3:1-Math.pow(-2*travel.t+2,3)/2
+      state.x=THREE.MathUtils.lerp(travel.from.x,travel.to.x,e); state.z=THREE.MathUtils.lerp(travel.from.z,travel.to.z,e)
+      state.yaw=travel.from.yaw+travel.dYaw*e; state.pitch=THREE.MathUtils.lerp(travel.from.pitch,travel.to.pitch,e)
+      if(travel.t>=1)travel=null
+    }
+    // Which spot is the visitor at? The one in front of them and close enough (or right beside them).
+    let active=null, best=Infinity
+    for(const spot of hotspots){
+      const dx=spot.pos.x-state.x, dz=spot.pos.z-state.z, dist=Math.hypot(dx,dz)
+      const ang=Math.abs(Math.atan2(Math.sin(Math.atan2(-dx,-dz)-state.yaw),Math.cos(Math.atan2(-dx,-dz)-state.yaw)))
+      const score=dist+ang*1.2
+      if(((dist<1.6&&ang<.55)||(dist<1.05&&ang<1))&&score<best){best=score;active=spot}
+    }
+    if(active!==state.hotspot){state.hotspot=active;state.nearby=!!active;handlers.onHotspot?.(active?active.id:null);handlers.onNearby?.(!!active)}
     camera.position.set(state.x,roomBounds?floorY+EYE_HEIGHT:EYE_HEIGHT,state.z);camera.rotation.set(state.pitch,state.yaw,0)
+    if(focus){
+      focus.t=Math.min(1,focus.t+dt/(focus.phase==='in'?1.15:.9))
+      const e=focus.t<.5?4*focus.t**3:1-Math.pow(-2*focus.t+2,3)/2
+      if(focus.phase==='in'){
+        if(focus.t>=1){const v=phoneView();if(v)focus.to=v} // follow window resizes
+        camera.position.lerpVectors(focus.from.pos,focus.to.pos,e); tmpQ.copy(focus.from.quat).slerp(focus.to.quat,e); camera.quaternion.copy(tmpQ)
+        camera.fov=THREE.MathUtils.lerp(focus.from.fov,focus.to.fov,e)
+      }else{
+        tmpV.copy(camera.position); tmpQ.copy(camera.quaternion) // the normal walking view
+        camera.position.lerpVectors(focus.from.pos,tmpV,e); camera.quaternion.copy(focus.from.quat).slerp(tmpQ,e)
+        camera.fov=THREE.MathUtils.lerp(focus.from.fov,focus.savedFov,e)
+        if(focus.t>=1){camera.fov=focus.savedFov;focus=null}
+      }
+      camera.updateProjectionMatrix()
+      // the desk lamp sits right beside the phone; ease the exposure down so the wood still reads
+      renderer.toneMappingExposure=.9-.28*(focus?(focus.phase==='in'?e:1-e):0)
+    } else renderer.toneMappingExposure=.9
     if(uiTime>.12){handlers.onPosition?.({x:state.x,z:state.z,minX:walkBounds?.min.x??-1,maxX:walkBounds?.max.x??1,minZ:walkBounds?.min.z??-1,maxZ:walkBounds?.max.z??1});uiTime=0}
     renderer.render(scene,camera);frame=requestAnimationFrame(tick)
   }
   frame=requestAnimationFrame(tick)
   return {
-    setMode(mode){nightTarget=mode==='night'?1:0},
+    setTimeOfDay(hour){lightTarget=lightAt(hour)},
+    // Walk to one of the explorable spots and face it.
+    goTo(id){
+      const spot=hotspots.find((h)=>h.id===id); if(!spot||state.system)return
+      const view=spot.view, yaw=Math.atan2(-(spot.pos.x-view.x),-(spot.pos.z-view.z))
+      const eyeY=floorY+EYE_HEIGHT, pitch=THREE.MathUtils.clamp(Math.atan2(spot.pos.y-eyeY,Math.hypot(spot.pos.x-view.x,spot.pos.z-view.z)),-.75,.3)
+      const dYaw=Math.atan2(Math.sin(yaw-state.yaw),Math.cos(yaw-state.yaw))
+      travel={t:0,duration:Math.min(1.8,.7+Math.hypot(view.x-state.x,view.z-state.z)*.35),from:{x:state.x,z:state.z,yaw:state.yaw,pitch:state.pitch},to:{x:view.x,z:view.z,pitch},dYaw}
+    },
+    openSpot(){ enterSystem() },
+    closeSystem(){ exitSystem() },
+    // Where the phone's screen is on the page once the camera has settled over it (null until then).
+    phoneScreenRect(){
+      if(!focus||focus.phase!=='in'||focus.t<1)return null
+      const phone=scene.getObjectByName('desk-phone'); if(!phone)return null
+      const r=canvas.getBoundingClientRect(), w=PHONE.displayW/2, l=PHONE.displayL/2
+      let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity
+      for(const [x,z] of [[-w,-l],[w,-l],[w,l],[-w,l]]){
+        tmpV.set(x,PHONE.T+.0003,z).applyMatrix4(phone.matrixWorld).project(camera)
+        const px=(tmpV.x+1)/2*r.width, py=(1-tmpV.y)/2*r.height
+        x0=Math.min(x0,px);x1=Math.max(x1,px);y0=Math.min(y0,py);y1=Math.max(y1,py)
+      }
+      return {left:r.left+x0,top:r.top+y0,width:x1-x0,height:y1-y0,radius:(x1-x0)*PHONE.displayR/PHONE.displayW}
+    },
     goToSpot(index){if(!spots[index])return;const spot=nearestFree(spots[index].x,spots[index].z);state.x=spot.x;state.z=spot.z;const target=index===3?spots[0]:desk;state.yaw=target?Math.atan2(-(target.x-state.x),-(target.z-state.z)):-Math.PI/2;state.pitch=0},
     dispose(){cancelAnimationFrame(frame);observer.disconnect();window.removeEventListener('keydown',onDown);window.removeEventListener('keyup',onUp);window.removeEventListener('blur',clearKeys);canvas.removeEventListener('pointerdown',pointerDown);canvas.removeEventListener('pointermove',pointerMove);canvas.removeEventListener('pointerup',pointerUp);canvas.removeEventListener('pointercancel',pointerUp);canvas.removeEventListener('wheel',onWheel);scene.traverse((object)=>{object.geometry?.dispose();if(Array.isArray(object.material))object.material.forEach((m)=>m.dispose());else object.material?.dispose()});groundMaterial?.map?.dispose();wallTexture.dispose();wallSource.dispose();floorTexture.dispose();cabinetTexture.dispose();doorTexture.dispose();desktopTexture.userData.dispose?.();desktopTexture.dispose();exteriorTexture.dispose();renderer.dispose()},
   }
 }
 
-export default function OfficeScene({sceneRef,onPosition,onNearby,onSystem,onReady}){
+export default function OfficeScene({sceneRef,onPosition,onNearby,onHotspot,onSystem,onReady,onProgress}){
   const canvasRef=useRef(null)
-  useEffect(()=>{if(!canvasRef.current)return undefined;const office=createScene(canvasRef.current,{onPosition,onNearby,onSystem,onReady});sceneRef.current=office;return()=>{office.dispose();if(sceneRef.current===office)sceneRef.current=null}},[sceneRef,onPosition,onNearby,onSystem,onReady])
+  useEffect(()=>{if(!canvasRef.current)return undefined;const office=createScene(canvasRef.current,{onPosition,onNearby,onHotspot,onSystem,onReady,onProgress});sceneRef.current=office;return()=>{office.dispose();if(sceneRef.current===office)sceneRef.current=null}},[sceneRef,onPosition,onNearby,onHotspot,onSystem,onReady,onProgress])
   return <canvas ref={canvasRef} className="office-canvas" aria-label="First-person walkthrough of the home office. Use arrow keys to move, drag to look, and press Enter at the work desk." />
 }
