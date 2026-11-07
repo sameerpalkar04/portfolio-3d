@@ -94,6 +94,20 @@ export const SPOTS = [
   { id: 'music', object: 'Speaker', opens: 'Song picks' },
 ]
 
+// A slider built from plain elements so dragging works the same with a mouse, a finger or a pen
+// (the native range input fights with touch scrolling on phones). Arrow keys also work.
+function TimeSlider({ value, onChange }) {
+  const track = useRef(null)
+  const set = (clientX) => { const r = track.current.getBoundingClientRect(); onChange(Math.min(5, Math.max(0, (clientX - r.left) / r.width * 5))) }
+  return <div ref={track} className="tslider" role="slider" tabIndex={0} aria-label="Time of day" aria-valuemin={0} aria-valuemax={5} aria-valuenow={+value.toFixed(2)}
+    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); set(e.clientX) }}
+    onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) set(e.clientX) }}
+    onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); onChange(Math.min(5, Math.max(0, value + (e.key === 'ArrowRight' ? .1 : -.1)))) } }}>
+    <span className="tslider-rail"><i style={{ width: `calc(17px + (100% - 34px) * ${value / 5})` }}/></span>
+    <span className="tslider-thumb" style={{ left: `calc(17px + (100% - 34px) * ${value / 5})` }}/>
+  </div>
+}
+
 function TimePanel({ hour, auto, onHour, onAuto }) {
   const value = hourToSlider(hour)
   // in auto mode show the real system time, kept current
@@ -104,7 +118,7 @@ function TimePanel({ hour, auto, onHour, onAuto }) {
   return <div className="bar-panel time-panel" role="dialog" aria-label="Time of day">
     <div className="panel-head"><b>{phase}</b><span>{auto ? `auto · ${systemTime}` : clock(hour)}</span></div>
     <div className="time-row">
-      <input type="range" min="0" max="5" step="0.01" value={value} onChange={(e) => onHour(sliderToHour(+e.target.value))} aria-label="Time of day"/>
+      <TimeSlider value={value} onChange={(v) => onHour(sliderToHour(v))}/>
       <button className={`auto-btn${auto ? ' on' : ''}`} onClick={onAuto} aria-pressed={auto} title="Follow your clock">Auto</button>
     </div>
     <div className="time-ticks">{PHASES.map(([name], i) => <button key={name} className={Math.round(value) === i ? 'on' : ''} onClick={() => onHour(PHASES[i][1])}>{name}</button>)}</div>
@@ -130,7 +144,7 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interact
   const ref = useRef(null)
   useEffect(() => {
     if (!panel) return undefined
-    const close = (e) => { if (!ref.current?.contains(e.target)) setPanel(null) }
+    const close = (e) => { if (!(ref.current?.contains(e.target) || e.target.closest?.('.hud-dock'))) setPanel(null) }
     const esc = (e) => { if (e.key === 'Escape') setPanel(null) }
     window.addEventListener('pointerdown', close); window.addEventListener('keydown', esc)
     return () => { window.removeEventListener('pointerdown', close); window.removeEventListener('keydown', esc) }
@@ -142,7 +156,7 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interact
   const compact = isTouch()
   const [open, setOpen] = useState(false)
   useEffect(() => { if (interacting) setOpen(false) }, [interacting])
-  if (compact && !open) return <motion.div className="touch-fabs" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4 }}>
+  if (compact && !open) return <motion.div key="fabs" className="touch-fabs" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4 }}>
     <AnimatePresence>
       {interacting
         ? <motion.button key="back" className="fab-action" onClick={onBack} initial={{ opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }}><Arrow dir="left"/> BACK TO ROOM</motion.button>
@@ -152,7 +166,7 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interact
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
     </button>
   </motion.div>
-  return <motion.div ref={ref} className={`hud-dock${compact ? ' is-sheet' : ''}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .45, ease: [.2, .8, .2, 1] }}>
+  return <motion.div key="dock" ref={ref} className={`hud-dock${compact ? ' is-sheet' : ''}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .45, ease: [.2, .8, .2, 1] }}>
     {panel === 'time' && <TimePanel hour={hour} auto={auto} onHour={onHour} onAuto={onAuto}/>}
     {panel === 'help' && <HelpPanel/>}
     <nav className="bottom-bar" aria-label="Controls">

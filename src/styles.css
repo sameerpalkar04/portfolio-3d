@@ -323,3 +323,14 @@
 .name-tag .name-holder{visibility:hidden}
 .name-tag .name-big{position:absolute;left:0;top:0;margin:0;width:max-content}
 @media(max-width:1180px){.name-tag.is-corner{top:18px;bottom:auto;left:20px}}
+.tslider{position:relative;flex:1;height:32px;cursor:pointer;touch-action:none;-webkit-user-select:none;user-select:none;outline:none}
+.tslider-rail{position:absolute;left:0;right:0;top:50%;height:6px;margin-top:-3px;border-radius:3px;background:#e3e5e8;overflow:hidden}
+.tslider-rail i{display:block;height:100%;background:#1d1f22}
+.tslider-thumb{position:absolute;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:#1d1f22;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.tslider:focus-visible .tslider-thumb{box-shadow:0 0 0 3px #6D988666,0 1px 4px rgba(0,0,0,.3)}
+.tslider-thumb{width:34px;height:18px;margin:-9px 0 0 -17px;border-radius:9px;background:#222831;border:2px solid #fff}
+.time-row{gap:22px}
+.time-ticks{padding-right:96px}
+.time-panel{width:430px}.time-ticks{padding-right:92px}
+@media(max-width:720px){.time-panel{width:auto}}.office-hud:has(.is-sheet) .look-cue,.office-hud:has(.bar-panel) .look-cue{display:none}
+@media(max-width:720px){.time-row{gap:14px}.time-ticks{padding-right:84px}.time-ticks button{font-size:9.5px}}
