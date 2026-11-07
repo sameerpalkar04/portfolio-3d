@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { createExteriorMaterial, WINDOW_UV } from './exteriorShader'
 import { buildCollisionGrid, createWalkTester } from './collision'
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
-import { PHONE, createPhone, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight } from './props'
+import { PHONE, createPhone, createFloorPlant, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight } from './props'
 import { createDesktopTexture, BEACH_PHOTO_URL } from './screens'
 
 const MODEL_URL = '/models/home-office.glb'
@@ -205,7 +205,7 @@ function createScene(canvas, handlers) {
           material.color.set('#b8b4ac'); material.metalness=.75; material.roughness=.32
         } else if (name.includes('door')) {
           material.map=cabinetTexture;material.color.set('#eee0c7');material.roughness=.74
-        } else if (name === 'plywood' || name === 'plywood 1' || name === 'plywood 2' || name === 'frame') {
+        } else if (name === 'plywood' || name === 'plywood 1' || name === 'plywood 2') {
           material.map=cabinetTexture; material.color.set('#fff8eb'); material.roughness=.68
         } else if (name === 'glass') {               // iMac front glass (and window pane): clear, not milky
           material.transparent=true; material.opacity=.1; material.color.set('#ffffff'); material.roughness=.05; material.metalness=0
@@ -220,6 +220,10 @@ function createScene(canvas, handlers) {
           material.color.set('#c0161d'); material.roughness=.26; material.metalness=0
         } else if (name === 'material.001') {        // coffee in the mug
           material.color.set('#3b200f'); material.roughness=.12; material.metalness=0
+        } else if (name === 'material.004') {        // glass over the standing photo: clear, so the picture shows
+          material.transparent=true; material.opacity=.08; material.depthWrite=false; material.color.set('#ffffff'); material.roughness=.05; material.transmission=0
+        } else if (name === 'frame') {               // standing photo frame on the cabinet: black border
+          material.map=null; material.color.set('#111113'); material.roughness=.42; material.metalness=.1
         } else if (name === 'photo (big)') {         // wall photo: the beach picture is swapped in below
           material.color.set('#ffffff'); material.roughness=.4
         } else if (name === 'cushion') {
@@ -241,6 +245,16 @@ function createScene(canvas, handlers) {
       beach.colorSpace = THREE.SRGBColorSpace; beach.flipY = false; beach.anisotropy = 8
       beach.center.set(.5, .5); beach.rotation = -Math.PI / 2 // the print's UVs run sideways
       model.traverse((o) => { if (o.isMesh && o.material?.name === 'photo (big)') { o.material.map = beach; o.material.needsUpdate = true } })
+    })
+    // Standing photo frame on the cabinet: my photo. The print's UVs cover only part of the
+    // texture square, so the picture is stretched onto exactly that patch.
+    textureLoader.load('/photo-frame.jpg', (photo) => {
+      photo.colorSpace = THREE.SRGBColorSpace; photo.flipY = false; photo.anisotropy = 8
+      const u0 = .214, u1 = .799, v0 = .153, v1 = .843
+      photo.repeat.set(1 / (u1 - u0), 1 / (v1 - v0)); photo.offset.set(-u0 / (u1 - u0), -v0 / (v1 - v0))
+      model.traverse((o) => { if (o.isMesh && o.material?.name === 'photos') { o.material.map = photo; o.material.color.set('#ffffff'); o.material.roughness = .45
+        // the print sits exactly on the mount board's face; nudge it forward so it isn't hidden behind it
+        o.material.polygonOffset = true; o.material.polygonOffsetFactor = -2; o.material.polygonOffsetUnits = -4; o.material.needsUpdate = true } })
     })
     // The door and its frame come without UVs, so textures could not show. Give them
     // flat UVs and their own materials: oak veneer door, painted frame.
@@ -399,6 +413,15 @@ function createScene(canvas, handlers) {
       nightLights.push({ light: wash, max: 5, glow, glowMax: 3.2 })
       const halo = new THREE.PointLight('#ffd49c', 0, 1.2, 2); halo.position.copy(wash.position).addScaledVector(normal, .05); scene.add(halo)
       nightLights.push({ light: halo, max: .5 })
+      // A tall ficus in the corner to the left of the photo (as you face it), clear of both walls.
+      const left = new THREE.Vector3(-normal.z, 0, normal.x) // facing the wall (−normal), this points left
+      const ficus = createFloorPlant()
+      const along = alongX ? (left.x > 0 ? roomBounds.max.x : roomBounds.min.x) : (left.z > 0 ? roomBounds.max.z : roomBounds.min.z)
+      const fx = alongX ? along - Math.sign(left.x) * .34 : wallFace + normal.x * .32
+      const fz = alongX ? wallFace + normal.z * .32 : along - Math.sign(left.z) * .34
+      ficus.position.set(fx, floorY, fz); ficus.rotation.y = .8; scene.add(ficus)
+      ficus.updateMatrixWorld(true)
+      const pot = ficus.getObjectByName('ficus-pot'); if (pot) meshColliders.push(pot) // can't walk through it
     }
     // LED mood strips under both wall shelves, washing the wall below with warm light.
     RectAreaLightUniformsLib.init()
@@ -468,6 +491,11 @@ function createScene(canvas, handlers) {
       scene.add(plant)
     }
 
+    // Light switch beside the door: charcoal plate, black rockers.
+    for (const [n, color] of [['Cube.018', '#3b3d41'], ['Cube.023', '#17181a'], ['Cube.024', '#17181a']]) {
+      const o = find(n); if (!o) continue
+      o.material = o.material.clone(); o.material.color.set(color); o.material.roughness = .5; o.material.map = null; o.material.needsUpdate = true
+    }
     grid = buildCollisionGrid(meshColliders, roomBounds, floorY)
     const imac = find('Apple iMac 27 - display')
     if (imac) { const p = imac.getWorldPosition(new THREE.Vector3()); computer = { x: p.x, z: p.z } }
@@ -532,7 +560,7 @@ function createScene(canvas, handlers) {
     const center=new THREE.Vector3(0,PHONE.T,0).applyMatrix4(phone.matrixWorld)
     const up=new THREE.Vector3(0,0,-1).transformDirection(phone.matrixWorld); up.y=0; up.normalize()
     const r=canvas.getBoundingClientRect(), fov=36, half=Math.tan(THREE.MathUtils.degToRad(fov/2))
-    const reserved=r.width<=720?150:104 // keep clear of the bottom bar
+    const reserved=window.matchMedia?.('(pointer: coarse)').matches?172:(r.width<=720?150:104) // keep clear of the bottom bar
     const usableH=Math.max(200,r.height-reserved-40), screenFrac=usableH/r.height
     const L=PHONE.L, W=PHONE.W
     const hForLength=(L/2)/(half*screenFrac*.97), hForWidth=(W/2)/(half*(r.width/r.height)*.9)

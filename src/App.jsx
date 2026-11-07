@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import OfficeScene from './OfficeScene'
 import Loader from './Loader'
@@ -32,10 +32,39 @@ function TrafficLights({ onClose }) { return <div className="traffic-lights" ari
 
 // Name intro: pops up large in the middle, then settles into the bottom-left corner.
 function NameTag({ phase }) {
-  return <motion.div layout className={`name-tag ${phase === 'center' ? 'is-center' : 'is-corner'}`} transition={{ layout: { duration: .9, ease: [.7, 0, .2, 1] } }}>
-    <motion.h1 layout="position" initial={{ opacity: 0, y: 24, filter: 'blur(8px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }} transition={{ duration: .7, ease: [.2, .8, .2, 1] }}>Sameer Palkar</motion.h1>
-    <motion.p layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: .35, duration: .5 }}><i/>software engineer · bengaluru</motion.p>
-  </motion.div>
+  // The name is drawn at its big size (so it stays sharp) and scaled down into the corner.
+  // A hidden copy at corner size holds the layout. The move to the corner is one eased transform.
+  const holderRef = useRef(null), bigRef = useRef(null)
+  const [geo, setGeo] = useState(null)
+  useLayoutEffect(() => {
+    const measure = () => {
+      const holder = holderRef.current, big = bigRef.current; if (!holder || !big) return
+      const wrap = holder.parentElement
+      const left = wrap.offsetLeft + holder.offsetLeft, top = wrap.offsetTop + holder.offsetTop
+      const W = big.offsetWidth, H = big.offsetHeight
+      const k = holder.offsetWidth / W
+      setGeo({ k, x: window.innerWidth / 2 - W / 2 - left, y: window.innerHeight / 2 - H / 2 - top })
+    }
+    measure()
+    document.fonts?.ready.then(measure) // the web font changes the width once it loads
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [])
+  const inCenter = phase === 'center'
+  const fontSize = Math.min(128, Math.max(46, window.innerWidth * .09))
+  return <>
+    <AnimatePresence>
+      {inCenter && <motion.div key="scrim" className="name-scrim" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: .9 } }} transition={{ duration: .6 }}/>}
+    </AnimatePresence>
+    <div className="name-tag is-corner">
+      <h1 ref={holderRef} className="name-holder" aria-hidden="true">Sameer Palkar</h1>
+      <motion.h1 ref={bigRef} className="name-big" style={{ fontSize, transformOrigin: '0 0' }}
+        initial={geo ? { x: geo.x, y: geo.y, scale: 1, opacity: 0 } : { opacity: 0 }}
+        animate={!geo ? { opacity: 0 } : inCenter ? { x: geo.x, y: geo.y, scale: 1, opacity: 1 } : { x: 0, y: 0, scale: geo.k, opacity: 1 }}
+        transition={inCenter ? { opacity: { duration: .6 }, default: { duration: 0 } } : { duration: 1.15, ease: [.65, 0, .35, 1] }}>Sameer Palkar</motion.h1>
+      <motion.p initial={{ opacity: 0, y: 4 }} animate={inCenter ? { opacity: 0, y: 4 } : { opacity: 1, y: 0 }} transition={{ delay: inCenter ? 0 : 1.1, duration: .45 }}>software engineer · bengaluru</motion.p>
+    </div>
+  </>
 }
 
 // Time of day: six named stops along one slider. The value 0…5 maps to an hour of the day.
@@ -67,9 +96,13 @@ export const SPOTS = [
 
 function TimePanel({ hour, auto, onHour, onAuto }) {
   const value = hourToSlider(hour)
+  // in auto mode show the real system time, kept current
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => { const t = window.setInterval(() => setNow(new Date()), 5000); return () => window.clearInterval(t) }, [])
+  const systemTime = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
   const phase = PHASES[Math.min(5, Math.round(value))][0]
   return <div className="bar-panel time-panel" role="dialog" aria-label="Time of day">
-    <div className="panel-head"><b>{phase}</b><span>{auto ? `auto · ${clock(hour)}` : clock(hour)}</span></div>
+    <div className="panel-head"><b>{phase}</b><span>{auto ? `auto · ${systemTime}` : clock(hour)}</span></div>
     <div className="time-row">
       <input type="range" min="0" max="5" step="0.01" value={value} onChange={(e) => onHour(sliderToHour(+e.target.value))} aria-label="Time of day"/>
       <button className={`auto-btn${auto ? ' on' : ''}`} onClick={onAuto} aria-pressed={auto} title="Follow your clock">Auto</button>
@@ -104,7 +137,22 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interact
   }, [panel])
   const toggle = (name) => setPanel((p) => (p === name ? null : name))
   const here = SPOTS.find((s) => s.id === hotspot)
-  return <motion.div ref={ref} className="hud-dock" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .45, ease: [.2, .8, .2, 1] }}>
+  // Phones: the bar folds away into one menu button so the room gets the screen.
+  // Only the action that matters right now (INTERACT / BACK TO ROOM) floats beside it.
+  const compact = isTouch()
+  const [open, setOpen] = useState(false)
+  useEffect(() => { if (interacting) setOpen(false) }, [interacting])
+  if (compact && !open) return <motion.div className="touch-fabs" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4 }}>
+    <AnimatePresence>
+      {interacting
+        ? <motion.button key="back" className="fab-action" onClick={onBack} initial={{ opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }}><Arrow dir="left"/> BACK TO ROOM</motion.button>
+        : here && <motion.button key="interact" className="fab-action" onClick={onOpen} initial={{ opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }}>INTERACT <Arrow/></motion.button>}
+    </AnimatePresence>
+    <button className="fab-menu" onClick={() => setOpen(true)} aria-label="Open menu">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+  </motion.div>
+  return <motion.div ref={ref} className={`hud-dock${compact ? ' is-sheet' : ''}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .45, ease: [.2, .8, .2, 1] }}>
     {panel === 'time' && <TimePanel hour={hour} auto={auto} onHour={onHour} onAuto={onAuto}/>}
     {panel === 'help' && <HelpPanel/>}
     <nav className="bottom-bar" aria-label="Controls">
@@ -116,9 +164,11 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interact
       </div>
       <div className="bar-section sec-spots" role="group" aria-label="Go to">
         <div className="bar-spots">
-          {SPOTS.map((s) => <button key={s.id} className={hotspot === s.id ? 'here' : ''} onClick={() => { setPanel(null); onGo(s.id) }} title={`Go to the ${s.object.toLowerCase()} · ${s.opens}`}>{s.object}</button>)}
+          {SPOTS.map((s) => <button key={s.id} className={hotspot === s.id ? 'here' : ''} onClick={() => { setPanel(null); setOpen(false); onGo(s.id) }} title={`Go to the ${s.object.toLowerCase()} · ${s.opens}`}>{s.object}</button>)}
         </div>
-        {interacting
+        {compact
+          ? <button className="bar-open is-close" onClick={() => { setPanel(null); setOpen(false) }} aria-label="Close menu"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg> CLOSE</button>
+          : interacting
           ? <button className="bar-open is-back" onClick={onBack} title="Back to the room"><Arrow dir="left"/> BACK TO ROOM</button>
           : <button className="bar-open" onClick={onOpen} disabled={!here} title={here ? `Open ${here.opens.toLowerCase()}` : 'Walk up to something first'}>INTERACT <Arrow/></button>}
       </div>
@@ -176,7 +226,7 @@ function PhoneScreen({ onClose, getRect }) {
       <div className="phone-island"/>
       <motion.div className="phone-ui" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: .3, duration: .4 }}>
         <div className="phone-status"><span>{time}</span><span className="phone-sys"><svg viewBox="0 0 18 12" width="17" height="11" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 26 12" width="24" height="11" fill="none" stroke="currentColor"><rect x=".5" y=".5" width="22" height="11" rx="3.2"/><rect x="2.5" y="2.5" width="16" height="7" rx="1.6" fill="currentColor" stroke="none"/><path d="M24.5 4v4" strokeWidth="1.5" strokeLinecap="round"/></svg></span></div>
-        <div className="phone-clock"><span>{date}</span><b>{time}</b><em>SAMEER PALKAR</em></div>
+        <div className="phone-clock"><span>{date}</span><b>{time}</b></div>
       </motion.div>
       <div className="phone-notes">
         {CONTACTS.map((c, i) => <motion.a key={c.app} className="phone-note" href={c.href} target={c.href.startsWith('http') ? '_blank' : undefined} rel="noreferrer"

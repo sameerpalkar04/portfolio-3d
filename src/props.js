@@ -364,3 +364,65 @@ export function createNightLight() {
   frame.castShadow = true
   return { group, glow, lightPoint: new THREE.Vector3(0, H * .1, D + .02) }
 }
+
+// A tall ficus (weeping fig) in a grey cement pot, ≈ 1.65 m. Origin at the bottom centre.
+export function createFloorPlant() {
+  const plant = new THREE.Group(); plant.name = 'floor-ficus'
+  let seed = 23; const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+  // cement pot: slightly tapered cylinder with a rolled lip, mottled grey
+  const potProfile = [[0, 0], [.135, 0], [.14, .01], [.165, .3], [.172, .31], [.168, .318], [.155, .312], [.15, .29], [0, .29]].map(([x, y]) => new THREE.Vector2(x, y))
+  const potTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 256; const ctx = c.getContext('2d')
+    ctx.fillStyle = '#8e8d89'; ctx.fillRect(0, 0, 256, 256)
+    for (let i = 0; i < 900; i++) { const v = 110 + rand() * 60 | 0; ctx.fillStyle = `rgba(${v},${v},${v - 4},${.12 + rand() * .2})`; ctx.beginPath(); ctx.arc(rand() * 256, rand() * 256, 2 + rand() * 9, 0, Math.PI * 2); ctx.fill() }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3, 1); return t
+  })()
+  const pot = new THREE.Mesh(new THREE.LatheGeometry(potProfile, 56), new THREE.MeshStandardMaterial({ map: potTex, color: '#a9a8a4', roughness: .92 }))
+  pot.name = 'ficus-pot'; plant.add(pot)
+  const soil = new THREE.Mesh(new THREE.CircleGeometry(.15, 40), new THREE.MeshStandardMaterial({ color: '#2a1d14', roughness: 1 }))
+  soil.rotation.x = -Math.PI / 2; soil.position.y = .285; plant.add(soil)
+
+  // two slender trunks twisting around each other
+  const bark = new THREE.MeshStandardMaterial({ color: '#7b5a41', roughness: .85 })
+  const top = 1.32
+  for (const phase of [0, Math.PI]) {
+    const pts = []
+    for (let i = 0; i <= 10; i++) { const t = i / 10, a = phase + t * 3.2, r = .012 * (1 - t * .6); pts.push(new THREE.Vector3(Math.cos(a) * r + t * .02, .27 + t * (top - .27), Math.sin(a) * r)) }
+    plant.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, .011, 7), bark))
+  }
+  // twigs fanning out from the upper trunk; leaves gather along and around their ends
+  const twigTips = []
+  const twigMat = new THREE.MeshStandardMaterial({ color: '#6d5a3c', roughness: .85 })
+  for (let i = 0; i < 18; i++) {
+    const h = .62 + rand() * .72, a = i * 2.39 + rand() * .5, reach = .16 + rand() * .2 * (1 - Math.abs(h - 1.05) * .9)
+    const start = new THREE.Vector3(.01, h, 0), end = new THREE.Vector3(Math.cos(a) * reach, h + .06 + rand() * .12, Math.sin(a) * reach)
+    const mid = start.clone().lerp(end, .5).add(new THREE.Vector3(0, .03, 0))
+    plant.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([start, mid, end]), 8, .004, 5), twigMat))
+    twigTips.push({ start, end })
+  }
+  // leaves: small glossy ovals, two greens, drooping slightly
+  const s = new THREE.Shape(); s.moveTo(0, 0)
+  s.bezierCurveTo(.022, .01, .024, .045, 0, .075); s.bezierCurveTo(-.024, .045, -.022, .01, 0, 0)
+  const leafGeo = new THREE.ShapeGeometry(s, 6)
+  const pos = leafGeo.attributes.position
+  for (let i = 0; i < pos.count; i++) { const x = pos.getX(i), y = pos.getY(i); pos.setZ(i, x * x * 5 - y * y * .9) }
+  leafGeo.computeVertexNormals()
+  const leafMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: .42, side: THREE.DoubleSide, emissive: '#16300f', emissiveIntensity: .3 })
+  const COUNT = 760, leaves = new THREE.InstancedMesh(leafGeo, leafMat, COUNT)
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), sc = new THREE.Vector3(), col = new THREE.Color()
+  const greens = ['#2f6b2a', '#3d7f31', '#4f9a3a', '#285e25', '#5aa645']
+  for (let i = 0; i < COUNT; i++) {
+    const tw = twigTips[i % twigTips.length], t = .35 + rand() * .75
+    p.copy(tw.start).lerp(tw.end, Math.min(1, t))
+    p.x += (rand() - .5) * .2; p.y += (rand() - .5) * .16; p.z += (rand() - .5) * .2
+    const out = Math.atan2(p.z, p.x)
+    e.set(-.5 - rand() * .9, -out + Math.PI / 2 + (rand() - .5) * 1.4, (rand() - .5) * .8, 'YXZ'); q.setFromEuler(e)
+    const k = .8 + rand() * .45; sc.set(k, k, k)
+    m.compose(p, q, sc); leaves.setMatrixAt(i, m)
+    leaves.setColorAt(i, col.set(greens[(rand() * greens.length) | 0]))
+  }
+  leaves.instanceMatrix.needsUpdate = true; leaves.instanceColor.needsUpdate = true
+  plant.add(leaves)
+  plant.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })
+  return plant
+}

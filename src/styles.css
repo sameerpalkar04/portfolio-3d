@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 
 :root{font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;color:#22252b;background:#c8d5d9;font-synthesis:none;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;font-optical-sizing:auto;font-weight:400;font-size:14px}*{box-sizing:border-box}html,body,#root{width:100%;height:100%;margin:0;overflow:hidden}button{font:inherit}button:focus-visible,a:focus-visible{outline:2px solid #5873bd;outline-offset:3px}.app-shell{height:100%;width:100%;position:relative;overflow:hidden;background:#c8d5d9}.office-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}.ambient-vignette{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(12,22,31,.22),transparent 28%,transparent 77%,rgba(14,20,26,.15));z-index:1}
@@ -210,8 +211,6 @@
   .bottom-bar .bar-open:disabled{border:1px solid #dcdee2;background:#fff}
   .bar-spots{grid-column:1 / -1;display:grid;grid-template-columns:repeat(5,1fr);gap:0;padding:5px;background:#fff;border:1px solid #dcdee2;border-radius:10px;box-shadow:0 2px 6px rgba(0,0,0,.08)}
   .bar-spots button{padding:0 2px;justify-content:center;font-size:12px}
-  .office-hud .mobile-controls{bottom:122px}
-  .look-cue.is-touch{bottom:286px}
 }
 /* while interacting the bar stays on top; the room behind is covered */
 .office-hud.is-interacting{z-index:9}
@@ -260,3 +259,67 @@
 .bottom-bar .bar-open{gap:8px}
 .dpad button .arrow-icon,.cue-arrows .arrow-icon,.help-panel kbd .arrow-icon{margin:auto}
 .mail-link .arrow-icon{display:inline-block;vertical-align:-2px}
+/* phones: folded controls */
+.touch-fabs{position:absolute;right:14px;bottom:calc(16px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:10px;z-index:2}
+.fab-menu,.fab-action{height:52px;border-radius:14px;border:1px solid #dcdee2;box-shadow:0 2px 6px rgba(0,0,0,.12);font:600 12px 'DM Sans',system-ui,sans-serif;letter-spacing:.06em;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.fab-menu{width:52px;background:#fff;color:#1d1f22}
+.fab-action{padding:0 16px;background:#1d1f22;color:#fff;border-color:#1d1f22}
+.fab-menu:active,.fab-action:active{transform:scale(.96)}
+.bottom-bar .bar-open.is-close{background:#fff;color:#1d1f22;border:1px solid #dcdee2}
+.office-hud:has(.is-sheet) .mobile-controls{display:none}
+.office-hud .mobile-controls{left:14px;right:auto;margin:0;bottom:calc(16px + env(safe-area-inset-bottom));width:178px;height:116px}
+.office-hud .dpad{width:178px;height:116px}
+.office-hud .dpad button{width:54px;height:54px;border-radius:13px}
+.office-hud .dpad button:nth-child(1){left:62px;top:0}.office-hud .dpad button:nth-child(2){left:0;top:62px}.office-hud .dpad button:nth-child(3){left:62px;top:62px}.office-hud .dpad button:nth-child(4){left:124px;top:62px}
+.look-cue.is-touch{bottom:160px}
+.touch-fabs{flex-direction:column;align-items:flex-end}
+.fab-menu{background:#ffc94a;color:#3a2a00;border-color:#e9b230}.fab-menu:active{background:#ffbf2e}
+.fab-menu{background:#1d1f22;color:#fff;border-color:#1d1f22}.fab-menu:active{background:#000}
+.bottom-bar .bar-spots button.here{background:#1d1f22;color:#fff;border-color:#1d1f22}
+.fab-menu{background:#6D9886;color:#fff;border-color:#6D9886}.fab-menu:active{background:#5d8574}
+.bar-section,.bar-panel,.fab-menu,.fab-action,.office-hud .dpad button,.look-cue{box-shadow:0 1px 2px rgba(0,0,0,.12),0 4px 12px rgba(0,0,0,.16)}
+.bottom-bar .bar-open.is-close{background:#6D9886;color:#fff;border-color:#6D9886}.bottom-bar .bar-open.is-close:hover,.bottom-bar .bar-open.is-close:active{background:#5d8574}
+/* phone uses Apple's system font (SF Pro) on Apple devices; Inter is the closest stand-in elsewhere */
+.phone-live,.phone-live *{font-family:-apple-system,BlinkMacSystemFont,system-ui,'SF Pro Text','SF Pro Display','Inter','Helvetica Neue',Arial,sans-serif}
+.phone-live .phone-clock b{font-family:-apple-system,BlinkMacSystemFont,system-ui,'SF Pro Display','Inter',sans-serif;font-weight:600;letter-spacing:-.01em}
+.phone-live .note-text{letter-spacing:-.01em}
+/* phone UI: Apple's system font (SF Pro) where available, Inter elsewhere */
+.phone-live,.phone-live *{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro',system-ui,Inter,'Helvetica Neue',Arial,sans-serif}
+.phone-live .phone-clock b{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro',system-ui,Inter,sans-serif;font-weight:600;letter-spacing:-.01em}
+.phone-live .phone-clock span,.phone-live .phone-status{font-weight:600}
+/* notifications: icon | text that fills the card, timestamps flush right on one line */
+.phone-live .phone-note{align-items:center}
+.phone-live .note-text{flex:1;min-width:0;gap:.4cqw;letter-spacing:-.01em}
+.phone-live .note-head{display:flex;align-items:baseline;justify-content:space-between;width:100%}
+.phone-live .note-head b,.phone-live .note-text strong{font-weight:600}
+.phone-live .note-head small{font-size:3.4cqw;color:#5f636b;font-weight:400}
+.phone-live .note-text>span:last-child{font-weight:400}
+/* lock screen wallpaper: a sunny playground (Unsplash, Moritz Mairinger) with my two dogs in front of a tall clock */
+.phone-live .phone-wall{background:url('https://images.unsplash.com/photo-1662125497309-980698288b68?w=1400&q=80&fm=jpg') 46% 50%/cover no-repeat,linear-gradient(#9cc6e8,#bcd9a0 60%,#cdb98a)}
+.phone-live .phone-ui{z-index:1}
+.phone-live .phone-clock{top:10.5%}
+.phone-live .phone-clock b{font-size:30cqw;font-weight:600;line-height:.86;letter-spacing:-.03em;transform:scaleY(1.75);transform-origin:50% 0;margin-top:1.2cqw;color:rgba(255,255,255,.94);text-shadow:0 2px 18px rgba(0,30,60,.25)}
+.phone-live .phone-clock em{position:absolute;left:0;right:0;top:-6.2cqw;margin:0;font-size:3cqw;opacity:.85}
+.phone-live .phone-clock span{margin-top:0}
+.phone-dogs{position:absolute;left:-3%;width:106%;top:29%;z-index:2;pointer-events:none;filter:drop-shadow(0 6px 10px rgba(0,0,0,.18))}
+.phone-live .phone-notes{z-index:3}
+.phone-live .phone-island,.phone-live .phone-status{z-index:4}
+.phone-live .phone-wall{background-position:38% 50%,0 0}
+.phone-live .phone-clock{top:12.5%}
+.phone-dogs{left:3%;width:94%;top:25%}
+.phone-live .phone-notes{bottom:5.5%;gap:2cqw}
+.phone-live .phone-note{padding:3cqw 3.6cqw}
+.phone-live .phone-clock{top:11.5%}
+.phone-live .phone-clock b{transform:scaleY(1.6)}
+.phone-dogs{top:27.5%}
+.phone-live .phone-wall{background:url(/phone-wallpaper.jpg) center/cover no-repeat,#0f2a6e}
+.name-sub-center{position:absolute;left:0;right:0;margin:0;z-index:4;pointer-events:none;display:flex;justify-content:center;align-items:center;gap:8px;color:#ffffffcc;font:500 13px 'JetBrains Mono',monospace;letter-spacing:.08em;text-transform:lowercase;text-shadow:0 2px 24px #0b0f1466}
+.name-sub-center i{width:7px;height:7px;border-radius:50%;background:#7ee2a8;box-shadow:0 0 0 3px #7ee2a833}
+/* intro: soft shade behind the big name and a deeper text shadow so it separates from the room */
+.name-scrim{position:absolute;inset:0;z-index:3;pointer-events:none;background:radial-gradient(ellipse 60% 38% at 50% 50%,rgba(10,12,16,.42),rgba(10,12,16,.18) 60%,rgba(10,12,16,0) 100%)}
+.name-tag h1{text-shadow:0 1px 2px rgba(0,0,0,.35),0 4px 18px rgba(0,0,0,.35)}
+.name-sub-center{text-shadow:0 1px 2px rgba(0,0,0,.5),0 2px 12px rgba(0,0,0,.45)}
+.name-tag h1{width:max-content}
+.name-tag .name-holder{visibility:hidden}
+.name-tag .name-big{position:absolute;left:0;top:0;margin:0;width:max-content}
+@media(max-width:1180px){.name-tag.is-corner{top:18px;bottom:auto;left:20px}}
