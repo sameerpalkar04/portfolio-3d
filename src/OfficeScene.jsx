@@ -1,0 +1,538 @@
+import { useEffect, useRef } from 'react'
+import * as THREE from 'three'
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { createExteriorMaterial, WINDOW_UV } from './exteriorShader'
+import { buildCollisionGrid, createWalkTester } from './collision'
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
+import { createPhone, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents } from './props'
+import { createDesktopTexture, BEACH_PHOTO_URL } from './screens'
+
+const MODEL_URL = '/models/home-office.glb'
+const SPOT_RATIOS = [
+  { x: .50, z: .16 }, // start at the far end of the room
+  { x: .20, z: .94 }, // window-side corner
+  { x: .80, z: .24 }, // opposite end of the room
+  { x: .52, z: .90 }, // work desk
+  { x: .48, z: .50 }, // center of the room
+  { x: .80, z: .82 }, // opposite corner
+]
+
+const EYE_HEIGHT = 1.58         // metres above the floor (standing adult)
+const DEFAULT_FOV = 66
+const SUN_DAY = 4.6             // direct sunlight strength in day mode
+const WALK_SPEED = 1.9          // metres per second
+const DAY_NIGHT_SECONDS = 3.2   // length of the day ↔ night transition
+// Plain cloth-bound colours that replace the printed book covers.
+const BOOK_COLORS = ['#2f3e46', '#b5523b', '#d9a441', '#6b8f71', '#e6dfd2', '#3b3b3d', '#8c5e3c', '#9fb2c4', '#c97c5d', '#5b4b6b', '#a4a08a', '#1f4e5f']
+
+
+// Flat UVs across a mesh's broad face, normalised to its bounds (the door has none).
+function addPlanarUVs(mesh) {
+  const geometry = mesh.geometry
+  geometry.computeBoundingBox()
+  const size = geometry.boundingBox.getSize(new THREE.Vector3()), min = geometry.boundingBox.min
+  const axes = [0, 1, 2].sort((a, b) => size.getComponent(a) - size.getComponent(b))
+  const uAxis = axes[1], vAxis = axes[2] // width, height (thinnest axis is the slab depth)
+  const position = geometry.attributes.position, uv = new Float32Array(position.count * 2)
+  for (let i = 0; i < position.count; i++) {
+    uv[i * 2] = (position.getComponent(i, uAxis) - min.getComponent(uAxis)) / (size.getComponent(uAxis) || 1)
+    uv[i * 2 + 1] = (position.getComponent(i, vAxis) - min.getComponent(vAxis)) / (size.getComponent(vAxis) || 1)
+  }
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2))
+}
+
+// Light oak veneer door with recessed panel grooves (symmetrical, so orientation doesn't matter).
+function createDoorTexture() {
+  const W = 512, H = 1024
+  const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H
+  const ctx = canvas.getContext('2d')
+  const x0 = 0, y0 = 0, w = W, h = H
+  ctx.fillStyle = '#d2b48a'; ctx.fillRect(x0, y0, w, h)
+  let seed = 7; const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+  for (let x = x0; x < x0 + w; x += 3) {
+    const tone = rand()
+    ctx.strokeStyle = tone > .66 ? 'rgba(255,240,214,.16)' : tone > .33 ? 'rgba(140,100,60,.10)' : 'rgba(120,84,48,.06)'
+    ctx.lineWidth = 1 + rand() * 1.5
+    const bend = (rand() - .5) * 10
+    ctx.beginPath(); ctx.moveTo(x, y0); ctx.bezierCurveTo(x + bend, y0 + h * .33, x - bend, y0 + h * .66, x + bend * .3, y0 + h); ctx.stroke()
+  }
+  const groove = (x, y, gw, gh) => {
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(92,62,34,.45)'; ctx.strokeRect(x, y, gw, gh)
+    ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,240,215,.35)'; ctx.strokeRect(x + 3, y + 3, gw - 6, gh - 6)
+  }
+  const gx = x0 + w * .14, gw = w * .72
+  groove(gx, y0 + h * .08, gw, h * .39); groove(gx, y0 + h * .53, gw, h * .39)
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace; texture.anisotropy = 4
+  return texture
+}
+
+function createScene(canvas, handlers) {
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' })
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); renderer.outputColorSpace = THREE.SRGBColorSpace
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = .9
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  const scene = new THREE.Scene(), dayColor = new THREE.Color('#9ec7e2'), nightColor = new THREE.Color('#050b18')
+  scene.background = nightColor.clone(); scene.fog = new THREE.Fog(dayColor, 48, 120)
+  const camera = new THREE.PerspectiveCamera(DEFAULT_FOV, 1, .08, 180); camera.rotation.order = 'YXZ'
+  const hemi = new THREE.HemisphereLight('#f3f7ff','#756b5d',1.05); scene.add(hemi)
+  const sun = new THREE.DirectionalLight('#ffe7c4',SUN_DAY); sun.position.set(-20,27,12); sun.castShadow=true
+  // The shadow camera is fitted to the room once the model loads, so sunlight through the
+  // window falls as crisp patches on the seat, floor and chair.
+  sun.shadow.mapSize.set(2048,2048); sun.shadow.camera.left=-90; sun.shadow.camera.right=90; sun.shadow.camera.top=90; sun.shadow.camera.bottom=-90; sun.shadow.camera.far=180; sun.shadow.bias=-.0004; sun.shadow.normalBias=.03
+  scene.add(sun)
+  const sunDay = new THREE.Color('#ffe7c4'), moonColor = new THREE.Color('#9fb6ff')
+  const fill = new THREE.AmbientLight('#dce7f2',.36); scene.add(fill)
+  // Extra warm lights that only switch on at night: { light, max, glow?: material, glowMax }
+  const nightLights = []
+  // Lights that stay on day and night (the desk lamp): { light, max, glow?, glowMax }
+  const alwaysOnLights = []
+  // Daytime-only fill (dayFillLights) and the shelf LED mood lights (moodLights): { light, max, glow?, glowMax }
+  const dayFillLights = [], moodLights = []
+  let windowSun=null
+  const loader = new GLTFLoader()
+  const panoramaLoader = new THREE.TextureLoader()
+  const wallCanvas = document.createElement('canvas'); wallCanvas.width=1024; wallCanvas.height=1024
+  const wallTexture = new THREE.CanvasTexture(wallCanvas)
+  wallTexture.colorSpace=THREE.SRGBColorSpace; wallTexture.wrapS=wallTexture.wrapT=THREE.RepeatWrapping; wallTexture.repeat.set(1.25,1.25); wallTexture.flipY=false
+  const wallSource = panoramaLoader.load('/models/textures/wall-plaster.jpg', (loaded) => {
+    const ctx=wallCanvas.getContext('2d'); ctx.fillStyle='#f0e4d5'; ctx.fillRect(0,0,1024,1024)
+    ctx.globalAlpha=.12; ctx.drawImage(loaded.image,0,0,1024,1024); ctx.globalAlpha=1
+    wallTexture.needsUpdate=true
+  })
+  const floorCanvas = document.createElement('canvas'); floorCanvas.width=1024; floorCanvas.height=1024
+  const floorTexture = new THREE.CanvasTexture(floorCanvas)
+  floorTexture.colorSpace=THREE.SRGBColorSpace; floorTexture.wrapS=floorTexture.wrapT=THREE.RepeatWrapping; floorTexture.flipY=false
+  const cabinetCanvas=document.createElement('canvas');cabinetCanvas.width=1024;cabinetCanvas.height=1024
+  const cabinetTexture=new THREE.CanvasTexture(cabinetCanvas)
+  cabinetTexture.colorSpace=THREE.SRGBColorSpace;cabinetTexture.wrapS=cabinetTexture.wrapT=THREE.RepeatWrapping;cabinetTexture.flipY=false
+  const doorTexture = createDoorTexture()
+  const desktopTexture = createDesktopTexture()
+  const screenMaterial = new THREE.MeshBasicMaterial({ map: desktopTexture, color: '#f2f2f2', toneMapped: false })
+  const textureLoader = new THREE.TextureLoader(); textureLoader.setCrossOrigin('anonymous')
+  const floorCtx=floorCanvas.getContext('2d'), plankW=128, plankH=512
+  floorCtx.fillStyle='#e8d5b2';floorCtx.fillRect(0,0,1024,1024)
+  for(let row=-1;row<3;row++) for(let col=-1;col<9;col++) {
+    const x=col*plankW+(row%2?plankW/2:0),y=row*plankH
+    floorCtx.fillStyle=(row+col)%3===0?'#efdfc2':(row+col)%3===1?'#e8d5b2':'#ecdabb';floorCtx.fillRect(x+2,y+2,plankW-4,plankH-4)
+    floorCtx.strokeStyle='rgba(139,112,78,.20)';floorCtx.lineWidth=2;floorCtx.strokeRect(x+1,y+1,plankW-2,plankH-2)
+    for(let grain=0;grain<7;grain++){
+      const gx=x+18+grain*16, bend=(grain%3-1)*3
+      floorCtx.strokeStyle=grain%2?'rgba(255,250,237,.24)':'rgba(164,132,92,.09)';floorCtx.lineWidth=1
+      floorCtx.beginPath();floorCtx.moveTo(gx,y+8);floorCtx.bezierCurveTo(gx+bend,y+160,gx-bend,y+340,gx,y+plankH-8);floorCtx.stroke()
+    }
+  }
+  floorTexture.needsUpdate=true
+  const cabinetCtx=cabinetCanvas.getContext('2d');cabinetCtx.fillStyle='#ddc69e';cabinetCtx.fillRect(0,0,1024,1024)
+  for(let x=0;x<1024;x+=12){cabinetCtx.strokeStyle=x%4?'rgba(255,248,231,.14)':'rgba(145,112,70,.07)';cabinetCtx.lineWidth=1;cabinetCtx.beginPath();cabinetCtx.moveTo(x,0);cabinetCtx.bezierCurveTo(x+2,280,x-3,690,x+1,1024);cabinetCtx.stroke()}
+  cabinetTexture.needsUpdate=true
+
+  // One garden photo for both day and night; the shader grades it into dusk and night.
+  const panoramaMaterial = createExteriorMaterial({ side: THREE.BackSide, depthWrite: false })
+  const windowImageMaterial = createExteriorMaterial({ ...WINDOW_UV, side: THREE.DoubleSide, depthWrite: false })
+  const exteriorMaterials = [panoramaMaterial, windowImageMaterial]
+  const panorama = new THREE.Mesh(new THREE.SphereGeometry(140, 48, 32), panoramaMaterial)
+  panorama.renderOrder = -10; scene.add(panorama)
+  const exteriorTexture = panoramaLoader.load('/exterior-campus.png', (texture) => {
+    texture.colorSpace = THREE.SRGBColorSpace
+    exteriorMaterials.forEach((material) => { material.uniforms.dayMap.value = texture })
+  })
+
+  let model = null, bounds = null, roomBounds = null, walkBounds = null, floorY = 0, desk = null, spots = [], meshColliders = [], ground = null, groundMaterial = null, windowGlassMaterials = [], loadError = false
+  let grid = null, computer = null
+  const state = { x: 0, z: 0, yaw: -Math.PI/2, pitch: 0, nearby: false, system: false }
+
+  const { isFree, nearestFree } = createWalkTester(() => grid, () => walkBounds)
+
+  loader.load(MODEL_URL, (gltf) => {
+    model = gltf.scene
+    // The supplied FBX uses centimeters; scale it to meters before positioning it.
+    model.scale.setScalar(.01)
+    model.updateMatrixWorld(true)
+    // three.js sanitises node names on load ('room base' → 'room_base', 'Icosphere.001' → 'Icosphere001').
+    const find = (name) => model.getObjectByName(name) || model.getObjectByName(THREE.PropertyBinding.sanitizeNodeName(name))
+    const source = new THREE.Box3().setFromObject(model), center = source.getCenter(new THREE.Vector3())
+    model.position.set(-center.x,-source.min.y,-center.z); model.updateMatrixWorld(true)
+    bounds = new THREE.Box3().setFromObject(model)
+    const roomBase = find('room base')
+    roomBounds = roomBase ? new THREE.Box3().setFromObject(roomBase) : bounds.clone()
+    floorY = roomBounds.min.y
+    walkBounds = roomBounds.clone()
+    // Hard limit just inside the walls; the collision grid handles the rest.
+    const wallInset = .12
+    walkBounds.min.x += wallInset; walkBounds.max.x -= wallInset
+    walkBounds.min.z += wallInset; walkBounds.max.z -= wallInset
+    const width = roomBounds.max.x-roomBounds.min.x, depth = roomBounds.max.z-roomBounds.min.z
+    const spotInset = Math.min(.38, width*.16, depth*.10)
+    const spotMinX = roomBounds.min.x+spotInset, spotMaxZ = roomBounds.max.z-spotInset
+    const spotWidth = width-spotInset*2, spotDepth = depth-spotInset*2
+    spots = SPOT_RATIOS.map((p) => ({ x: spotMinX+spotWidth*p.x, z: spotMaxZ-spotDepth*p.z }))
+    desk = spots[3]
+    model.traverse((object) => {
+      if (!object.isMesh) return
+      // Everything casts shadows: small parts like the ceiling downlights fill holes in the
+      // ceiling, and without them sunlight leaked through as bright blobs on the far wall.
+      object.castShadow=true; object.receiveShadow = true; meshColliders.push(object)
+      const materials = Array.isArray(object.material) ? object.material : [object.material]
+      // Blender boolean cutters (CTRL_Hole…, CTRL_Baseboard…) were exported as white slabs; one of
+      // them stood in front of the door and hid it. They are not meant to be seen.
+      if (materials.some((m) => m?.name === 'hidden_material')) { object.visible = false; return }
+      for (const material of materials) if (material) {
+        const name=(material.name||'').toLowerCase()
+        material.side = THREE.DoubleSide
+        material.normalMap=null;material.bumpMap=null;material.roughnessMap=null;material.metalnessMap=null
+        if (object.name.toLowerCase()==='window' && name==='glass') { windowGlassMaterials.push(material); material.roughness=.12; material.metalness=.08 }
+        if (name === 'white wall') {
+          material.map=wallTexture; material.color.set('#f7f1e9'); material.roughness=.88
+        } else if (name === 'wod floring') {
+          material.map=floorTexture; material.color.set('#fffefa'); material.roughness=.5 // a little sheen so sunlight reflects
+        } else if (name === 'handle_material') {
+          material.color.set('#b8b4ac'); material.metalness=.75; material.roughness=.32
+        } else if (name.includes('door')) {
+          material.map=cabinetTexture;material.color.set('#eee0c7');material.roughness=.74
+        } else if (name === 'plywood' || name === 'plywood 1' || name === 'plywood 2' || name === 'frame') {
+          material.map=cabinetTexture; material.color.set('#fff8eb'); material.roughness=.68
+        } else if (name === 'glass') {               // iMac front glass (and window pane): clear, not milky
+          material.transparent=true; material.opacity=.1; material.color.set('#ffffff'); material.roughness=.05; material.metalness=0
+          material.transmission=0; material.thickness=0; material.depthWrite=false
+        } else if (name === 'aluminium' || name === 'matt white plastic') { // iMac chin, back and stand: silver aluminium
+          material.map=null; material.color.set('#dcdee1'); material.metalness=.18; material.roughness=.38
+        } else if (name === 'display frame' || name === 'glass frame') { // iMac bezel: black glass
+          material.color.set('#0a0a0b'); material.roughness=.35
+        } else if (material.name === 'metal.001') {   // iMac Apple logo (the lamp's 'Metal.001' is left alone)
+          material.color.set('#1d1d1f'); material.metalness=.2; material.roughness=.35
+        } else if (name === 'material.002' || name === 'material.003') { // coffee mug: red glazed ceramic
+          material.color.set('#c0161d'); material.roughness=.26; material.metalness=0
+        } else if (name === 'material.001') {        // coffee in the mug
+          material.color.set('#3b200f'); material.roughness=.12; material.metalness=0
+        } else if (name === 'photo (big)') {         // wall photo: the beach picture is swapped in below
+          material.color.set('#ffffff'); material.roughness=.4
+        } else if (name === 'cushion') {
+          material.color.set('#d5c1aa')
+        } else if (name === 'pillow 1') {          // larger cushion: warm grey linen
+          material.color.set('#a9a69f'); material.roughness=.92
+        } else if (name === 'pillow 2') {          // smaller cushion: bright yellow
+          material.color.set('#f4e01e'); material.roughness=.9
+        } else if (/^material__6\d\d$/.test(name)) { // printed book covers → plain solid colours
+          material.map=null; material.color.set(BOOK_COLORS[Number(name.slice(-3))%BOOK_COLORS.length]); material.roughness=.78
+        }
+        material.needsUpdate = true
+      }
+    })
+    // iMac screen: a lit desktop (wallpaper, menu bar, dock) instead of a black panel.
+    model.traverse((o) => { if (o.isMesh && o.material?.name === 'display') o.material = screenMaterial })
+    // Wall photo: a beach scene. If the photo can't load, the original print stays.
+    textureLoader.load(BEACH_PHOTO_URL, (beach) => {
+      beach.colorSpace = THREE.SRGBColorSpace; beach.flipY = false; beach.anisotropy = 8
+      beach.center.set(.5, .5); beach.rotation = -Math.PI / 2 // the print's UVs run sideways
+      model.traverse((o) => { if (o.isMesh && o.material?.name === 'photo (big)') { o.material.map = beach; o.material.needsUpdate = true } })
+    })
+    // The door and its frame come without UVs, so textures could not show. Give them
+    // flat UVs and their own materials: oak veneer door, painted frame.
+    const doorMesh = find('Door'), doorFrame = find('DoorFrame')
+    if (doorMesh?.isMesh) {
+      addPlanarUVs(doorMesh)
+      doorMesh.material = new THREE.MeshStandardMaterial({ map: doorTexture, color: '#ffffff', roughness: .58, side: THREE.DoubleSide })
+    }
+    if (doorFrame?.isMesh) {
+      addPlanarUVs(doorFrame)
+      doorFrame.material = new THREE.MeshStandardMaterial({ color: '#efe7da', roughness: .55, side: THREE.DoubleSide })
+    }
+    const windowNode=find('Window')
+    if(windowNode){
+      const windowImage=new THREE.Mesh(new THREE.PlaneGeometry(1.24,1.9),windowImageMaterial)
+      windowImage.rotation.x=Math.PI/2;windowImage.position.set(0,-.15,1.025);windowImage.renderOrder=10;windowImage.name='garden-window-view';windowNode.add(windowImage)
+      // The pillows were modelled leaning back past the glass, so the garden view drew over
+      // them. Slide each one into the room until it sits fully in front of the window.
+      model.updateMatrixWorld(true)
+      const planePoint=windowImage.getWorldPosition(new THREE.Vector3())
+      const roomCenter=roomBounds.getCenter(new THREE.Vector3())
+      const intoRoom=new THREE.Vector3(roomCenter.x-planePoint.x,0,roomCenter.z-planePoint.z)
+      intoRoom.set(Math.abs(intoRoom.x)>Math.abs(intoRoom.z)?Math.sign(intoRoom.x):0,0,Math.abs(intoRoom.z)>=Math.abs(intoRoom.x)?Math.sign(intoRoom.z):0)
+      for(const pillowName of ['pillow','pillow.001']){
+        const pillow=find(pillowName); if(!pillow) continue
+        const box=new THREE.Box3().setFromObject(pillow)
+        const back=intoRoom.z? (intoRoom.z>0?box.min.z:box.max.z) : (intoRoom.x>0?box.min.x:box.max.x)
+        const planeCoord=intoRoom.z?planePoint.z:planePoint.x
+        const gap=(back-planeCoord)*(intoRoom.z||intoRoom.x), clearance=.06
+        if(gap<clearance){
+          const world=pillow.getWorldPosition(new THREE.Vector3()).addScaledVector(intoRoom,clearance-gap)
+          pillow.position.copy(pillow.parent.worldToLocal(world)); pillow.updateMatrixWorld(true)
+        }
+      }
+      const trimMaterial=new THREE.MeshStandardMaterial({color:'#3f403e',roughness:.48,metalness:.08})
+      const trimDepth=.075,trim=.065,windowW=1.24,windowH=1.9,bottom=.075,top=1.975,mid=1.06,frontY=-.163
+      const rails=[[-windowW/2-trim/2,(top+bottom)/2,trim,top-bottom+trim*2],[windowW/2+trim/2,(top+bottom)/2,trim,top-bottom+trim*2],[0,bottom-trim/2,windowW,trim],[0,top+trim/2,windowW,trim],[0,mid,windowW,trim*.8]]
+      for(const [x,z,w,h] of rails){const rail=new THREE.Mesh(new THREE.BoxGeometry(w,trimDepth,h),trimMaterial);rail.position.set(x,frontY,z);rail.castShadow=true;rail.renderOrder=11;windowNode.add(rail)}
+      const glassTint=new THREE.Mesh(new THREE.PlaneGeometry(windowW,windowH),new THREE.MeshBasicMaterial({color:'#dceaf0',transparent:true,opacity:.12,side:THREE.DoubleSide,depthTest:true,depthWrite:false}))
+      glassTint.rotation.x=Math.PI/2;glassTint.position.set(0,-.158,1.025);glassTint.renderOrder=12;windowNode.add(glassTint)
+      const sill=new THREE.Mesh(new THREE.BoxGeometry(windowW+.18,.18,.095),new THREE.MeshStandardMaterial({color:'#e4d4bb',roughness:.65}));sill.position.set(0,-.14,bottom-.08);sill.castShadow=true;windowNode.add(sill)
+    }
+    const groundTexture = panoramaLoader.load('/ground-grass.png')
+    groundTexture.colorSpace=THREE.SRGBColorSpace; groundTexture.wrapS=groundTexture.wrapT=THREE.RepeatWrapping
+    groundTexture.repeat.set(Math.ceil((width+420)/7),Math.ceil((depth+420)/7))
+    groundMaterial = new THREE.MeshStandardMaterial({ map:groundTexture,roughness:1,color:'#d4d7c4' })
+    ground = new THREE.Mesh(new THREE.PlaneGeometry(width+420,depth+420),groundMaterial)
+    ground.rotation.x=-Math.PI/2; ground.position.set((roomBounds.min.x+roomBounds.max.x)/2,floorY-.045,(roomBounds.min.z+roomBounds.max.z)/2)
+    ground.receiveShadow=true; scene.add(ground)
+    const floorOverlayMaterial=new THREE.MeshStandardMaterial({map:floorTexture,color:'#fffefa',roughness:.74})
+    const floorOverlay=new THREE.Mesh(new THREE.PlaneGeometry(width,depth),floorOverlayMaterial)
+    // Kept out of the scene: the floor mesh already carries this texture, and now that the
+    // floor height is found correctly this plane would sit 3.5 cm above it.
+    floorOverlay.rotation.x=-Math.PI/2;floorOverlay.position.set((roomBounds.min.x+roomBounds.max.x)/2,floorY+.035,(roomBounds.min.z+roomBounds.max.z)/2);floorOverlay.receiveShadow=true;floorOverlay.name='light-oak-floor-overlay'
+    scene.add(model)
+    model.updateMatrixWorld(true)
+    const ceilingY = roomBounds.max.y-.24
+    // Daylight bounce: soft, fixture-less fill so the far (door) end of the room isn't dark
+    // by day. These fade out completely at night.
+    for (const ratio of [.45, .85]) {
+      const bounce = new THREE.PointLight('#fff5e8', 0, 7, 1.1)
+      bounce.position.set((roomBounds.min.x+roomBounds.max.x)/2, ceilingY-.2, roomBounds.min.z+depth*ratio); scene.add(bounce)
+      dayFillLights.push({ light: bounce, max: ratio > .6 ? 2.2 : 1.4 })
+    }
+
+    // ---- Night lighting ------------------------------------------------------
+    const worldPos = (object) => object.getWorldPosition(new THREE.Vector3())
+    // Desk lamp: always on. The bulb glows, a soft point light warms the wall and a
+    // spotlight throws a pool of light onto the desk below the shade.
+    const filament = find('filament'), lampBase = find('base')
+    const deskTopY = lampBase ? new THREE.Box3().setFromObject(lampBase).min.y : floorY + .77
+    if (filament) {
+      const bulb = new THREE.MeshStandardMaterial({ color: '#fff4dc', emissive: '#ffcf87', emissiveIntensity: 3, roughness: .3 })
+      filament.traverse((o) => { if (o.isMesh) o.material = bulb })
+      const p = worldPos(filament)
+      const lamp = new THREE.PointLight('#ffc983', 0, 3, 1.7); lamp.position.copy(p).add(new THREE.Vector3(0, -.06, 0)); scene.add(lamp)
+      alwaysOnLights.push({ light: lamp, day: 1.1, night: 1.8 })
+      const pool = new THREE.SpotLight('#ffcb88', 0, 2.2, .75, .7, 1.6); pool.position.copy(p).add(new THREE.Vector3(0, -.04, 0))
+      pool.target.position.set(p.x, deskTopY, p.z); scene.add(pool); scene.add(pool.target)
+      alwaysOnLights.push({ light: pool, day: 4, night: 3 })
+    }
+    // A phone lying beside the lamp base, on the chair side of the desk.
+    if (lampBase) {
+      const b = new THREE.Box3().setFromObject(lampBase), phone = createPhone()
+      const roomMidX = (roomBounds.min.x + roomBounds.max.x) / 2, towardChair = Math.sign(roomMidX - b.getCenter(new THREE.Vector3()).x) || -1
+      const lampCenter = b.getCenter(new THREE.Vector3())
+      phone.position.set(lampCenter.x + towardChair * ((b.max.x - b.min.x) / 2 + .1), b.min.y + .001, lampCenter.z - .06)
+      phone.rotation.y = Math.PI / 2 + .22 // long side pointing away from whoever sits at the desk
+      scene.add(phone)
+    }
+    // A fabric speaker on the low cabinet, next to the vase of white roses.
+    const roses = find('white rose'), cabinet = find('Cube.009')
+    if (roses && cabinet) {
+      const rb = new THREE.Box3().setFromObject(roses), cb = new THREE.Box3().setFromObject(cabinet), speaker = createSpeaker()
+      const cabinetMidX = (cb.min.x + cb.max.x) / 2
+      speaker.position.set(cabinetMidX, cb.max.y, rb.min.z - .14); speaker.rotation.y = .4
+      scene.add(speaker)
+    }
+    // Ceiling lights: the model's two round downlights are swapped for black linear pendants
+    // hung from the ceiling, at the same spots.
+    const ceilingHit = new THREE.Raycaster(new THREE.Vector3(roomBounds.getCenter(new THREE.Vector3()).x, floorY + 1.5, roomBounds.getCenter(new THREE.Vector3()).z), new THREE.Vector3(0, 1, 0))
+      .intersectObject(roomBase || model, true)[0]
+    const ceilingSurfaceY = ceilingHit ? ceilingHit.point.y : floorY + 2.6
+    for (const [bulbName, housings] of [['Icosphere', ['Cylinder', 'Cylinder.001']], ['Icosphere.001', ['Cylinder.002', 'Cylinder.003']]]) {
+      const bulb = find(bulbName)
+      if (!bulb) continue
+      const p = worldPos(bulb)
+      for (const n of [bulbName, ...housings]) { const o = find(n); if (o) o.visible = false }
+      const { group, glow } = createPendant(1.0, .42)
+      group.position.set(p.x, ceilingSurfaceY, p.z); scene.add(group)
+      const lamp = new THREE.PointLight('#ffe2b4', 0, 6, 1.4); lamp.position.set(p.x, ceilingSurfaceY - .5, p.z); scene.add(lamp)
+      nightLights.push({ light: lamp, max: 2.4, glow, glowMax: 2.4 })
+    }
+    // Low LED glow under the window seat.
+    if (windowNode) {
+      const windowBox = new THREE.Box3().setFromObject(windowNode), c = windowBox.getCenter(new THREE.Vector3())
+      const roomMid = new THREE.Vector3((roomBounds.min.x+roomBounds.max.x)/2, 0, (roomBounds.min.z+roomBounds.max.z)/2)
+      const inward = new THREE.Vector3(roomMid.x-c.x, 0, roomMid.z-c.z).normalize()
+      const stripMat = new THREE.MeshStandardMaterial({ color: '#fff3dc', emissive: '#ffcf8f', emissiveIntensity: 0 })
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(Math.max(windowBox.max.x-windowBox.min.x, windowBox.max.z-windowBox.min.z)*.9, .015, .02), stripMat)
+      strip.position.set(c.x+inward.x*.62, floorY+.47, c.z+inward.z*.62); strip.rotation.y = Math.atan2(inward.x, inward.z); scene.add(strip)
+      const seatGlow = new THREE.PointLight('#ffcf8f', 0, 1.8, 1.8); seatGlow.position.set(c.x+inward.x*.75, floorY+.3, c.z+inward.z*.75); scene.add(seatGlow)
+      nightLights.push({ light: seatGlow, max: .9, glow: stripMat, glowMax: 2.2 })
+    }
+    // Picture light above the beach photo: bar lamp on the wall, washing the print at night.
+    const print = find('Cube.030')
+    if (print) {
+      const pb = new THREE.Box3().setFromObject(print), pc = pb.getCenter(new THREE.Vector3()), size = pb.getSize(new THREE.Vector3())
+      const alongX = size.x > size.z, roomMid = roomBounds.getCenter(new THREE.Vector3())
+      // wall normal pointing into the room
+      const normal = alongX ? new THREE.Vector3(0, 0, Math.sign(roomMid.z - pc.z)) : new THREE.Vector3(Math.sign(roomMid.x - pc.x), 0, 0)
+      const wallFace = alongX ? (normal.z > 0 ? pb.max.z : pb.min.z) : (normal.x > 0 ? pb.max.x : pb.min.x)
+      const { group, glow, lightPoint } = createPictureLight(Math.max(size.x, size.z) * .9)
+      group.position.set(alongX ? pc.x : wallFace, pb.max.y + .1, alongX ? wallFace : pc.z)
+      group.rotation.y = Math.atan2(normal.x, normal.z); scene.add(group)
+      group.updateMatrixWorld(true)
+      const wash = new THREE.SpotLight('#ffd49c', 0, 2.4, .62, .75, 1.5)
+      wash.position.copy(group.localToWorld(lightPoint.clone()))
+      wash.target.position.copy(pc).addScaledVector(normal, .02); scene.add(wash); scene.add(wash.target)
+      nightLights.push({ light: wash, max: 5, glow, glowMax: 3.2 })
+      const halo = new THREE.PointLight('#ffd49c', 0, 1.2, 2); halo.position.copy(wash.position).addScaledVector(normal, .05); scene.add(halo)
+      nightLights.push({ light: halo, max: .5 })
+    }
+    // LED mood strips under both wall shelves, washing the wall below with warm light.
+    RectAreaLightUniformsLib.init()
+    for (const shelfName of ['Cube.027', 'Cube.028']) {
+      const shelf = find(shelfName); if (!shelf) continue
+      const sb = new THREE.Box3().setFromObject(shelf), sc = sb.getCenter(new THREE.Vector3()), size = sb.getSize(new THREE.Vector3())
+      const alongZ = size.z > size.x, length = (alongZ ? size.z : size.x) * .97
+      const roomMid = roomBounds.getCenter(new THREE.Vector3())
+      // the shelf's front edge is the side facing the room
+      const front = alongZ ? (roomMid.x > sc.x ? sb.max.x : sb.min.x) : (roomMid.z > sc.z ? sb.max.z : sb.min.z)
+      const back = alongZ ? (roomMid.x > sc.x ? sb.min.x : sb.max.x) : (roomMid.z > sc.z ? sb.min.z : sb.max.z)
+      const { strip, glow } = createLedStrip(length)
+      const inset = (front - back) * .1
+      strip.position.set(alongZ ? front - inset : sc.x, sb.min.y - .003, alongZ ? sc.z : front - inset)
+      if (!alongZ) strip.rotation.y = Math.PI / 2
+      scene.add(strip)
+      const holder = new THREE.Group(); holder.position.set(alongZ ? (front + back) / 2 : sc.x, sb.min.y - .006, alongZ ? sc.z : (front + back) / 2)
+      if (alongZ) holder.rotation.y = Math.PI / 2
+      const area = new THREE.RectAreaLight('#ffd29a', 0, length, Math.abs(front - back) * .8)
+      area.rotation.x = -Math.PI / 2; holder.add(area); scene.add(holder)
+      moodLights.push({ light: area, max: 7, glow, glowMax: 2.6 })
+    }
+    // Fill both wall shelves with books and box files, around what's already on them
+    // (storage boxes, book stacks, magazines) and stopping at the window wall.
+    {
+      const shelves = ['Cube.027', 'Cube.028'].map(find).filter(Boolean).map((o) => ({ o, box: new THREE.Box3().setFromObject(o) })).sort((p, q) => p.box.min.y - q.box.min.y)
+      const windowWall = find('room 1'), wallBox = windowWall ? new THREE.Box3().setFromObject(windowWall) : null
+      const roomMid = roomBounds.getCenter(new THREE.Vector3()), tmp = new THREE.Box3()
+      shelves.forEach(({ o, box }, idx) => {
+        const size = box.getSize(new THREE.Vector3()), alongZ = size.z > size.x
+        const lo = alongZ ? box.min.z : box.min.x, hi = alongZ ? box.max.z : box.max.x
+        const towardRoom = alongZ ? roomMid.x > box.getCenter(new THREE.Vector3()).x : roomMid.z > box.getCenter(new THREE.Vector3()).z
+        const back = alongZ ? (towardRoom ? box.min.x : box.max.x) : (towardRoom ? box.min.z : box.max.z)
+        const front = alongZ ? (towardRoom ? box.max.x : box.min.x) : (towardRoom ? box.max.z : box.min.z)
+        let from = lo, to = hi
+        // don't run into the thick window wall
+        if (wallBox && alongZ) { if (wallBox.max.z > from && wallBox.max.z < to && wallBox.getCenter(new THREE.Vector3()).z < box.getCenter(new THREE.Vector3()).z) from = wallBox.max.z + .02 }
+        const occupied = []
+        model.traverse((m) => {
+          if (!m.isMesh || !m.visible || m === o) return
+          tmp.setFromObject(m)
+          const onTop = tmp.min.y > box.max.y - .03 && tmp.min.y < box.max.y + .06 && tmp.max.y - tmp.min.y < .6
+          const overlaps = alongZ ? (tmp.max.x > box.min.x && tmp.min.x < box.max.x && tmp.max.z > lo && tmp.min.z < hi)
+                                  : (tmp.max.z > box.min.z && tmp.min.z < box.max.z && tmp.max.x > lo && tmp.min.x < hi)
+          if (onTop && overlaps) occupied.push(alongZ ? [tmp.min.z - .03, tmp.max.z + .03] : [tmp.min.x - .03, tmp.max.x + .03])
+        })
+        const above = shelves[idx + 1]
+        const maxHeight = above ? Math.min(.36, above.box.min.y - box.max.y - .03) : .33
+        scene.add(createShelfContents({ top: box.max.y, back, front, from, to, alongZ, maxHeight, occupied, seed: idx + 3 }))
+      })
+    }
+    // Replace the protea arrangement on the desk with a bonsai in a shallow glazed pot.
+    const vase = find('Clay_Vase_01')
+    if (vase) {
+      const vb = new THREE.Box3().setFromObject(vase), vc = vb.getCenter(new THREE.Vector3())
+      for (const n of ['Clay_Vase_01', 'Protea_1', 'Protea_002', 'BabyBreaths_01a', 'BabyBreaths_01a.001', 'BabyBreaths_01b', 'Gum_branch_01', 'Gum_branch_02']) { const o = find(n); if (o) o.visible = false }
+      const bonsai = createBonsai()
+      bonsai.position.set(vc.x, vb.min.y, vc.z); bonsai.rotation.y = Math.PI / 2 + .3
+      scene.add(bonsai)
+    }
+    // Replace the vase of white roses with a potted pothos on a wooden tray.
+    if (roses && cabinet) {
+      const rb = new THREE.Box3().setFromObject(roses), cb = new THREE.Box3().setFromObject(cabinet)
+      roses.visible = false
+      const plant = createPlant()
+      plant.position.set((cb.min.x + cb.max.x) / 2, cb.max.y, (rb.min.z + rb.max.z) / 2); plant.rotation.y = .5
+      scene.add(plant)
+    }
+
+    grid = buildCollisionGrid(meshColliders, roomBounds, floorY)
+    const imac = find('Apple iMac 27 - display')
+    if (imac) { const p = imac.getWorldPosition(new THREE.Vector3()); computer = { x: p.x, z: p.z } }
+    const start = nearestFree(spots[0].x, spots[0].z)
+    state.x=start.x;state.z=start.z
+    state.yaw=Math.atan2(-(desk.x-state.x),-(desk.z-state.z));state.pitch=0
+    if(windowNode){
+      const windowBox=new THREE.Box3().setFromObject(windowNode),windowCenter=windowBox.getCenter(new THREE.Vector3())
+      const inward=new THREE.Vector3(state.x-windowCenter.x,0,state.z-windowCenter.z).normalize()
+      if(inward.lengthSq()<.01)inward.set(0,0,1)
+      // Aim the sun through the middle of the window, slightly from the side, at ~37° elevation.
+      const side=new THREE.Vector3(inward.z,0,-inward.x), sunDir=inward.clone().addScaledVector(side,.22).add(new THREE.Vector3(0,-.62,0)).normalize()
+      sun.position.copy(windowCenter).addScaledVector(sunDir,-9)
+      sun.target.position.copy(windowCenter).addScaledVector(sunDir,4);scene.add(sun.target)
+      const sc=sun.shadow.camera; sc.left=-4.5; sc.right=4.5; sc.top=4.5; sc.bottom=-4.5; sc.near=1; sc.far=22; sc.updateProjectionMatrix()
+      // Glass and the garden backdrop must not block the sun.
+      windowNode.traverse((o)=>{ if(o.isMesh&&o.name!==''&&!o.geometry?.type?.startsWith('Box')) o.castShadow=false })
+      const backdrop=find('background'); if(backdrop) backdrop.traverse((o)=>{ if(o.isMesh) o.castShadow=false })
+      windowSun=new THREE.PointLight('#fff1d6',2.1,7,1.3);windowSun.position.set(windowCenter.x+inward.x*.45,windowCenter.y+.2,windowCenter.z+inward.z*.45);scene.add(windowSun)
+    }
+    handlers.onPosition?.({ x:state.x,z:state.z,minX:walkBounds.min.x,maxX:walkBounds.max.x,minZ:walkBounds.min.z,maxZ:walkBounds.max.z })
+    handlers.onReady?.()
+  }, undefined, (error) => { console.error('Unable to load the home-office model.',error); loadError=true; handlers.onReady?.() })
+
+  const keys = new Set()
+  const onDown = (event) => {
+    const key=event.key.toLowerCase()
+    if (state.system && ['backspace','delete'].includes(key)) { event.preventDefault(); state.system=false; handlers.onSystem(false); return }
+    if (!state.system && key==='enter' && state.nearby) { event.preventDefault(); state.system=true; handlers.onSystem(true); return }
+    if (!state.system && ['arrowup','arrowdown','arrowleft','arrowright'].includes(key)) { event.preventDefault(); keys.add(key) }
+  }
+  const onUp=(event)=>keys.delete(event.key.toLowerCase()), clearKeys=()=>keys.clear()
+  window.addEventListener('keydown',onDown); window.addEventListener('keyup',onUp); window.addEventListener('blur',clearKeys)
+  let pointer=null
+  const pointerDown=(event)=>{ if(event.button!==0)return; pointer={id:event.pointerId,x:event.clientX,y:event.clientY}; canvas.setPointerCapture?.(event.pointerId) }
+  const pointerMove=(event)=>{ if(!pointer||pointer.id!==event.pointerId||state.system)return; const dx=event.clientX-pointer.x,dy=event.clientY-pointer.y; pointer.x=event.clientX;pointer.y=event.clientY;state.yaw-=dx*.003;state.pitch=THREE.MathUtils.clamp(state.pitch-dy*.002,-.45,.32) }
+  const pointerUp=()=>{pointer=null}
+  canvas.addEventListener('pointerdown',pointerDown);canvas.addEventListener('pointermove',pointerMove);canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',pointerUp)
+  const onWheel=(event)=>{event.preventDefault();camera.fov=THREE.MathUtils.clamp(camera.fov+Math.sign(event.deltaY)*2,46,80);camera.updateProjectionMatrix()}
+  canvas.addEventListener('wheel',onWheel,{passive:false})
+  const resize=()=>{const r=canvas.getBoundingClientRect();renderer.setSize(r.width,r.height,false);camera.aspect=r.width/Math.max(r.height,1);camera.updateProjectionMatrix()}
+  const observer=new ResizeObserver(resize);observer.observe(canvas);resize()
+  const localHour=new Date().getHours(), startsAtNight=localHour<6||localHour>=18
+  // `progress` moves at a constant rate toward the target; `night` is its eased value.
+  let frame=0,last=performance.now(),uiTime=0,nightTarget=startsAtNight?1:0,progress=nightTarget,night=nightTarget
+  const walkDirection=new THREE.Vector3()
+  const tick=(now)=>{
+    const dt=Math.min((now-last)/1000,.04);last=now;uiTime+=dt
+    const stepAmount=dt/DAY_NIGHT_SECONDS
+    progress=progress<nightTarget?Math.min(nightTarget,progress+stepAmount):Math.max(nightTarget,progress-stepAmount)
+    night=progress*progress*(3-2*progress)
+    scene.background.copy(dayColor).lerp(nightColor,night);scene.fog.color.copy(scene.background)
+    exteriorMaterials.forEach((material)=>{material.uniforms.nightMix.value=progress;material.uniforms.time.value=now/1000})
+    const lerp=THREE.MathUtils.lerp
+    hemi.intensity=lerp(.95,.22,night);fill.intensity=lerp(.3,.12,night)
+    sun.intensity=lerp(SUN_DAY,.3,night);sun.color.copy(sunDay).lerp(moonColor,night)
+    // Lamps come on during dusk, before it is fully dark.
+    const lampsOn=THREE.MathUtils.smoothstep(progress,.3,.85)
+    dayFillLights.forEach((entry)=>{entry.light.intensity=entry.max*(1-night)})
+    // Shelf LEDs: a faint glow by day, full mood lighting at night.
+    moodLights.forEach((entry)=>{const k=lerp(.12,1,lampsOn);entry.light.intensity=entry.max*k;entry.glow.emissiveIntensity=entry.glowMax*k})
+    alwaysOnLights.forEach((entry)=>{entry.light.intensity=lerp(entry.day,entry.night,night)})
+    nightLights.forEach((entry)=>{entry.light.intensity=entry.max*lampsOn;if(entry.glow)entry.glow.emissiveIntensity=entry.glowMax*lampsOn})
+    if(windowSun){windowSun.intensity=lerp(2.1,.22,night);windowSun.color.copy(sunDay).lerp(moonColor,night)}
+    if (groundMaterial) groundMaterial.color.setRGB(1-.62*night,1-.58*night,1-.5*night)
+    const turn=Number(keys.has('arrowright'))-Number(keys.has('arrowleft')), forward=Number(keys.has('arrowup'))-Number(keys.has('arrowdown'))
+    if(turn&&!state.system)state.yaw-=turn*1.6*dt
+    if(forward&&!state.system&&walkBounds){
+      // forward = +1 walks ahead, -1 walks backwards.
+      const step=WALK_SPEED*dt
+      walkDirection.set(-Math.sin(state.yaw)*forward,0,-Math.cos(state.yaw)*forward)
+      const nextX=state.x+walkDirection.x*step, nextZ=state.z+walkDirection.z*step
+      const stuck=!isFree(state.x,state.z) // never trap someone who starts inside a collider
+      if(stuck||isFree(nextX,nextZ)){state.x=nextX;state.z=nextZ}
+      else if(isFree(nextX,state.z))state.x=nextX   // slide along the obstacle
+      else if(isFree(state.x,nextZ))state.z=nextZ
+      if(walkBounds){state.x=THREE.MathUtils.clamp(state.x,walkBounds.min.x,walkBounds.max.x);state.z=THREE.MathUtils.clamp(state.z,walkBounds.min.z,walkBounds.max.z)}
+    }
+    // Near the desk: within reach of the iMac (or the desk spot if the iMac isn't found).
+    const target=computer||desk, reach=computer?1.6:1.5
+    const distance=target?Math.hypot(state.x-target.x,state.z-target.z):Infinity,isNearby=distance<reach
+    if(isNearby!==state.nearby){state.nearby=isNearby;handlers.onNearby(isNearby)}
+    camera.position.set(state.x,roomBounds?floorY+EYE_HEIGHT:EYE_HEIGHT,state.z);camera.rotation.set(state.pitch,state.yaw,0)
+    if(uiTime>.12){handlers.onPosition?.({x:state.x,z:state.z,minX:walkBounds?.min.x??-1,maxX:walkBounds?.max.x??1,minZ:walkBounds?.min.z??-1,maxZ:walkBounds?.max.z??1});uiTime=0}
+    renderer.render(scene,camera);frame=requestAnimationFrame(tick)
+  }
+  frame=requestAnimationFrame(tick)
+  return {
+    setMode(mode){nightTarget=mode==='night'?1:0},
+    goToSpot(index){if(!spots[index])return;const spot=nearestFree(spots[index].x,spots[index].z);state.x=spot.x;state.z=spot.z;const target=index===3?spots[0]:desk;state.yaw=target?Math.atan2(-(target.x-state.x),-(target.z-state.z)):-Math.PI/2;state.pitch=0},
+    dispose(){cancelAnimationFrame(frame);observer.disconnect();window.removeEventListener('keydown',onDown);window.removeEventListener('keyup',onUp);window.removeEventListener('blur',clearKeys);canvas.removeEventListener('pointerdown',pointerDown);canvas.removeEventListener('pointermove',pointerMove);canvas.removeEventListener('pointerup',pointerUp);canvas.removeEventListener('pointercancel',pointerUp);canvas.removeEventListener('wheel',onWheel);scene.traverse((object)=>{object.geometry?.dispose();if(Array.isArray(object.material))object.material.forEach((m)=>m.dispose());else object.material?.dispose()});groundMaterial?.map?.dispose();wallTexture.dispose();wallSource.dispose();floorTexture.dispose();cabinetTexture.dispose();doorTexture.dispose();desktopTexture.userData.dispose?.();desktopTexture.dispose();exteriorTexture.dispose();renderer.dispose()},
+  }
+}
+
+export default function OfficeScene({sceneRef,onPosition,onNearby,onSystem,onReady}){
+  const canvasRef=useRef(null)
+  useEffect(()=>{if(!canvasRef.current)return undefined;const office=createScene(canvasRef.current,{onPosition,onNearby,onSystem,onReady});sceneRef.current=office;return()=>{office.dispose();if(sceneRef.current===office)sceneRef.current=null}},[sceneRef,onPosition,onNearby,onSystem,onReady])
+  return <canvas ref={canvasRef} className="office-canvas" aria-label="First-person walkthrough of the home office. Use arrow keys to move, drag to look, and press Enter at the work desk." />
+}
