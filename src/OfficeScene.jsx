@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { createExteriorMaterial, WINDOW_UV } from './exteriorShader'
 import { buildCollisionGrid, createWalkTester } from './collision'
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
-import { PHONE, BOOK, CAMERA_SCREEN, createOpenBook, createDigitalCamera, createTableLamp, createModelAirplane, createPhone, createFloorPlant, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight } from './props'
+import { PHONE, BOOK, CAMERA_SCREEN, createOpenBook, createDigitalCamera, createTableLamp, createPolaroid, createModelAirplane, createPhone, createFloorPlant, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight } from './props'
 import { createDesktopTexture, BEACH_PHOTO_URL } from './screens'
 
 const MODEL_URL = '/models/home-office.glb'
@@ -502,7 +502,8 @@ function createScene(canvas, handlers) {
     {
       const stack = find('Line023'), single = find('Line040.001')
       if (stack) {
-        const sb = new THREE.Box3().setFromObject(stack), top = sb.min.y // cabinet top
+        const sb = new THREE.Box3().setFromObject(stack), cab = find('Cube.008')
+        const top = cab ? new THREE.Box3().setFromObject(cab).max.y : sb.min.y // cabinet top (the stack's own base sits higher)
         const sc = sb.getCenter(new THREE.Vector3())
         // the cabinet runs along Z against the wall at −X (or the mirror of that)
         const intoRoom = Math.sign(roomBounds.getCenter(new THREE.Vector3()).x - sc.x) || 1
@@ -538,6 +539,17 @@ function createScene(canvas, handlers) {
         lamp.position.set(wallX, tb.max.y, endZ); scene.add(lamp); lamp.updateMatrixWorld(true)
         const bulb = new THREE.PointLight('#ffc985', 0, 2.6, 2); bulb.position.copy(lamp.localToWorld(lightPoint.clone())); scene.add(bulb)
         nightLights.push({ light: bulb, max: 1.6, glow, glowMax: 1.8 })
+        // a few instant prints scattered between the camera and the lamp
+        if (cameraSpot) {
+          const intoRoom = Math.sign(roomBounds.getCenter(new THREE.Vector3()).x - cameraSpot.x) || 1
+          const face = intoRoom > 0 ? Math.PI / 2 : -Math.PI / 2 // bottom margin toward the room
+          ;[[.13, .015, .25], [.2, -.03, -.35], [.165, .045, .05]].forEach(([dz, dx, rot], i) => {
+            const p = createPolaroid(i)
+            p.position.set(cameraSpot.x + intoRoom * dx, cameraSpot.y + .0004 + i * .0011, cameraSpot.z + towardEnd * dz)
+            p.rotation.y = face + rot
+            scene.add(p)
+          })
+        }
       }
     }
     grid = buildCollisionGrid(meshColliders, roomBounds, floorY)
@@ -608,8 +620,21 @@ function createScene(canvas, handlers) {
     const spec=FOCUS[id], obj=spec&&scene.getObjectByName(spec.name); if(!obj)return null
     obj.updateWorldMatrix(true,false)
     const center=new THREE.Vector3(0,spec.y,0).applyMatrix4(obj.matrixWorld)
-    const up=new THREE.Vector3(0,0,-1).transformDirection(obj.matrixWorld); up.y=0; up.normalize()
     const r={width:canvas.clientWidth,height:canvas.clientHeight}, fov=36, half=Math.tan(THREE.MathUtils.degToRad(fov/2))
+    if(id==='about'&&sideways()){
+      // upright phone: show the open book turned sideways (landscape) so it can fill the screen;
+      // its left edge goes to the top. Room above and below for the page buttons, and the bar below.
+      const up=new THREE.Vector3(-1,0,0).transformDirection(obj.matrixWorld); up.y=0; up.normalize()
+      const top=96, bottom=172+84, usableH=Math.max(200,r.height-top-bottom)
+      const hForLong=(spec.W/2)/(half*(usableH/r.height)*.97), hForShort=(spec.L/2)/(half*(r.width/r.height)*.94)
+      const h=Math.max(hForLong,hForShort)
+      const shiftPx=(bottom-top)/2, shift=(shiftPx/(r.height/2))*h*half
+      const pos=center.clone().addScaledVector(up,-shift); pos.y+=h
+      const look=pos.clone(); look.y-=1
+      tmpM.lookAt(pos,look,up)
+      return {pos,quat:new THREE.Quaternion().setFromRotationMatrix(tmpM),fov,id,turn:true}
+    }
+    const up=new THREE.Vector3(0,0,-1).transformDirection(obj.matrixWorld); up.y=0; up.normalize()
     const reserved=window.matchMedia?.('(pointer: coarse)').matches?172:(r.width<=720?150:104) // keep clear of the bottom bar
     const usableH=Math.max(200,r.height-reserved-40), screenFrac=usableH/r.height
     const hForLength=(spec.L/2)/(half*screenFrac*spec.fill), hForWidth=(spec.W/2)/(half*(r.width/r.height)*.92)
@@ -801,7 +826,7 @@ function createScene(canvas, handlers) {
         const px=(tmpV.x+1)/2*W, py=(1-tmpV.y)/2*H
         x0=Math.min(x0,px);x1=Math.max(x1,px);y0=Math.min(y0,py);y1=Math.max(y1,py)
       }
-      return {left:x0,top:y0,width:x1-x0,height:y1-y0,radius:(x1-x0)*spec.rect.r/spec.rect.w}
+      return {left:x0,top:y0,width:x1-x0,height:y1-y0,radius:(x1-x0)*spec.rect.r/spec.rect.w,rotated:!!focus.to.turn}
     },
     phoneScreenRect(){ return this.focusRect('contact') },
     // The camera's rear screen once it has been picked up (null until then).

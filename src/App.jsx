@@ -292,37 +292,123 @@ function PhoneScreen({ onClose, getRect }) {
   </motion.div>
 }
 
-// The open book on the cabinet: once the camera settles over it, two pages about me appear on it.
+// Phone turning from upright to sideways: an upright phone, a dashed sideways outline and a curved arrow.
+const RotateIcon = () => <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <rect x="3" y="7.5" width="8.5" height="13.5" rx="1.8"/><path d="M6.4 18.6h1.7"/>
+  <rect x="13.2" y="12.5" width="8.5" height="6.5" rx="1.5" strokeDasharray="2 1.7" opacity=".5"/>
+  <path d="M7.5 4.6a8.3 8.3 0 0 1 11.4 5.3"/><path d="m16.9 8.6 2.1 1.6 1.2-2.4"/>
+</svg>
+// The open book on the cabinet: once the camera settles over it, the pages about me appear on it.
+// Two spreads (four pages): sketch + intro with an index, then work experience + education.
+// ← → buttons (and arrow keys) turn pages. On an upright phone the book is shown sideways.
+const BOOK_INDEX = [['About me', 2, 0], ['Work experience', 3, 1], ['Education', 4, 1]]
+const bookSpread = (page, goTo) => page === 0 ? [
+  <section className="book-page left sketch-page" key="l0">
+    <img className="book-sketch" src="/about/sameer-sketch.png?v=3" alt="Pencil sketch of Sameer Palkar" draggable="false"/>
+    <span className="folio">1</span>
+  </section>,
+  <section className="book-page right" key="r0">
+    <small>chapter one</small>
+    <h2>Hi, I’m Sameer.</h2>
+    <p className="lede">I’m a software engineer working across backend development, full‑stack technologies, and artificial intelligence. I build scalable applications, solve complex problems, and explore new technologies to develop efficient and practical solutions for real‑world challenges.</p>
+    <nav className="book-index" aria-label="Contents">
+      <span className="book-index-title">Contents</span>
+      {BOOK_INDEX.map(([label, n, spread]) => <button key={label} onClick={(e) => { e.stopPropagation(); goTo(spread) }}><span>{label}</span><i/><b>{n}</b></button>)}
+    </nav>
+    <span className="folio">2</span>
+  </section>,
+] : [
+  <section className="book-page left edu-page" key="l1">
+    <small>chapter two</small>
+    <h3>Work experience</h3>
+    <article className="edu exp">
+      <img src="/about/oracle-logo.png" alt="Oracle logo" draggable="false"/>
+      <div>
+        <b>Application Software Engineer 1</b>
+        <span>Oracle Financial Services Software Ltd.</span>
+        <span className="edu-meta">August 2026 – Present</span>
+        {/* description goes here */}
+        <div className="exp-desc"/>
+      </div>
+    </article>
+    <span className="folio">3</span>
+  </section>,
+  <section className="book-page right edu-page" key="r1">
+    <small>chapter three</small>
+    <h3>Education</h3>
+    <article className="edu">
+      <img src="/about/vit-crest.png" alt="Vellore Institute of Technology crest" draggable="false"/>
+      <div>
+        <b>Vellore Institute of Technology, Vellore</b>
+        <span className="edu-meta">September 2022 – August 2026</span>
+        <span className="degree">Bachelor of Technology · Computer Science &amp; Engineering <em className="cgpa">CGPA 9.27</em></span>
+        <span className="edu-label">Relevant coursework</span>
+        <span className="chips">{['Database Management Systems', 'Operating Systems', 'Computer Networks', 'Data Structures & Algorithms', 'Web Programming', 'Artificial Intelligence & Machine Learning'].map((c) => <i key={c}>{c}</i>)}</span>
+      </div>
+    </article>
+    <article className="edu">
+      <img src="/about/amity-crest.png" alt="Amity International School crest" draggable="false"/>
+      <div>
+        <b>Amity International School, Sector 46, Gurugram</b>
+        <span className="edu-meta">March 2011 – August 2022</span>
+        <span>Secondary and Senior Secondary education.</span>
+        <span className="edu-note">Activities and societies: Selected among the top 300 teams across India in the Atal Tinkering Lab (ATL) Marathon 2020.</span>
+      </div>
+    </article>
+    <span className="folio">4</span>
+  </section>,
+]
+const BOOK_LAST = 1
 function BookPages({ onClose, getRect }) {
   const [rect, setRect] = useState(null)
+  const [page, setPage] = useState(0)
+  const [dir, setDir] = useState(1)
+  const touch = isTouch()
   useEffect(() => {
     let raf = 0
     const tick = () => {
       const r = getRect()
-      setRect((prev) => (!r ? null : prev && Math.abs(prev.left - r.left) + Math.abs(prev.top - r.top) + Math.abs(prev.width - r.width) < 1 ? prev : r))
+      setRect((prev) => (!r ? null : prev && prev.rotated === r.rotated && Math.abs(prev.left - r.left) + Math.abs(prev.top - r.top) + Math.abs(prev.width - r.width) < 1 ? prev : r))
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
   }, [getRect])
+  const goTo = (n) => setPage((p) => { n = Math.min(BOOK_LAST, Math.max(0, n)); if (n !== p) setDir(n > p ? 1 : -1); return n })
+  const turn = (d) => setPage((p) => { const n = Math.min(BOOK_LAST, Math.max(0, p + d)); if (n !== p) setDir(d); return n })
+  useEffect(() => {
+    const key = (e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); turn(e.key === 'ArrowRight' ? 1 : -1) } }
+    window.addEventListener('keydown', key, true); return () => window.removeEventListener('keydown', key, true)
+  })
+  const turned = rect?.rotated
+  const navBtn = (d) => {
+    const label = d < 0 ? 'Previous page' : 'Next page'
+    const disabled = d < 0 ? page === 0 : page === BOOK_LAST
+    // sideways book: previous above it, next below it; the button is turned with the book
+    const style = turned
+      ? { left: rect.left + rect.width / 2 - 28, top: d < 0 ? Math.max(8, rect.top - 56 - 18) : Math.min(window.innerHeight - 64, rect.top + rect.height + 18) }
+      : { left: d < 0 ? Math.max(8, rect.left - 56 - 22) : Math.min(window.innerWidth - 64, rect.left + rect.width + 22), top: rect.top + rect.height / 2 - 28 }
+    return <button className={`book-nav${touch ? ' show-tip' : ''}${turned ? ' turned' : ''}`} style={style} disabled={disabled} aria-label={label}
+      onClick={(e) => { e.stopPropagation(); turn(d) }}>
+      <Arrow dir={d < 0 ? 'left' : 'right'} size={20}/>
+      {!turned && <span className="book-tip">{label}</span>}
+    </button>
+  }
   return <motion.div className="phone-overlay" onClick={onClose} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
-    {rect && <motion.div className="book-live" onClick={(e) => e.stopPropagation()} style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
+    {rect && <motion.div key={turned ? 'turned' : 'flat'} className="book-live" onClick={(e) => e.stopPropagation()}
+      style={turned
+        ? { left: rect.left + rect.width / 2 - rect.height / 2, top: rect.top + rect.height / 2 - rect.width / 2, width: rect.height, height: rect.width, rotate: 90 }
+        : { left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .5 }}>
-      <section className="book-page left">
-        <small>chapter one</small>
-        <h2>Hi, I’m Sameer.</h2>
-        <p>I’m a computer science student and builder who enjoys turning thoughtful ideas into useful, polished software.</p>
-        <dl><dt>Based in</dt><dd>Bengaluru, India</dd><dt>Studying</dt><dd>B.Tech, Computer Science · VIT Vellore</dd><dt>Graduating</dt><dd>August 2026</dd></dl>
-        <span className="folio">1</span>
-      </section>
-      <section className="book-page right">
-        <small>what I work with</small>
-        <h3>Tools in my kit</h3>
-        <ul>{['Java', 'Python', 'C++', 'JavaScript', 'TypeScript', 'React', 'Node.js', 'Spring Boot', 'FastAPI', 'SQL', 'Docker', 'Kubernetes', 'Git', 'Figma', 'AI / ML'].map((x) => <li key={x}>{x}</li>)}</ul>
-        <p className="aside">Interested in software engineering, backend systems and applied AI.</p>
-        <span className="folio">2</span>
-      </section>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div key={page} className="book-spread"
+          initial={{ opacity: 0, x: dir * 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -dir * 18 }} transition={{ duration: .22, ease: [.2, .8, .2, 1] }}>
+          {bookSpread(page, goTo)}
+        </motion.div>
+      </AnimatePresence>
     </motion.div>}
+    {rect && navBtn(-1)}{rect && navBtn(1)}
+    {turned && <div className="rotate-hint"><RotateIcon/>Rotate your phone for a bigger view</div>}
   </motion.div>
 }
 
@@ -384,7 +470,7 @@ function CameraView({ onClose, getRect }) {
       {rect.rotated ? <>
         <button className="cam-nav" style={{ left: rect.left + rect.width / 2 - 28, top: Math.max(8, rect.bodyTop - 56 - 22) }} onClick={(e) => { e.stopPropagation(); step(-1) }} disabled={n < 2} aria-label="Previous photo"><Arrow dir="up" size={22}/></button>
         <button className="cam-nav" style={{ left: rect.left + rect.width / 2 - 28, top: Math.min(window.innerHeight - 64, rect.bodyBottom + 22) }} onClick={(e) => { e.stopPropagation(); step(1) }} disabled={n < 2} aria-label="Next photo"><Arrow dir="down" size={22}/></button>
-        <div className="rotate-hint"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M20 9a8 8 0 0 1-2 7M18.5 16.2 18 13.6l2.6.4"/></svg>Rotate your phone for a bigger view</div>
+        <div className="rotate-hint"><RotateIcon/>Rotate your phone for a bigger view</div>
       </> : <>
         <button className="cam-nav" style={{ left: Math.max(8, rect.bodyLeft - 56 - 22), top: rect.top + rect.height / 2 - 28 }} onClick={(e) => { e.stopPropagation(); step(-1) }} disabled={n < 2} aria-label="Previous photo"><Arrow dir="left" size={22}/></button>
         <button className="cam-nav" style={{ left: Math.min(window.innerWidth - 64, rect.bodyRight + 22), top: rect.top + rect.height / 2 - 28 }} onClick={(e) => { e.stopPropagation(); step(1) }} disabled={n < 2} aria-label="Next photo"><Arrow dir="right" size={22}/></button>

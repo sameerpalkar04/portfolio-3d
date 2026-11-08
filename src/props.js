@@ -575,3 +575,60 @@ export function createTableLamp() {
   group.traverse((o) => { if (o.isMesh) { o.castShadow = o !== shade; o.receiveShadow = true } })
   return { group, glow, lightPoint: new THREE.Vector3(0, .07 + H * .45, 0) }
 }
+
+// An instant (Polaroid-style) print lying flat, ≈ 8.8 × 10.7 cm, with a painted snapshot.
+// Origin at the bottom centre; the thick bottom margin of the frame is toward local +Z.
+const POLAROID_SCENES = [
+  // sunset over the sea
+  (ctx, w, h) => {
+    let g = ctx.createLinearGradient(0, 0, 0, h * .62); g.addColorStop(0, '#3d4f8a'); g.addColorStop(.55, '#e98a5c'); g.addColorStop(1, '#ffd58a')
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h * .62)
+    ctx.fillStyle = '#fff1c4'; ctx.beginPath(); ctx.arc(w * .58, h * .6, w * .11, Math.PI, 0); ctx.fill()
+    g = ctx.createLinearGradient(0, h * .62, 0, h); g.addColorStop(0, '#d9835f'); g.addColorStop(1, '#2c3b62')
+    ctx.fillStyle = g; ctx.fillRect(0, h * .62, w, h * .38)
+    ctx.fillStyle = 'rgba(255,230,170,.55)'; for (let i = 0; i < 14; i++) ctx.fillRect(w * .58 - w * (.12 - i * .006), h * (.64 + i * .024), w * (.24 - i * .012), 2)
+  },
+  // mountains over a lake
+  (ctx, w, h) => {
+    let g = ctx.createLinearGradient(0, 0, 0, h * .55); g.addColorStop(0, '#7fb2d8'); g.addColorStop(1, '#dbe9ef')
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h)
+    const ridge = (col, base, amp, seed) => { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(0, h * .6); for (let x = 0; x <= w; x += w / 12) ctx.lineTo(x, h * (base - amp * Math.abs(Math.sin(x / w * 5.3 + seed)))); ctx.lineTo(w, h * .6); ctx.fill() }
+    ridge('#8a9bb0', .42, .2, 1); ridge('#4f6a6a', .52, .12, 2.4); ridge('#2f4a3c', .58, .06, 4)
+    g = ctx.createLinearGradient(0, h * .6, 0, h); g.addColorStop(0, '#5d8193'); g.addColorStop(1, '#2a4552')
+    ctx.fillStyle = g; ctx.fillRect(0, h * .6, w, h * .4)
+    ctx.fillStyle = 'rgba(255,255,255,.18)'; for (let i = 0; i < 9; i++) ctx.fillRect(w * Math.random(), h * (.66 + Math.random() * .3), w * .2, 1.5)
+  },
+  // a city skyline at dusk
+  (ctx, w, h) => {
+    const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#1d2347'); g.addColorStop(.6, '#7b4f7a'); g.addColorStop(1, '#f0a36b')
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h)
+    let x = 0, k = 7
+    while (x < w) {
+      const bw = w * (.07 + ((k * 37) % 9) / 90), bh = h * (.25 + ((k * 53) % 11) / 22)
+      ctx.fillStyle = '#16182a'; ctx.fillRect(x, h - bh, bw - 2, bh)
+      ctx.fillStyle = 'rgba(255,214,140,.85)'
+      for (let wy = h - bh + 6; wy < h - 6; wy += 9) for (let wx = x + 4; wx < x + bw - 6; wx += 7) if (((wx * 13 + wy * 7 + k) % 5) < 2) ctx.fillRect(wx, wy, 3, 4)
+      x += bw; k++
+    }
+  },
+]
+export function createPolaroid(scene = 0) {
+  const W = .088, L = .107, T = .0009
+  const c = document.createElement('canvas'); c.width = 352; c.height = 428; const ctx = c.getContext('2d')
+  ctx.fillStyle = '#f6f4ee'; ctx.fillRect(0, 0, c.width, c.height)
+  const m = 22, pw = c.width - m * 2, ph = pw // square photo, thick margin below
+  ctx.save(); ctx.translate(m, m); ctx.beginPath(); ctx.rect(0, 0, pw, ph); ctx.clip()
+  POLAROID_SCENES[scene % POLAROID_SCENES.length](ctx, pw, ph)
+  const v = ctx.createRadialGradient(pw / 2, ph / 2, pw * .3, pw / 2, ph / 2, pw * .75); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(20,10,0,.35)')
+  ctx.fillStyle = v; ctx.fillRect(0, 0, pw, ph)
+  for (let i = 0; i < 2500; i++) { ctx.fillStyle = `rgba(${Math.random() < .5 ? '255,255,255' : '0,0,0'},.06)`; ctx.fillRect(Math.random() * pw, Math.random() * ph, 1, 1) }
+  ctx.restore()
+  ctx.strokeStyle = 'rgba(0,0,0,.08)'; ctx.strokeRect(m, m, pw, ph)
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8
+  const paper = new THREE.MeshStandardMaterial({ color: '#f1efe8', roughness: .85 })
+  const face = new THREE.MeshStandardMaterial({ map: tex, roughness: .45 })
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(W, T, L), [paper, paper, face, paper, paper, paper])
+  mesh.position.y = T / 2; mesh.castShadow = true; mesh.receiveShadow = true
+  const g = new THREE.Group(); g.name = 'polaroid'; g.add(mesh)
+  return g
+}

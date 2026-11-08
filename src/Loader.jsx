@@ -99,7 +99,7 @@ export default function Loader({ progress, loaded, total, ready, onEnter }) {
         {done && <motion.button className="loader-enter" onClick={onEnter} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .3 }}>
           Enter <span aria-hidden="true">→</span>
         </motion.button>}
-        {done && <small>or press ↵</small>}
+        {done && !window.matchMedia?.('(pointer: coarse)').matches && <small>or press ↵</small>}
       </div>
     </div>
   </motion.div>
