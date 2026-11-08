@@ -336,7 +336,7 @@ const RotateIcon = () => <svg viewBox="0 0 24 24" width="22" height="22" fill="n
 // The open book on the cabinet: once the camera settles over it, the pages about me appear on it.
 // Two spreads (four pages): sketch + intro with an index, then work experience + education.
 // ← → buttons (and arrow keys) turn pages. On an upright phone the book is shown sideways.
-const BOOK_INDEX = [['About me', 2, 0], ['Work experience', 3, 1], ['Education', 4, 1]]
+const BOOK_INDEX = [['About me', 2, 0], ['Work experience', 3, 1], ['Education', 4, 1], ['Extracurriculars', 5, 2]]
 const bookSpread = (page, goTo) => page === 0 ? [
   <section className="book-page left sketch-page" key="l0">
     <img className="book-sketch" src="/about/sameer-sketch.png?v=3" alt="Pencil sketch of Sameer Palkar" draggable="false"/>
@@ -352,7 +352,7 @@ const bookSpread = (page, goTo) => page === 0 ? [
     </nav>
     <span className="folio">2</span>
   </section>,
-] : [
+] : page === 1 ? [
   <section className="book-page left edu-page" key="l1">
     <small>chapter two</small>
     <h3>Work experience</h3>
@@ -392,8 +392,83 @@ const bookSpread = (page, goTo) => page === 0 ? [
     </article>
     <span className="folio">4</span>
   </section>,
+] : page === 2 ? [
+  <section className="book-page left edu-page xc-page" key="l2">
+    <small>chapter four</small>
+    <h3>Extracurriculars</h3>
+    <article className="edu xc">
+      <img src="/about/iste-logo.png?v=2" alt="ISTE logo" draggable="false"/>
+      <div>
+        <b>Indian Society for Technical Education</b>
+        <span>ISTE · VIT Chapter, Vellore</span>
+        <span className="xc-role"><strong>Publicity Head</strong><em>April 2024 – March 2025</em></span>
+        <ul className="xc-points">
+          <li>Directed publicity campaigns across platforms, driving 5,000+ student engagements.</li>
+          <li>Led outreach for the Technica hackathon, coordinating a 40+ member team for seamless execution with 2,100+ participants.</li>
+        </ul>
+      </div>
+    </article>
+    <article className="edu xc xc-more">
+      <div>
+        <span className="xc-role"><strong>Core Committee Member</strong><em>February 2023 – April 2024</em></span>
+        <ul className="xc-points">
+          <li>Worked in the design and publicity domain, creating campaign visuals for the chapter&rsquo;s events.</li>
+          <li>Coordinated the planning, execution and marketing of several successful chapter events.</li>
+        </ul>
+      </div>
+    </article>
+    <span className="folio">5</span>
+  </section>,
+  <section className="book-page right edu-page xc-page" key="r2">
+    <article className="edu xc">
+      <img src="/about/riviera-mark.png" alt="Riviera logo" draggable="false"/>
+      <div>
+        <b>Riviera 2026</b>
+        <span className="xc-role"><strong>Organizer, Design &amp; Print</strong><em>February 2026</em></span>
+        <span className="edu-note">The annual international sports and cultural festival of VIT Vellore, with a footfall of 40,000+.</span>
+        <ul className="xc-points">
+          <li>Led the digital design team for VIT&rsquo;s flagship festival of 40,000+ people.</li>
+          <li>Oversaw visual content strategy, promotions and multimedia coordination.</li>
+        </ul>
+      </div>
+    </article>
+    <article className="edu xc">
+      <img src="/about/riviera-mark.png" alt="Riviera logo" draggable="false"/>
+      <div>
+        <b>Riviera 2025</b>
+        <span className="xc-role"><strong>Manager, Design &amp; Media</strong><em>February 2025</em></span>
+        <span className="edu-note">The annual international sports and cultural festival of VIT Vellore, with a footfall of 40,000+.</span>
+        <ul className="xc-points">
+          <li>Designed social media posts, brochures and promotional material for the festival.</li>
+          <li>Kept communication smooth between the design, media and organising teams.</li>
+        </ul>
+      </div>
+    </article>
+    <span className="folio">6</span>
+  </section>,
+] : [
+  <section className="book-page left edu-page xc-page" key="l3">
+    <article className="edu xc">
+      <img src="/about/gravitas-logo.png?v=2" alt="graVITas logo" draggable="false"/>
+      <div>
+        <b>graVITas 2024</b>
+        <span className="xc-role"><strong>Coordinator, Design &amp; Print</strong><em>August – September 2024</em></span>
+        <span className="edu-note">The annual techno-management fest of VIT Vellore.</span>
+        <ul className="xc-points">
+          <li>Designed the social media posts that publicised graVITas&rsquo;24.</li>
+          <li>Helped keep operations running smoothly within the design team.</li>
+        </ul>
+      </div>
+    </article>
+    <span className="folio">7</span>
+  </section>,
+  <section className="book-page right edu-page end-page" key="r3">
+    <span className="end-mark">— fin —</span>
+    <span className="end-note">Thanks for reading. Find me on the phone to say hello.</span>
+    <span className="folio">8</span>
+  </section>,
 ]
-const BOOK_LAST = 1
+const BOOK_LAST = 3
 function BookPages({ onClose, getRect }) {
   const [rect, setRect] = useState(null)
   const [page, setPage] = useState(0)

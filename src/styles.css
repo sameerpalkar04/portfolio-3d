@@ -525,3 +525,81 @@ html[data-lock] .rotate-hint{display:none}
 .rotate-back{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:rgba(14,16,20,.55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 .rotate-back-card{display:flex;flex-direction:column;align-items:center;gap:6px;padding:22px 28px;background:#fff;border:1px solid #dcdee2;border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.12),0 8px 24px rgba(0,0,0,.2);color:#1d1f22;font-family:'DM Sans',system-ui,sans-serif;text-align:center}
 .rotate-back-card svg{margin-bottom:6px}.rotate-back-card b{font-size:16px;font-weight:600}.rotate-back-card small{font-size:13px;color:#6b7078}
+/* Book: extracurriculars */
+.xc-page .edu{margin-bottom:2.2cqw}
+.edu.xc img.wordmark{height:auto;max-height:3.4cqw;margin-top:.6cqw}
+.xc-role{display:flex;justify-content:space-between;align-items:baseline;gap:1.2cqw;margin-top:.5cqw}
+.xc-role strong{font-weight:600;font-size:1.5cqw;color:#2b2622}.xc-role em{font-style:normal;color:#8f8576;font-size:1.25cqw;white-space:nowrap}
+.book-page .xc-points{list-style:none;margin:.25cqw 0 .3cqw;padding:0;display:flex;flex-direction:column;gap:.25cqw;font-size:1.3cqw;line-height:1.42}
+.book-page .xc-points{grid-template-columns:none}
+.xc-points li{position:relative;padding-left:1.3cqw}
+.xc-points li::before{content:'';position:absolute;left:.2cqw;top:.62cqw;width:.45cqw;height:.45cqw;border-radius:50%;background:#b3202a}
+.xc-cert{all:unset;cursor:zoom-in;display:inline-flex;align-items:center;gap:1cqw;margin-top:.6cqw;align-self:flex-start}
+.xc-cert img{width:9.5cqw;height:auto;border-radius:.4cqw;box-shadow:0 1px 3px rgba(0,0,0,.2);border:1px solid #e2dccd}
+.xc-cert span{font-size:1.15cqw;color:#8f8576;text-decoration:underline;text-decoration-color:#d6cfbf;text-underline-offset:.25cqw}
+.xc-cert:hover span{color:#b3202a}
+.end-page{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.4cqw;text-align:center}
+.end-mark{font-size:2.4cqw;font-style:italic;color:#8f8576;letter-spacing:.1em}.end-note{font-size:1.4cqw;color:#8f8576;max-width:28cqw}
+.cert-zoom{all:unset;position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.4cqw;background:rgba(20,16,12,.72);cursor:zoom-out}
+.cert-zoom img{max-width:86%;max-height:84%;border-radius:.6cqw;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+.cert-zoom span{font:500 1.2cqw 'DM Sans',system-ui,sans-serif;color:rgba(255,255,255,.75)}
+/* Book chapters: body text at least as large as the intro paragraph */
+.book-page .edu{font-size:1.85cqw;line-height:1.45;grid-template-columns:7.6cqw 1fr;gap:2cqw}
+.book-page .edu img{width:7.6cqw;height:7.6cqw}
+.book-page .edu.exp img{height:7.6cqw}
+.book-page .edu b{font-size:2.05cqw}
+.book-page .edu-meta{font-size:1.75cqw}.book-page .edu-meta em,.book-page .edu em.cgpa{font-size:1.45cqw}
+.book-page .edu-note{font-size:1.8cqw}
+.book-page .edu-label{font-size:1.75cqw}
+.book-page .chips i{font-size:1.4cqw;padding:.3cqw 1cqw}
+.book-page .xc-points{font-size:1.85cqw;line-height:1.45;gap:.45cqw}
+.xc-points li{padding-left:1.6cqw}.xc-points li::before{top:.85cqw;width:.55cqw;height:.55cqw}
+.xc-role strong{font-size:1.95cqw}.xc-role em{font-size:1.6cqw}
+.edu.xc img.wordmark{height:auto;max-height:none;width:7.6cqw;margin-top:.8cqw}
+/* bigger certificates with a "tap to view" label */
+.xc-cert{gap:1.4cqw;margin-top:1.2cqw}
+.xc-cert img{width:17cqw}
+.xc-cert span{display:flex;flex-direction:column;gap:.3cqw;font-size:1.5cqw;text-decoration:none}
+.book-page .xc-cert span b{font-size:1.75cqw;font-weight:500;color:#4a443c}
+.xc-cert:hover span b{color:#b3202a}
+.book-page .edu .xc-cert img{width:17cqw;height:auto;object-fit:initial}
+.xc-role{flex-wrap:wrap;column-gap:1.4cqw;row-gap:0}.xc-role strong{white-space:nowrap}
+.book-page .edu .xc-cert img{width:14.5cqw}
+.book-page .xc-points{gap:.3cqw;margin-bottom:.2cqw}
+.xc-page .edu{margin-bottom:1.6cqw}
+.edu-page.xc-page h3{margin-bottom:1cqw;padding-bottom:.8cqw}
+.book-page.roomy .edu .xc-cert img{width:21cqw}
+.book-page.roomy .xc-cert{flex-direction:column;align-items:flex-start;gap:.8cqw}.book-page.roomy .xc-cert span{flex-direction:row;gap:1cqw;align-items:baseline}
+/* Book chapters v3: slightly smaller type; the logo sits beside the heading lines only and the rest of
+   the entry runs full width beneath it (no empty column under the logo) */
+.book-page .edu{display:grid;grid-template-columns:5.6cqw 1fr;column-gap:1.6cqw;row-gap:.25cqw;align-items:center;margin-bottom:2.2cqw;font-size:1.55cqw;line-height:1.45}
+.book-page .edu > img,.book-page .edu.exp > img{grid-row:1 / span 2;width:5.6cqw;height:5.6cqw;margin:0;align-self:center}
+.book-page .edu.xc > img.wordmark{width:5.6cqw;height:auto}
+.book-page .edu > div{display:contents}
+.book-page .edu > div > *{grid-column:1 / -1}
+.book-page .edu > div > :nth-child(1),.book-page .edu > div > :nth-child(2){grid-column:2}
+.book-page .edu > div > :nth-child(3){margin-top:.6cqw}
+.book-page .edu b{font-size:1.75cqw;line-height:1.25}
+.book-page .edu-meta{font-size:1.45cqw}.book-page .edu-meta em,.book-page .edu em.cgpa{font-size:1.25cqw}
+.book-page .edu-note{font-size:1.5cqw}
+.book-page .edu-label{font-size:1.45cqw;margin-top:.5cqw}
+.book-page .chips i{font-size:1.2cqw;padding:.25cqw .85cqw}
+.book-page .xc-points{font-size:1.55cqw;line-height:1.42;gap:.25cqw;margin:.2cqw 0 .4cqw}
+.xc-points li{padding-left:1.4cqw}.xc-points li::before{top:.72cqw;width:.48cqw;height:.48cqw}
+.xc-role strong{font-size:1.62cqw}.xc-role em{font-size:1.35cqw}
+.xc-role{margin-top:.4cqw}
+.book-page .exp-desc{min-height:12cqw}
+.book-page .edu.exp > img{grid-row:1 / span 3}.book-page .edu.exp > div > :nth-child(3){grid-column:2;margin-top:0}
+/* Book: entries share the page height (each centred in its share) with a rule between them */
+.book-page.edu-page{display:flex;flex-direction:column;padding-bottom:6cqw}
+.book-page.edu-page > small,.book-page.edu-page > h3{flex:none}
+.book-page.edu-page .edu{flex:1 1 0;align-content:center;margin:0;padding:1.6cqw 0}
+.book-page.edu-page .edu + .edu{border-top:1px solid #e2dccd}
+.book-page .edu.xc-more{grid-template-columns:1fr}
+.book-page .edu.xc-more > div > *{grid-column:1 / -1}
+.book-page .edu.xc-more > div > :nth-child(3){margin-top:0}
+.edu-page.xc-page h3,.edu-page h3{margin-bottom:.4cqw}
+.book-page .edu{font-size:1.65cqw}.book-page .xc-points{font-size:1.65cqw}.book-page .edu b{font-size:1.85cqw}
+.xc-role strong{font-size:1.72cqw}.xc-role em{font-size:1.42cqw}.book-page .edu-note{font-size:1.58cqw}.book-page .edu-meta{font-size:1.52cqw}
+.book-page.edu-page article.edu:only-of-type{flex:none;padding-top:1.6cqw}
+.book-page .edu > img[src*="riviera-mark"]{object-fit:contain}
