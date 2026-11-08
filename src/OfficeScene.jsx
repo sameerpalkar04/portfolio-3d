@@ -784,14 +784,14 @@ function createScene(canvas, handlers) {
     const key=event.key.toLowerCase()
     if (state.system && ['backspace','delete','escape'].includes(key)) { event.preventDefault(); exitSystem(); return }
     if (!state.system && key==='enter' && state.hotspot) { event.preventDefault(); enterSystem(); return }
-    if (!state.system && ['arrowup','arrowdown','arrowleft','arrowright'].includes(key)) { event.preventDefault(); keys.add(key); travel=null }
+    if (!state.system && ['arrowup','arrowdown','arrowleft','arrowright'].includes(key)) { event.preventDefault(); if(state.allowWalk===false)return; keys.add(key); travel=null }
   }
   const onUp=(event)=>keys.delete(event.key.toLowerCase()), clearKeys=()=>keys.clear()
   window.addEventListener('keydown',onDown); window.addEventListener('keyup',onUp); window.addEventListener('blur',clearKeys)
   let pointer=null
   const pointerDown=(event)=>{ if(event.button!==0)return; travel=null; pointer={id:event.pointerId,x:event.clientX,y:event.clientY}; canvas.setPointerCapture?.(event.pointerId) }
   const pointerUp=()=>{pointer=null}
-  const pointerMove=(event)=>{ if(!pointer||pointer.id!==event.pointerId||state.system)return; const dx=event.clientX-pointer.x,dy=event.clientY-pointer.y; pointer.x=event.clientX;pointer.y=event.clientY;state.yaw-=dx*.003;state.pitch=THREE.MathUtils.clamp(state.pitch-dy*.002,-.75,.32) }
+  const pointerMove=(event)=>{ if(!pointer||pointer.id!==event.pointerId||state.system||state.allowLook===false)return; const dx=event.clientX-pointer.x,dy=event.clientY-pointer.y; pointer.x=event.clientX;pointer.y=event.clientY;state.yaw-=dx*.003;state.pitch=THREE.MathUtils.clamp(state.pitch-dy*.002,-.75,.32) }
 
   canvas.addEventListener('pointerdown',pointerDown);canvas.addEventListener('pointermove',pointerMove);canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',pointerUp)
   const onWheel=(event)=>{event.preventDefault();camera.fov=THREE.MathUtils.clamp(camera.fov+Math.sign(event.deltaY)*2,46,80);camera.updateProjectionMatrix()}
@@ -916,13 +916,15 @@ function createScene(canvas, handlers) {
     setTimeOfDay(hour){lightTarget=lightAt(hour)},
     // Walk to one of the explorable spots and face it.
     goTo(id){
-      const spot=hotspots.find((h)=>h.id===id); if(!spot||state.system)return
+      const spot=hotspots.find((h)=>h.id===id); if(!spot||state.system||state.allowWalk===false)return // not during the walkthrough
       const view=spot.view, yaw=Math.atan2(-(spot.pos.x-view.x),-(spot.pos.z-view.z))
       const eyeY=floorY+EYE_HEIGHT, pitch=THREE.MathUtils.clamp(Math.atan2(spot.pos.y-eyeY,Math.hypot(spot.pos.x-view.x,spot.pos.z-view.z)),-.75,.5)
       const dYaw=Math.atan2(Math.sin(yaw-state.yaw),Math.cos(yaw-state.yaw))
       travel={t:0,duration:Math.min(1.8,.7+Math.hypot(view.x-state.x,view.z-state.z)*.35),from:{x:state.x,z:state.z,yaw:state.yaw,pitch:state.pitch},to:{x:view.x,z:view.z,pitch},dYaw}
     },
     openSpot(){ enterSystem() },
+    // first-visit walkthrough: which controls are live yet
+    setControls({walk=true,look=true}={}){ state.allowWalk=walk; state.allowLook=look; if(!walk)keys.clear() },
     closeSystem(){ exitSystem() },
     // Where the phone's screen is on the page once the camera has settled over it (null until then).
     // Where the close-up surface (phone screen, book pages) is on the page once the camera has

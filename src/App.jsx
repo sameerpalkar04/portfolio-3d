@@ -229,32 +229,42 @@ function SpotCue({ id }) {
 // Shown once at the start, after the look-around cue: what there is to find in the room.
 function ExploreCue({ onDismiss }) {
   const touch = isTouch()
-  useEffect(() => {
-    const dismiss = () => onDismiss()
-    const events = touch ? ['touchstart', 'pointerdown'] : ['pointermove']
-    const t = window.setTimeout(() => events.forEach((e) => window.addEventListener(e, dismiss, { once: true, passive: true })), 1400)
-    return () => { window.clearTimeout(t); events.forEach((e) => window.removeEventListener(e, dismiss)) }
-  }, [onDismiss, touch])
   return <motion.div className={`look-cue explore-cue${touch ? ' is-touch' : ''}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .4 }}>
+    <span className="tour-step">Step 3 of 3</span>
     <b>Things to explore</b>
     <ul className="explore-rows">{ALL_SPOTS.map((s) => <li key={s.id}><span className="cue-cam">{CUES[s.id]?.icon}</span><span className="ex-name">{s.object}</span><small>{s.opens}</small></li>)}</ul>
     <small className="explore-foot">{touch ? 'Walk up to one, or use the menu to go straight there' : 'Walk up to one, or use the shortcuts in the bar'}</small>
+    <button className="tour-start" onClick={onDismiss}>Start exploring <Arrow dir="right" size={16}/></button>
   </motion.div>
 }
 
-function LookCue({ onDismiss }) {
+// First-visit walkthrough: walk → look around → see what's in the room → start exploring.
+// Each step waits for the visitor to actually do it.
+function TourCue({ step, onDone }) {
   const touch = isTouch()
   useEffect(() => {
-    const dismiss = () => onDismiss()
-    const events = touch ? ['touchstart', 'pointerdown'] : ['pointermove']
-    // give it a moment on screen before hovering can clear it
-    const t = window.setTimeout(() => events.forEach((e) => window.addEventListener(e, dismiss, { once: true, passive: true })), 900)
-    return () => { window.clearTimeout(t); events.forEach((e) => window.removeEventListener(e, dismiss)) }
-  }, [onDismiss, touch])
-  return <motion.div className={`look-cue${touch ? ' is-touch' : ''}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .4 }}>
-    {touch
-      ? <><span className="cue-arrows"><i><Arrow dir="up" size={12}/></i><i><Arrow dir="left" size={12}/></i><i><Arrow dir="down" size={12}/></i><i><Arrow dir="right" size={12}/></i></span><b>tap the arrows to move</b><small>drag to look around</small></>
-      : <><span className="cue-mouse"><i/></span><b>drag to look around</b><small>arrow keys to walk</small></>}
+    if (step === 'walk') {
+      let t = 0
+      const onKey = (e) => { if (e.key.startsWith('Arrow') && !t) t = window.setTimeout(onDone, 700) }
+      window.addEventListener('keydown', onKey)
+      return () => { window.removeEventListener('keydown', onKey); window.clearTimeout(t) }
+    }
+    if (step === 'look') {
+      let down = null, moved = 0, done = false
+      const onDown = (e) => { if (e.target.closest?.('.office-canvas')) { down = { x: e.clientX, y: e.clientY }; moved = 0 } }
+      const onMove = (e) => { if (!down || done) return; moved += Math.hypot(e.clientX - down.x, e.clientY - down.y); down = { x: e.clientX, y: e.clientY }; if (moved > 60) { done = true; window.setTimeout(onDone, 400) } }
+      const onUp = () => { down = null }
+      window.addEventListener('pointerdown', onDown); window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp)
+      return () => { window.removeEventListener('pointerdown', onDown); window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp) }
+    }
+    return undefined
+  }, [step, onDone])
+  const n = step === 'walk' ? 1 : 2
+  return <motion.div className={`look-cue tour-cue${touch ? ' is-touch' : ''}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .4 }}>
+    <span className="tour-step">Step {n} of 3</span>
+    {step === 'walk'
+      ? <><span className="cue-arrows"><i><Arrow dir="up" size={12}/></i><i><Arrow dir="left" size={12}/></i><i><Arrow dir="down" size={12}/></i><i><Arrow dir="right" size={12}/></i></span><b>{touch ? 'Tap the arrows to walk' : 'Use the arrow keys to walk'}</b><small>{touch ? 'Try it now: tap any arrow' : 'Try it now: press any arrow key'}</small></>
+      : <>{touch ? <span className="cue-swipe"><svg viewBox="0 0 48 24" width="48" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 12h36M11 7l-5 5 5 5M37 7l5 5-5 5"/><circle cx="24" cy="12" r="4.5" fill="currentColor" stroke="none"/></svg></span> : <span className="cue-mouse"><i/></span>}<b>{touch ? 'Drag on the screen to look around' : 'Click and drag to look around'}</b><small>Try it now</small></>}
   </motion.div>
 }
 
@@ -576,8 +586,20 @@ export default function App() {
   }, [])
   // after the look-around cue goes, the list of things to explore shows once
   const [showExplore, setShowExplore] = useState(false)
-  const dismissCue = useCallback(() => { setShowCue(false); window.setTimeout(() => setShowExplore(true), 450) }, [])
-  const dismissExplore = useCallback(() => setShowExplore(false), [])
+  const [tourStep, setTourStep] = useState('walk') // walk → look → (explore card) → done
+  const dismissCue = useCallback(() => {
+    if (tourStep === 'walk') { setShowCue(false); window.setTimeout(() => { setTourStep('look'); setShowCue(true) }, 350); return }
+    setShowCue(false); window.setTimeout(() => setShowExplore(true), 350)
+  }, [tourStep])
+  const dismissExplore = useCallback(() => { setShowExplore(false); setTourStep('done') }, [])
+  // only the control being taught is live; after "Start exploring" everything is
+  useEffect(() => {
+    const scene = sceneRef.current; if (!scene?.setControls) return
+    scene.setControls(tourStep === 'done' ? { walk: true, look: true }
+      : tourStep === 'walk' ? { walk: true, look: false }
+      : tourStep === 'look' && !showExplore ? { walk: false, look: true }
+      : { walk: false, look: false })
+  }, [tourStep, showExplore, introPhase])
   const onKey = (key, down) => window.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { key, bubbles: true }))
   const closeSystem = () => sceneRef.current?.closeSystem()
   const getPhoneRect = useCallback(() => sceneRef.current?.phoneScreenRect() ?? null, [])
@@ -609,9 +631,9 @@ export default function App() {
           interacting={systemOpen} onBack={closeSystem}/>
         {isTouch() && !systemOpen && <MobileControls onKey={onKey}/>}
       </>}
-      <AnimatePresence>{showCue && introPhase === 'corner' && !systemOpen && <LookCue onDismiss={dismissCue}/>}</AnimatePresence>
+      <AnimatePresence>{showCue && introPhase === 'corner' && !systemOpen && <TourCue key={tourStep} step={tourStep} onDone={dismissCue}/>}</AnimatePresence>
       <AnimatePresence>{showExplore && introPhase === 'corner' && !systemOpen && <ExploreCue key="explore" onDismiss={dismissExplore}/>}</AnimatePresence>
-      <AnimatePresence>{!showCue && !showExplore && introPhase === 'corner' && !systemOpen && (deskNear && (!hotspot || hotspot === 'projects' || hotspot === 'achievements')
+      <AnimatePresence>{!showCue && !showExplore && tourStep === 'done' && introPhase === 'corner' && !systemOpen && (deskNear && (!hotspot || hotspot === 'projects' || hotspot === 'achievements')
         ? <DeskCue key="desk" hotspot={hotspot}/>
         : hotspot && <SpotCue key={hotspot} id={hotspot}/>)}</AnimatePresence>
     </div>}

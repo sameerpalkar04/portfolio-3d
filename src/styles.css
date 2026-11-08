@@ -512,3 +512,10 @@ html,body{background:#fff;color-scheme:light}
 .help-panel::-webkit-scrollbar{display:none}
 /* phone menu open: hide the interaction controls until it closes */
 body.menu-open .stack-nav,body.menu-open .rotate-hint,body.menu-open .cam-nav,body.menu-open .book-nav{visibility:hidden;pointer-events:none}
+/* first-visit walkthrough */
+.look-cue .tour-step{font:600 10px 'DM Sans',system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#9aa0a8}
+.look-cue.tour-cue{pointer-events:none}
+.look-cue.explore-cue{pointer-events:auto}
+.tour-start{margin-top:4px;height:44px;border-radius:12px;border:1px solid #1d1f22;background:#1d1f22;color:#fff;font:600 13px 'DM Sans',system-ui,sans-serif;letter-spacing:.02em;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.12),0 4px 12px rgba(0,0,0,.16)}
+.tour-start:hover{background:#000}.tour-start:active{transform:scale(.98)}
+.cue-swipe{display:grid;place-items:center;color:#1d1f22;height:28px}
