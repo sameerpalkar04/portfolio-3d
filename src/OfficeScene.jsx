@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { createExteriorMaterial, WINDOW_UV } from './exteriorShader'
 import { buildCollisionGrid, createWalkTester } from './collision'
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
+import { toLocal } from './orientation'
 import { PHONE, BOOK, CAMERA_SCREEN, createOpenBook, createDigitalCamera, createTableLamp, createGlobe, createCertificateWall, createPolaroid, createModelAirplane, createPhone, createFloorPlant, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight } from './props'
 import { createDesktopTexture, BEACH_PHOTO_URL } from './screens'
 
@@ -791,7 +792,7 @@ function createScene(canvas, handlers) {
   let pointer=null
   const pointerDown=(event)=>{ if(event.button!==0)return; travel=null; pointer={id:event.pointerId,x:event.clientX,y:event.clientY}; canvas.setPointerCapture?.(event.pointerId) }
   const pointerUp=()=>{pointer=null}
-  const pointerMove=(event)=>{ if(!pointer||pointer.id!==event.pointerId||state.system||state.allowLook===false)return; const dx=event.clientX-pointer.x,dy=event.clientY-pointer.y; pointer.x=event.clientX;pointer.y=event.clientY;state.yaw-=dx*.003;state.pitch=THREE.MathUtils.clamp(state.pitch-dy*.002,-.75,.32) }
+  const pointerMove=(event)=>{ if(!pointer||pointer.id!==event.pointerId||state.system||state.allowLook===false)return; const [dx,dy]=toLocal(event.clientX-pointer.x,event.clientY-pointer.y); pointer.x=event.clientX;pointer.y=event.clientY;state.yaw-=dx*.003;state.pitch=THREE.MathUtils.clamp(state.pitch-dy*.002,-.75,.32) }
 
   canvas.addEventListener('pointerdown',pointerDown);canvas.addEventListener('pointermove',pointerMove);canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',pointerUp)
   const onWheel=(event)=>{event.preventDefault();camera.fov=THREE.MathUtils.clamp(camera.fov+Math.sign(event.deltaY)*2,46,80);camera.updateProjectionMatrix()}

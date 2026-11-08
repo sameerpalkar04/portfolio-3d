@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import OfficeScene from './OfficeScene'
 import Loader from './Loader'
+import { viewW, viewH, fracAlong, phoneLandscape, setPortraitLock } from './orientation'
 
 // Songs on the speaker: add your picks here as { title, artist, link? }.
 const songs = []
@@ -44,7 +46,7 @@ function NameTag({ phase }) {
       const left = wrap.offsetLeft + holder.offsetLeft, top = wrap.offsetTop + holder.offsetTop
       const W = big.offsetWidth, H = big.offsetHeight
       const k = holder.offsetWidth / W
-      setGeo({ k, x: window.innerWidth / 2 - W / 2 - left, y: window.innerHeight / 2 - H / 2 - top })
+      setGeo({ k, x: viewW() / 2 - W / 2 - left, y: viewH() / 2 - H / 2 - top })
     }
     measure()
     document.fonts?.ready.then(measure) // the web font changes the width once it loads
@@ -52,7 +54,7 @@ function NameTag({ phase }) {
     return () => window.removeEventListener('resize', measure)
   }, [])
   const inCenter = phase === 'center'
-  const fontSize = Math.min(128, Math.max(46, window.innerWidth * .09))
+  const fontSize = Math.min(128, Math.max(46, viewW() * .09))
   return <>
     <AnimatePresence>
       {inCenter && <motion.div key="scrim" className="name-scrim" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: .9 } }} transition={{ duration: .6 }}/>}
@@ -101,10 +103,10 @@ const ALL_SPOTS = [...SPOTS, { id: 'music', object: 'Speaker', opens: 'Song pick
 // (the native range input fights with touch scrolling on phones). Arrow keys also work.
 function TimeSlider({ value, onChange }) {
   const track = useRef(null)
-  const set = (clientX) => { const r = track.current.getBoundingClientRect(); onChange(Math.min(5, Math.max(0, (clientX - r.left) / r.width * 5))) }
+  const set = (clientX, clientY) => { const r = track.current.getBoundingClientRect(); onChange(Math.min(5, Math.max(0, fracAlong(r, clientX, clientY) * 5))) }
   return <div ref={track} className="tslider" role="slider" tabIndex={0} aria-label="Time of day" aria-valuemin={0} aria-valuemax={5} aria-valuenow={+value.toFixed(2)}
-    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); set(e.clientX) }}
-    onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) set(e.clientX) }}
+    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); set(e.clientX, e.clientY) }}
+    onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) set(e.clientX, e.clientY) }}
     onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); onChange(Math.min(5, Math.max(0, value + (e.key === 'ArrowRight' ? .1 : -.1)))) } }}>
     <span className="tslider-rail"><i style={{ width: `calc(17px + (100% - 34px) * ${value / 5})` }}/></span>
     <span className="tslider-thumb" style={{ left: `calc(17px + (100% - 34px) * ${value / 5})` }}/>
@@ -216,6 +218,17 @@ function DeskCue({ hotspot }) {
     {[['projects', 'Interact with the computer', 'Look towards the computer to interact with it'], ['achievements', 'Interact with the certificates', 'Look towards the wall to view achievements']].map(([id, title, hint]) =>
       <span key={id} className={`dc-row${active === id ? ' on' : ''}`}><span className="cue-cam">{CUES[id].icon}</span><span className="cue-text"><b>{title}</b><small>{hint}</small></span></span>)}
   </motion.div>
+}
+// Phone held sideways outside the close-ups that are meant for it: ask to turn it upright.
+// Rendered outside the (possibly turned) app so it reads the right way up.
+function RotateBack() {
+  return createPortal(<motion.div className="rotate-back" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .25 }}>
+    <div className="rotate-back-card">
+      <svg viewBox="0 0 48 48" width="44" height="44" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="26" width="24" height="15" rx="2.5" strokeDasharray="3 3" opacity=".5"/><rect x="27" y="5" width="15" height="25" rx="2.5"/><path d="M32.5 25.5h4"/><path d="M8 20a14 14 0 0 1 13-13"/><path d="m17.5 4.5 3.5 2.5-2.5 3.5"/></svg>
+      <b>Turn your phone upright</b>
+      <small>This room is best explored in portrait</small>
+    </div>
+  </motion.div>, document.body)
 }
 function SpotCue({ id }) {
   const touch = isTouch(), cue = CUES[id]
@@ -410,7 +423,7 @@ function BookPages({ onClose, getRect }) {
     // sideways book: both buttons stack bottom-left, beside the rotate cue and BACK TO ROOM
     const style = turned
       ? {}
-      : { left: d < 0 ? Math.max(8, rect.left - 56 - 22) : Math.min(window.innerWidth - 64, rect.left + rect.width + 22), top: rect.top + rect.height / 2 - 28 }
+      : { left: d < 0 ? Math.max(8, rect.left - 56 - 22) : Math.min(viewW() - 64, rect.left + rect.width + 22), top: rect.top + rect.height / 2 - 28 }
     return <button className={`book-nav${touch ? ' show-tip' : ''}${turned ? ` stack-nav ${d < 0 ? 'up' : 'down'}` : ''}`} style={style} disabled={disabled} aria-label={label}
       onClick={(e) => { e.stopPropagation(); turn(d) }}>
       <Arrow dir={turned ? (d < 0 ? 'up' : 'down') : d < 0 ? 'left' : 'right'} size={20}/>
@@ -454,7 +467,7 @@ function PortfolioSystem({ onClose }) {
 const ACHIEVEMENTS = []
 function AchievementsView({ onClose }) {
   // on an upright phone the wall is shown sideways, so the caption turns with it
-  const turned = isTouch() && window.innerHeight > window.innerWidth
+  const turned = isTouch() // phones: always the portrait layout (turned back when held sideways)
   return <motion.div className="phone-overlay achv-overlay" onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
     {turned && <div className="rotate-hint"><RotateIcon/>Rotate your phone for a bigger view</div>}
     <motion.div className={`achv-card${turned ? ' turned' : ''}`} onClick={(e) => e.stopPropagation()}
@@ -542,7 +555,7 @@ function CameraView({ onClose, getRect }) {
         <div className="rotate-hint"><RotateIcon/>Rotate your phone for a bigger view</div>
       </> : <>
         <button className="cam-nav" style={{ left: Math.max(8, rect.bodyLeft - 56 - 22), top: rect.top + rect.height / 2 - 28 }} onClick={(e) => { e.stopPropagation(); step(-1) }} disabled={n < 2} aria-label="Previous photo"><Arrow dir="left" size={22}/></button>
-        <button className="cam-nav" style={{ left: Math.min(window.innerWidth - 64, rect.bodyRight + 22), top: rect.top + rect.height / 2 - 28 }} onClick={(e) => { e.stopPropagation(); step(1) }} disabled={n < 2} aria-label="Next photo"><Arrow dir="right" size={22}/></button>
+        <button className="cam-nav" style={{ left: Math.min(viewW() - 64, rect.bodyRight + 22), top: rect.top + rect.height / 2 - 28 }} onClick={(e) => { e.stopPropagation(); step(1) }} disabled={n < 2} aria-label="Next photo"><Arrow dir="right" size={22}/></button>
       </>}
     </>}
   </motion.div>
@@ -568,7 +581,18 @@ export default function App() {
   const hour = manualHour ?? clockHour
   const [hotspot, setHotspot] = useState(null)
   const [systemOpen, setSystemOpen] = useState(false)
+  // phone held sideways: keep the portrait layout (turned back), except the computer, which uses the
+  // natural landscape screen. Outside the sideways close-ups, ask to turn the phone upright.
+  const [land, setLand] = useState(phoneLandscape)
+  useEffect(() => {
+    const on = () => setLand(phoneLandscape())
+    window.addEventListener('resize', on); window.addEventListener('orientationchange', on)
+    return () => { window.removeEventListener('resize', on); window.removeEventListener('orientationchange', on) }
+  }, [])
   const [systemApp, setSystemApp] = useState('about')
+  const landOK = systemOpen && ['about', 'photos', 'achievements', 'projects'].includes(systemApp)
+  const lockOn = land && !(systemOpen && systemApp === 'projects')
+  useLayoutEffect(() => { setPortraitLock(lockOn); window.dispatchEvent(new Event('portrait-lock')) }, [lockOn, land])
   const sceneRef = useRef(null)
   const updateHotspot = useCallback((v) => setHotspot(v), [])
   const [deskNear, setDeskNear] = useState(false)
@@ -610,6 +634,7 @@ export default function App() {
   return <main className="app-shell"><OfficeScene sceneRef={sceneRef} onHotspot={updateHotspot} onDeskNear={updateDeskNear} onSystem={updateSystem} onReady={updateReady} onProgress={updateProgress}/>
     <div className="ambient-vignette"/>
     <AnimatePresence>{loading && <Loader progress={load.progress} loaded={load.loaded} total={load.total} ready={sceneReady} onEnter={finishLoading}/>}</AnimatePresence>
+    <AnimatePresence>{land && !landOK && <RotateBack key="rotate-back"/>}</AnimatePresence>
     <AnimatePresence>{systemOpen && (systemApp === 'contact'
       ? <PhoneScreen key="phone" onClose={closeSystem} getRect={getPhoneRect}/>
       : systemApp === 'about'
