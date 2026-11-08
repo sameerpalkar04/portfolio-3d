@@ -425,3 +425,6 @@
 .edu .degree{display:block;text-align-last:justify}.edu .degree .cgpa{margin-left:2cqw;margin-bottom:0}
 .edu .degree .cgpa{display:inline-block;text-align-last:auto;line-height:1.35}
 .book-nav.turned .book-tip{display:none}
+
+/* light browser chrome: Safari/Chrome tint their toolbars from the page background */
+html,body{background:#fff;color-scheme:light}
