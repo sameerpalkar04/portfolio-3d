@@ -90,12 +90,12 @@ const MoonIcon = () => <svg viewBox="0 0 24 24" width="18" height="18" fill="non
 export const SPOTS = [
   { id: 'about', object: 'Books', opens: 'About me' },
   { id: 'projects', object: 'Computer', opens: 'Projects' },
+  { id: 'achievements', object: 'Achievements', opens: 'Certificates' },
   { id: 'resume', object: 'Files', opens: 'Résumé' },
-  { id: 'music', object: 'Speaker', opens: 'Song picks' },
   { id: 'contact', object: 'Phone', opens: 'Contact' },
 ]
-// Explorable but without a shortcut in the bar.
-const ALL_SPOTS = [...SPOTS, { id: 'photos', object: 'Camera', opens: 'Through my lens' }]
+// Explorable but without a shortcut in the bar (the bar keeps to the professional things).
+const ALL_SPOTS = [...SPOTS, { id: 'music', object: 'Speaker', opens: 'Song picks' }, { id: 'photos', object: 'Camera', opens: 'Through my lens' }]
 
 // A slider built from plain elements so dragging works the same with a mouse, a finger or a pen
 // (the native range input fights with touch scrolling on phones). Arrow keys also work.
@@ -202,8 +202,18 @@ const CUES = {
   projects: { name: 'the computer', does: 'see my projects', icon: SVG(<><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M9 20h6M12 16v4"/></>) },
   resume: { name: 'the files', does: 'view my résumé', icon: SVG(<><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></>) },
   music: { name: 'the speaker', does: 'hear my song picks', icon: SVG(<><rect x="6" y="3" width="12" height="18" rx="3"/><circle cx="12" cy="14" r="3"/><circle cx="12" cy="7.5" r="1"/></>) },
+  achievements: { name: 'my achievements', does: 'view my achievements', icon: SVG(<><circle cx="12" cy="9" r="5"/><path d="M9 13.5 7.5 21l4.5-2.5 4.5 2.5L15 13.5"/></>) },
   contact: { name: 'the phone', does: 'get in touch', icon: SVG(<><rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M11 18.5h2"/></>) },
   photos: { name: 'the camera', does: 'see through my lens', icon: SVG(<><path d="M4 8h3l1.6-2.2h6.8L17 8h3v11H4z"/><circle cx="12" cy="13.3" r="3.4"/></>) },
+}
+// Near the desk corner the computer and the certificates above it share a spot. Both are listed, styled
+// like the other cues; the one being looked at is dark, the other grey.
+function DeskCue({ hotspot }) {
+  const active = hotspot === 'achievements' ? 'achievements' : hotspot === 'projects' ? 'projects' : null
+  return <motion.div className={`look-cue cam-cue desk-cue${isTouch() ? ' is-touch' : ''}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .35 }}>
+    {[['projects', 'Interact with the computer', 'Look towards the computer to interact with it'], ['achievements', 'Interact with the certificates', 'Look towards the wall to view achievements']].map(([id, title, hint]) =>
+      <span key={id} className={`dc-row${active === id ? ' on' : ''}`}><span className="cue-cam">{CUES[id].icon}</span><span className="cue-text"><b>{title}</b><small>{hint}</small></span></span>)}
+  </motion.div>
 }
 function SpotCue({ id }) {
   const touch = isTouch(), cue = CUES[id]
@@ -225,7 +235,7 @@ function ExploreCue({ onDismiss }) {
   }, [onDismiss, touch])
   return <motion.div className={`look-cue explore-cue${touch ? ' is-touch' : ''}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .4 }}>
     <b>Things to explore</b>
-    <ul>{ALL_SPOTS.map((s) => <li key={s.id}><span>{s.object}</span><small>{s.opens}</small></li>)}</ul>
+    <ul className="explore-rows">{ALL_SPOTS.map((s) => <li key={s.id}><span className="cue-cam">{CUES[s.id]?.icon}</span><span className="ex-name">{s.object}</span><small>{s.opens}</small></li>)}</ul>
     <small className="explore-foot">{touch ? 'Walk up to one, or use the menu to go straight there' : 'Walk up to one, or use the shortcuts in the bar'}</small>
   </motion.div>
 }
@@ -427,6 +437,52 @@ function PortfolioSystem({ onClose }) {
   </motion.div>
 }
 
+// Achievements: the camera faces the framed certificates above the iMac; a small caption sits on top.
+// Add entries here ({ title, issuer, year }) as certificates come in.
+const ACHIEVEMENTS = []
+function AchievementsView({ onClose }) {
+  // on an upright phone the wall is shown sideways, so the caption turns with it
+  const turned = isTouch() && window.innerHeight > window.innerWidth
+  return <motion.div className="phone-overlay achv-overlay" onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
+    {turned && <div className="rotate-hint"><RotateIcon/>Rotate your phone for a bigger view</div>}
+    <motion.div className={`achv-card${turned ? ' turned' : ''}`} onClick={(e) => e.stopPropagation()}
+      initial={turned ? { opacity: 0, x: '50%', y: '-50%', rotate: 90 } : { y: -10, x: '-50%', opacity: 0 }}
+      animate={turned ? { opacity: 1, x: '50%', y: '-50%', rotate: 90 } : { y: 0, x: '-50%', opacity: 1 }}
+      exit={{ opacity: 0 }} transition={{ delay: .8, duration: .35 }}>
+      <b>Achievements</b>
+      {ACHIEVEMENTS.length
+        ? <ul>{ACHIEVEMENTS.map((a) => <li key={a.title}><span>{a.title}</span><small>{a.issuer} · {a.year}</small></li>)}</ul>
+        : <small>Certificates and awards. Details coming soon.</small>}
+    </motion.div>
+  </motion.div>
+}
+
+// The speaker: the camera glides to it, its top lights up, and a card lists songs I keep on repeat.
+const art = (id) => `https://image-cdn-ak.spotifycdn.com/image/ab67616d00001e02${id}`
+const SONGS = [
+  { title: 'Reflections', by: 'The Neighbourhood', id: '2xql0pid3EUwW38AsywxhV', art: art('9b6ac98a52f62d5cb473da40') },
+  { title: 'What Makes You Beautiful', by: 'One Direction', id: '4cluDES4hQEUhmXj6TXkSo', art: art('4a5584795dc73860653a9a3e') },
+  { title: 'Counting Stars', by: 'OneRepublic', id: '2tpWsVSb9UEmDRxAl1zhX1', art: art('9e2f95ae77cf436017ada9cb') },
+  { title: 'Beautiful Now', by: 'Zedd, Jon Bellion', id: '6t9gboVdKdqsWcKnmN0Ku4', art: art('09de7ca54cd7e9a6a3210013') },
+  { title: 'Zehnaseeb', by: 'Vishal-Shekhar, Chinmayi, Shekhar Ravjiani', id: '3xF15SqY32Mno3UUMBirhU', art: art('2025db071cd9dd7e8023e01e') },
+  { title: 'Tum Hi Ho Bandhu', by: 'Neeraj Shridhar, Kavita Seth', id: '7H3mfOvtPNA8YDF3EdKy0L', art: art('ad204486839062991becfbc9') },
+  { title: 'Bin Tere', by: 'Vishal-Shekhar, Shafqat Amanat Ali, Sunidhi Chauhan', id: '3bZPdEskcnMdepwCaDSJRl', art: art('1992dd7b33baf5887ea4a1ec') },
+  { title: 'The Disco Song', by: 'Vishal-Shekhar, Benny Dayal, Sunidhi Chauhan', id: '3UaP2PQwhA31keZXt7oPLA', art: art('ad40f4e70b2f2a2a6052d49d') },
+]
+function MusicPanel({ onClose }) {
+  return <motion.div className="phone-overlay music-overlay" onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
+    <motion.article className="music-card" onClick={(e) => e.stopPropagation()} initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 10, opacity: 0 }} transition={{ delay: .75, duration: .4, ease: [.2, .8, .2, 1] }}>
+      <header><h3>On my speaker</h3><span className="music-sub">Songs on repeat</span></header>
+      <ol className="music-list">{SONGS.map((s, i) => <li key={s.id}><a href={s.href || `https://open.spotify.com/track/${s.id}`} target="_blank" rel="noreferrer">
+        <span className="music-n">{i + 1}</span>
+        <img src={s.art} alt={`${s.title} cover art`} loading="lazy" width="48" height="48"/>
+        <span className="music-text"><b>{s.title}</b><small>{s.by}</small></span>
+        <span className="music-go">Spotify <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></span>
+      </a></li>)}</ol>
+    </motion.article>
+  </motion.div>
+}
+
 // Files (résumé) and the speaker (song picks): a plain card over the room.
 function SpotCard({ app, onClose }) {
   const a = apps.find((x) => x.id === app)
@@ -503,6 +559,8 @@ export default function App() {
   const [systemApp, setSystemApp] = useState('about')
   const sceneRef = useRef(null)
   const updateHotspot = useCallback((v) => setHotspot(v), [])
+  const [deskNear, setDeskNear] = useState(false)
+  const updateDeskNear = useCallback((v) => setDeskNear(v), [])
   const updateSystem = useCallback((open, app) => { if (open && app) setSystemApp(app); setSystemOpen(open) }, [])
   const updateReady = useCallback(() => setSceneReady(true), [])
   const [load, setLoad] = useState({ progress: 0, loaded: 0, total: 0 })
@@ -525,7 +583,7 @@ export default function App() {
   const getBookRect = useCallback(() => sceneRef.current?.focusRect('about') ?? null, [])
   useEffect(() => { sceneRef.current?.setTimeOfDay(hour) }, [hour, sceneReady])
   useEffect(() => { const timer = window.setInterval(() => setClockHour(systemHour()), 60000); return () => window.clearInterval(timer) }, [])
-  return <main className="app-shell"><OfficeScene sceneRef={sceneRef} onHotspot={updateHotspot} onSystem={updateSystem} onReady={updateReady} onProgress={updateProgress}/>
+  return <main className="app-shell"><OfficeScene sceneRef={sceneRef} onHotspot={updateHotspot} onDeskNear={updateDeskNear} onSystem={updateSystem} onReady={updateReady} onProgress={updateProgress}/>
     <div className="ambient-vignette"/>
     <AnimatePresence>{loading && <Loader progress={load.progress} loaded={load.loaded} total={load.total} ready={sceneReady} onEnter={finishLoading}/>}</AnimatePresence>
     <AnimatePresence>{systemOpen && (systemApp === 'contact'
@@ -536,6 +594,10 @@ export default function App() {
       ? <CameraView key="camera" onClose={closeSystem} getRect={getCameraRect}/>
       : systemApp === 'projects'
       ? <PortfolioSystem key="system" onClose={closeSystem}/>
+      : systemApp === 'music'
+      ? <MusicPanel key="music" onClose={closeSystem}/>
+      : systemApp === 'achievements'
+      ? <AchievementsView key="achievements" onClose={closeSystem}/>
       : <SpotCard key={systemApp} app={systemApp} onClose={closeSystem}/>)}</AnimatePresence>
     {!loading && <div className={`office-hud${systemOpen ? ' is-interacting' : ''}`}>
       {introPhase !== 'hidden' && !systemOpen && <NameTag phase={introPhase}/>}
@@ -547,7 +609,9 @@ export default function App() {
       </>}
       <AnimatePresence>{showCue && introPhase === 'corner' && !systemOpen && <LookCue onDismiss={dismissCue}/>}</AnimatePresence>
       <AnimatePresence>{showExplore && introPhase === 'corner' && !systemOpen && <ExploreCue key="explore" onDismiss={dismissExplore}/>}</AnimatePresence>
-      <AnimatePresence>{hotspot && !showCue && !showExplore && introPhase === 'corner' && !systemOpen && <SpotCue key={hotspot} id={hotspot}/>}</AnimatePresence>
+      <AnimatePresence>{!showCue && !showExplore && introPhase === 'corner' && !systemOpen && (deskNear && (!hotspot || hotspot === 'projects' || hotspot === 'achievements')
+        ? <DeskCue key="desk" hotspot={hotspot}/>
+        : hotspot && <SpotCue key={hotspot} id={hotspot}/>)}</AnimatePresence>
     </div>}
   </main>
 }

@@ -60,6 +60,18 @@ export function createSpeaker() {
   top.rotation.x = -Math.PI / 2; top.position.y = H + .0006; speaker.add(top)
   const glow = new THREE.Mesh(new THREE.RingGeometry(.016, .021, 48), new THREE.MeshBasicMaterial({ color: '#d9e4ff', transparent: true, opacity: .55 }))
   glow.rotation.x = -Math.PI / 2; glow.position.y = H + .0012; speaker.add(glow)
+  // "on" glow: a swirl of teal / violet / magenta light across the top, faded in while music is open
+  const c = document.createElement('canvas'); c.width = c.height = 256; const ctx = c.getContext('2d')
+  const cg = ctx.createConicGradient ? ctx.createConicGradient(0, 128, 128) : null
+  if (cg) { [['#22d3ee', 0], ['#6366f1', .25], ['#e040fb', .5], ['#38bdf8', .75], ['#22d3ee', 1]].forEach(([col, t]) => cg.addColorStop(t, col)); ctx.fillStyle = cg } else ctx.fillStyle = '#7c8cff'
+  ctx.beginPath(); ctx.arc(128, 128, 128, 0, Math.PI * 2); ctx.fill()
+  const fade = ctx.createRadialGradient(128, 128, 10, 128, 128, 128); fade.addColorStop(0, 'rgba(0,0,0,.85)'); fade.addColorStop(.45, 'rgba(0,0,0,.25)'); fade.addColorStop(.8, 'rgba(0,0,0,0)'); fade.addColorStop(1, 'rgba(0,0,0,.6)')
+  ctx.fillStyle = fade; ctx.fill()
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace
+  const onMat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })
+  const on = new THREE.Mesh(new THREE.CircleGeometry(R - r * .6, 64), onMat); on.rotation.x = -Math.PI / 2; on.position.y = H + .0016; speaker.add(on)
+  speaker.userData.glow = { on, onMat, idle: glow.material, level: 0 }
+  speaker.userData.height = H
   return speaker
 }
 
@@ -631,4 +643,104 @@ export function createPolaroid(scene = 0) {
   mesh.position.y = T / 2; mesh.castShadow = true; mesh.receiveShadow = true
   const g = new THREE.Group(); g.name = 'polaroid'; g.add(mesh)
   return g
+}
+
+// A desk globe: domed brushed-steel foot, slim stem, a dark graduated meridian half-ring and an earth
+// ball tilted 23.5°. About 29 cm tall. Origin at the bottom centre. The map is /globe-map.jpg.
+export function createGlobe() {
+  const group = new THREE.Group(); group.name = 'desk-globe'
+  const steel = new THREE.MeshStandardMaterial({ color: '#c9ccd1', roughness: .28, metalness: .92 })
+  const dark = new THREE.MeshStandardMaterial({ color: '#2b2d31', roughness: .45, metalness: .6 })
+  // foot: a low dome flaring to a lip
+  const prof = [[0, 0], [.074, 0], [.076, .004], [.074, .009], [.06, .014], [.04, .022], [.022, .032], [.012, .044], [.009, .056], [0, .056]].map(([x, y]) => new THREE.Vector2(x, y))
+  const foot = new THREE.Mesh(new THREE.LatheGeometry(prof, 48), steel); group.add(foot)
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(.0065, .008, .03, 20), steel); stem.position.y = .07; group.add(stem)
+  const collar = new THREE.Mesh(new THREE.CylinderGeometry(.011, .011, .006, 20), steel); collar.position.y = .086; group.add(collar)
+  const R = .1, cy = .086 + .003 + R + .012
+  const tilt = new THREE.Group(); tilt.position.y = cy; tilt.rotation.z = THREE.MathUtils.degToRad(23.5); group.add(tilt)
+  const map = new THREE.TextureLoader().load('/globe-map.jpg'); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 8
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(R, 64, 48), new THREE.MeshPhysicalMaterial({ map, roughness: .35, clearcoat: .6, clearcoatRoughness: .25 }))
+  ball.name = 'globe-ball'; tilt.add(ball)
+  // meridian half-ring on one side, pole to pole, with pins at the poles
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(R + .009, .0035, 10, 72, Math.PI), dark); ring.rotation.z = -Math.PI / 2; ring.scale.z = 1.8; tilt.add(ring)
+  for (const s of [1, -1]) {
+    const pin = new THREE.Mesh(new THREE.CylinderGeometry(.0022, .0022, .016, 10), steel); pin.position.y = s * (R + .004); tilt.add(pin)
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(.0045, 14, 10), steel); knob.position.y = s * (R + .013); tilt.add(knob)
+  }
+  // short arm from the collar up to the bottom of the ring
+  const bottom = new THREE.Vector3(0, -(R + .009), 0).applyEuler(tilt.rotation).add(tilt.position)
+  const from = new THREE.Vector3(0, .089, 0), len = from.distanceTo(bottom)
+  const arm = new THREE.Mesh(new THREE.CylinderGeometry(.004, .005, len, 12), steel)
+  arm.position.copy(from).add(bottom).multiplyScalar(.5); arm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), bottom.clone().sub(from).normalize()); group.add(arm)
+  group.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })
+  return group
+}
+
+// An achievements wall: a salon-style cluster of thin black frames holding certificates, a plaque and a
+// badge. Built in the XY plane facing +Z, centred on the origin, ≈ 1.1 × .66 m.
+function certificateArt(kind, accent) {
+  const c = document.createElement('canvas'); const ctx = c.getContext('2d')
+  const W = c.width = kind === 'portrait' ? 400 : kind === 'square' ? 400 : 560, H = c.height = kind === 'portrait' ? 520 : kind === 'square' ? 400 : 400
+  if (kind === 'plaque') {
+    ctx.fillStyle = '#121214'; ctx.fillRect(0, 0, W, H)
+    const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, '#f1d58a'); g.addColorStop(.5, '#b8862f'); g.addColorStop(1, '#f6e2a6')
+    ctx.fillStyle = g
+    ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 34 : 80; ctx.lineTo(W / 2 + Math.cos(a) * r, 150 + Math.sin(a) * r) } ctx.fill()
+    ctx.fillRect(W * .18, 270, W * .64, 70); ctx.fillStyle = '#3a2a0c'; for (let i = 0; i < 3; i++) ctx.fillRect(W * .26, 286 + i * 16, W * (.48 - i * .1), 5)
+  } else if (kind === 'square') {
+    ctx.fillStyle = accent; ctx.fillRect(0, 0, W, H)
+    ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 10; ctx.lineJoin = 'round'
+    // a trophy outline
+    ctx.beginPath(); ctx.moveTo(140, 110); ctx.lineTo(260, 110); ctx.quadraticCurveTo(262, 220, 200, 236); ctx.quadraticCurveTo(138, 220, 140, 110); ctx.stroke()
+    ctx.beginPath(); ctx.arc(140, 150, 30, Math.PI / 2, Math.PI * 1.5); ctx.stroke(); ctx.beginPath(); ctx.arc(260, 150, 30, -Math.PI / 2, Math.PI / 2); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(200, 236); ctx.lineTo(200, 270); ctx.moveTo(160, 290); ctx.lineTo(240, 290); ctx.stroke()
+  } else {
+    ctx.fillStyle = '#fbf8f1'; ctx.fillRect(0, 0, W, H)
+    ctx.strokeStyle = accent; ctx.lineWidth = 8; ctx.strokeRect(18, 18, W - 36, H - 36); ctx.lineWidth = 2; ctx.strokeRect(32, 32, W - 64, H - 64)
+    ctx.fillStyle = '#2a2a2e'; ctx.textAlign = 'center'
+    ctx.font = `600 ${kind === 'portrait' ? 34 : 38}px Georgia, serif`; ctx.fillText('CERTIFICATE', W / 2, kind === 'portrait' ? 110 : 96)
+    ctx.font = '500 15px Georgia, serif'; ctx.fillStyle = accent; ctx.fillText('OF ACHIEVEMENT', W / 2, kind === 'portrait' ? 138 : 122)
+    ctx.fillStyle = '#c9c4b8'; const y0 = kind === 'portrait' ? 200 : 170
+    ctx.fillRect(W * .2, y0, W * .6, 3); for (let i = 0; i < 3; i++) ctx.fillRect(W * (.25 + i * .02), y0 + 40 + i * 22, W * (.5 - i * .04), 3)
+    // gold seal with ribbons, bottom right; signature line bottom left
+    const sx = W - 110, sy = H - (kind === 'portrait' ? 110 : 90)
+    ctx.fillStyle = '#9c1c24'; ctx.beginPath(); ctx.moveTo(sx - 22, sy); ctx.lineTo(sx - 34, sy + 62); ctx.lineTo(sx - 16, sy + 50); ctx.lineTo(sx - 4, sy + 66); ctx.lineTo(sx, sy); ctx.fill()
+    ctx.beginPath(); ctx.moveTo(sx + 22, sy); ctx.lineTo(sx + 34, sy + 62); ctx.lineTo(sx + 16, sy + 50); ctx.lineTo(sx + 4, sy + 66); ctx.lineTo(sx, sy); ctx.fill()
+    const sg = ctx.createRadialGradient(sx - 8, sy - 8, 4, sx, sy, 36); sg.addColorStop(0, '#f6dd92'); sg.addColorStop(1, '#b07d26')
+    ctx.fillStyle = sg; ctx.beginPath(); for (let i = 0; i < 32; i++) { const a = i * Math.PI / 16, r = i % 2 ? 32 : 36; ctx.lineTo(sx + Math.cos(a) * r, sy + Math.sin(a) * r) } ctx.fill()
+    ctx.fillStyle = '#c9c4b8'; ctx.fillRect(70, sy + 20, 130, 2)
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8
+  return t
+}
+export function createCertificateWall() {
+  const wall = new THREE.Group(); wall.name = 'achievements-wall'
+  const frameMat = new THREE.MeshStandardMaterial({ color: '#121214', roughness: .45, metalness: .2 })
+  const matMat = new THREE.MeshStandardMaterial({ color: '#f4f2ec', roughness: .9 })
+  // [x, y, art width, art height, kind, accent]
+  const layout = [
+    // ≈ 5 cm between frames, 6 cm between the rows
+    [-.376, .2, .34, .243, 'landscape', '#1f3c6e'],
+    [0, .2, .16, .215, 'plaque', ''],
+    [.376, .2, .34, .243, 'landscape', '#7a5a1c'],
+    [-.504, -.188, .17, .17, 'square', '#2f6f5e'],
+    [-.193, -.188, .2, .26, 'portrait', '#8a1c2b'],
+    [.163, -.188, .26, .186, 'landscape', '#2f6f5e'],
+    [.504, -.188, .17, .17, 'square', '#1f3c6e'],
+  ]
+  const F = .016, M = .022, D = .018
+  for (const [x, y, w, h, kind, accent] of layout) {
+    const g = new THREE.Group(); g.position.set(x, y, 0)
+    const ow = w + 2 * (M + F), oh = h + 2 * (M + F)
+    for (const [bw, bh, bx, by] of [[ow, F, 0, (oh - F) / 2], [ow, F, 0, -(oh - F) / 2], [F, oh - 2 * F, -(ow - F) / 2, 0], [F, oh - 2 * F, (ow - F) / 2, 0]]) {
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, D), frameMat); bar.position.set(bx, by, D / 2); g.add(bar)
+    }
+    const back = new THREE.Mesh(new THREE.PlaneGeometry(ow - 2 * F, oh - 2 * F), kind === 'plaque' || kind === 'square' ? frameMat : matMat); back.position.z = .004; g.add(back)
+    const art = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: certificateArt(kind, accent), roughness: .7 })); art.position.z = .005; g.add(art)
+    const glass = new THREE.Mesh(new THREE.PlaneGeometry(ow - 2 * F, oh - 2 * F), new THREE.MeshPhysicalMaterial({ color: '#ffffff', transparent: true, opacity: .06, roughness: .05, clearcoat: 1 })); glass.position.z = D - .002; g.add(glass)
+    g.traverse((o) => { if (o.isMesh) { o.castShadow = o !== glass; o.receiveShadow = true } })
+    wall.add(g)
+  }
+  wall.userData.size = { w: 1.3, h: .74 }
+  return wall
 }

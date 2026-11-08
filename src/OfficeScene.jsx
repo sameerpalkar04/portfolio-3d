@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { createExteriorMaterial, WINDOW_UV } from './exteriorShader'
 import { buildCollisionGrid, createWalkTester } from './collision'
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
-import { PHONE, BOOK, CAMERA_SCREEN, createOpenBook, createDigitalCamera, createTableLamp, createPolaroid, createModelAirplane, createPhone, createFloorPlant, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight } from './props'
+import { PHONE, BOOK, CAMERA_SCREEN, createOpenBook, createDigitalCamera, createTableLamp, createGlobe, createCertificateWall, createPolaroid, createModelAirplane, createPhone, createFloorPlant, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight } from './props'
 import { createDesktopTexture, BEACH_PHOTO_URL } from './screens'
 
 const MODEL_URL = '/models/home-office.glb'
@@ -535,10 +535,12 @@ function createScene(canvas, handlers) {
         const probe = new THREE.Raycaster(new THREE.Vector3((tb.min.x + tb.max.x) / 2, tb.max.y + .15, cameraSpot ? cameraSpot.z : (tb.min.z + tb.max.z) / 2), new THREE.Vector3(0, 0, towardEnd), 0, 6)
         const wallHit = probe.intersectObject(model, true).find((h) => h.object.visible)
         const endZ = (wallHit ? wallHit.point.z : (towardEnd < 0 ? tb.min.z : tb.max.z)) - towardEnd * .14
-        const { group: lamp, glow, lightPoint } = createTableLamp()
-        lamp.position.set(wallX, tb.max.y, endZ); scene.add(lamp); lamp.updateMatrixWorld(true)
-        const bulb = new THREE.PointLight('#ffc985', 0, 2.6, 2); bulb.position.copy(lamp.localToWorld(lightPoint.clone())); scene.add(bulb)
-        nightLights.push({ light: bulb, max: 1.6, glow, glowMax: 1.8 })
+        // a desk globe in the corner, Africa / the Indian Ocean turned toward the room
+        const globe = createGlobe()
+        globe.position.set(wallX + (wallX < (tb.min.x + tb.max.x) / 2 ? .01 : -.01), tb.max.y, endZ - towardEnd * .01)
+        globe.rotation.y = wallX < (tb.min.x + tb.max.x) / 2 ? Math.PI / 2 : -Math.PI / 2 // axis leans sideways as seen from the room
+        const ball = globe.getObjectByName('globe-ball'); if (ball) ball.rotation.y = -Math.PI / 2
+        scene.add(globe)
         // a few instant prints scattered between the camera and the lamp
         if (cameraSpot) {
           const intoRoom = Math.sign(roomBounds.getCenter(new THREE.Vector3()).x - cameraSpot.x) || 1
@@ -555,6 +557,21 @@ function createScene(canvas, handlers) {
     grid = buildCollisionGrid(meshColliders, roomBounds, floorY)
     const imac = find('Apple iMac 27 - display')
     if (imac) { const p = imac.getWorldPosition(new THREE.Vector3()); computer = { x: p.x, z: p.z } }
+    // Achievements: framed certificates on the wall above the iMac
+    let achievementsWall = null
+    if (imac) {
+      const ib = new THREE.Box3().setFromObject(imac), ic = ib.getCenter(new THREE.Vector3())
+      const toWall = new THREE.Vector3(ic.x - roomBounds.getCenter(new THREE.Vector3()).x, 0, 0).normalize()
+      const probe = new THREE.Raycaster(new THREE.Vector3(ic.x, ib.max.y + .3, ic.z), toWall, 0, 2)
+      const hit = probe.intersectObject(model, true).find((h) => h.object.visible)
+      if (hit) {
+        const wall = createCertificateWall()
+        const n = toWall.clone().negate()
+        wall.position.set(hit.point.x + n.x * .004, ib.max.y + .1 + wall.userData.size.h / 2 + .06, ic.z)
+        wall.lookAt(wall.position.clone().add(n))
+        scene.add(wall); achievementsWall = wall
+      }
+    }
     // Explorable spots: what each object opens, and where to stand to use it.
     {
       const centerX=(walkBounds.min.x+walkBounds.max.x)/2
@@ -570,7 +587,8 @@ function createScene(canvas, handlers) {
         return run.reduce((s,p)=>s.add(p),new THREE.Vector3()).divideScalar(run.length)
       }
       const spots=[
-        { id:'projects', app:'projects', label:'Computer', pos:at(imac) },
+        { id:'projects', app:'projects', label:'Computer', pos:at(imac), vertical:true },
+        { id:'achievements', app:'achievements', label:'Achievements', pos:achievementsWall?achievementsWall.position.clone():null, vertical:true, viewFrom:imac?at(imac):null },
         { id:'contact', app:'contact', label:'Phone', pos:at(scene.getObjectByName('desk-phone')) },
         { id:'resume', app:'resume', label:'Files', pos:filesSpot() },
         { id:'photos', app:'photos', label:'Camera', pos:cameraSpot ? cameraSpot.clone().add(new THREE.Vector3(0,.04,0)) : null },
@@ -579,7 +597,8 @@ function createScene(canvas, handlers) {
       ]
       hotspots=spots.filter((h)=>h.pos).map((h)=>{
         // stand in the walkway about an arm's length back from the object, facing it
-        const v=nearestFree(h.pos.x+THREE.MathUtils.clamp(centerX-h.pos.x,-1.15,1.15),h.pos.z+.15)
+        const base=h.viewFrom||h.pos
+        const v=nearestFree(base.x+THREE.MathUtils.clamp(centerX-base.x,-1.15,1.15),base.z+.15)
         return {...h,view:v}
       })
     }
@@ -609,14 +628,68 @@ function createScene(canvas, handlers) {
   }, (xhr) => { if (xhr.total) handlers.onProgress?.(xhr.loaded / xhr.total, xhr.loaded, xhr.total) }, (error) => { console.error('Unable to load the home-office model.',error); loadError=true; handlers.onReady?.() })
 
   // Phone close-up: the camera glides down to look straight onto the phone lying on the desk.
-  let focus=null
+  let focus=null, speakerObj=null, pendantsHidden=false
   const tmpM=new THREE.Matrix4(), tmpV=new THREE.Vector3(), tmpQ=new THREE.Quaternion(), tmpSize=new THREE.Vector2()
   // Close-ups: the camera glides down to look straight onto an object lying on a surface.
   const FOCUS = {
     contact: { name: 'desk-phone', y: PHONE.T, L: PHONE.L, W: PHONE.W, rect: { w: PHONE.displayW, l: PHONE.displayL, y: PHONE.T + .0003, r: PHONE.displayR }, fill: .97 },
     about: { name: 'open-book', y: BOOK.pageY, L: BOOK.L, W: BOOK.W, rect: { w: BOOK.pagesW, l: BOOK.pagesL, y: BOOK.pageY, r: 0 }, fill: .94 },
   }
+  // Speaker close-up: a three-quarter view from the room side, the speaker on the left of the screen
+  // (laptop) or in the top half (phone) so the song card has the rest.
+  const speakerView=()=>{
+    const obj=scene.getObjectByName('cabinet-speaker'); if(!obj)return null
+    obj.updateWorldMatrix(true,false)
+    const H=obj.userData.height||.16, target=new THREE.Vector3(0,H*.55,0).applyMatrix4(obj.matrixWorld)
+    const W=canvas.clientWidth, Hh=canvas.clientHeight, aspect=W/Hh, fov=36, t=Math.tan(THREE.MathUtils.degToRad(fov/2))
+    const portrait=aspect<1
+    const toRoom=roomBounds.getCenter(new THREE.Vector3()).sub(target); toRoom.y=0; toRoom.normalize()
+    // distance: the speaker (≈ .2 m tall incl. perspective) fills ≈ 50% of the height, or ≈ 62% of the width on a phone
+    const dist=portrait?Math.max(.2/(.4*2*t),.14/(.8*2*t*aspect)):.2/(.7*2*t)
+    const pitch=.42 // looking down a little
+    const back=toRoom.clone().multiplyScalar(Math.cos(pitch)*dist)
+    const pos=target.clone().add(back); pos.y+=Math.sin(pitch)*dist
+    tmpM.lookAt(pos,target,new THREE.Vector3(0,1,0))
+    const quat=new THREE.Quaternion().setFromRotationMatrix(tmpM)
+    const right=new THREE.Vector3(1,0,0).applyQuaternion(quat), up=new THREE.Vector3(0,1,0).applyQuaternion(quat)
+    // move the camera so the speaker lands at x≈26% (laptop) or y≈25% from the top (phone)
+    if(portrait) pos.addScaledVector(up,-(.5-.24)*2*t*dist)
+    else pos.addScaledVector(right,(.5-.26)*2*t*aspect*dist)
+    return {pos,quat,fov,id:'music'}
+  }
+  const wallView=()=>{
+    const wall=scene.getObjectByName('achievements-wall'); if(!wall)return null
+    wall.updateWorldMatrix(true,false)
+    const {w,h}=wall.userData.size, n=new THREE.Vector3(0,0,1).transformDirection(wall.matrixWorld)
+    const W=canvas.clientWidth, H=canvas.clientHeight, aspect=W/H, fov=36, t=Math.tan(THREE.MathUtils.degToRad(fov/2))
+    const center=wall.getWorldPosition(new THREE.Vector3())
+    // never back out through the opposite wall: stay inside the room
+    const back=new THREE.Raycaster(center.clone().addScaledVector(n,.05),n,0,10).intersectObject(model,true).find((x)=>x.object.visible)
+    const maxDist=back?Math.max(.4,back.distance+.05-.25):2
+    if(sideways()){
+      // upright phone: turn the view so the long side of the frame cluster runs down the screen
+      // a wider lens so the whole cluster fits without backing out of the room; the caption takes the right edge
+      const up=new THREE.Vector3(-1,0,0).transformDirection(wall.matrixWorld), wUp=new THREE.Vector3(0,1,0).transformDirection(wall.matrixWorld)
+      const tfov=56, tt=Math.tan(THREE.MathUtils.degToRad(tfov/2)), cap=110
+      const top=20, bottom=152, usable=(H-top-bottom)/H, across=(W-cap-24)/W
+      const dist=Math.min(maxDist,Math.max((w/2)/(tt*usable*.94),(h/2)/(tt*aspect*across)))
+      const pos=center.clone().addScaledVector(n,dist)
+        .addScaledVector(up,-((bottom-top)/2/(H/2))*tt*dist) // centred in the space above the controls
+        .addScaledVector(wUp,((cap/2)/(W/2))*tt*aspect*dist) // and nudged left of the caption
+      tmpM.lookAt(pos,pos.clone().sub(n),up)
+      return {pos,quat:new THREE.Quaternion().setFromRotationMatrix(tmpM),fov:tfov,id:'achievements',turn:true}
+    }
+    const reserved=window.matchMedia?.('(pointer: coarse)').matches?150:100
+    const usable=(H-reserved-40)/H
+    const dist=Math.min(maxDist,Math.max((h/2)/(t*usable*.92),(w/2)/(t*aspect*.92)))
+    const pos=center.clone().addScaledVector(n,dist)
+    pos.y-=((reserved-40)/2/(H/2))*t*dist // keep the frames clear of the bar
+    tmpM.lookAt(pos,pos.clone().sub(n),new THREE.Vector3(0,1,0))
+    return {pos,quat:new THREE.Quaternion().setFromRotationMatrix(tmpM),fov,id:'achievements'}
+  }
   const focusView=(id)=>{
+    if(id==='music')return speakerView()
+    if(id==='achievements')return wallView()
     const spec=FOCUS[id], obj=spec&&scene.getObjectByName(spec.name); if(!obj)return null
     obj.updateWorldMatrix(true,false)
     const center=new THREE.Vector3(0,spec.y,0).applyMatrix4(obj.matrixWorld)
@@ -683,7 +756,7 @@ function createScene(canvas, handlers) {
       const obj=scene.getObjectByName('desk-camera')
       if(obj){ if(!obj.userData.rest)obj.userData.rest={pos:obj.position.clone(),quat:obj.quaternion.clone()}; hold={phase:'in',t:0,obj,from:{pos:obj.position.clone(),quat:obj.quaternion.clone(),fov:camera.fov},savedFov:camera.fov} }
     }
-    if(FOCUS[state.hotspot.id]){
+    if(FOCUS[state.hotspot.id]||state.hotspot.id==='music'||state.hotspot.id==='achievements'){
       const to=focusView(state.hotspot.id)
       if(to)focus={phase:'in',t:0,from:{pos:camera.position.clone(),quat:camera.quaternion.clone(),fov:camera.fov},to,savedFov:camera.fov}
     }
@@ -761,11 +834,24 @@ function createScene(canvas, handlers) {
     }
     // Which spot is the visitor at? The one in front of them and close enough (or right beside them).
     let active=null, best=Infinity
+    // the computer and the certificates above it share a spot: whichever is nearer the line of sight wins
+    // (split halfway between their elevations, nudged up so a level gaze favours the computer)
+    const eyeY=floorY+EYE_HEIGHT, elevOf=(p)=>Math.atan2(p.y-eyeY,Math.max(.3,Math.hypot(p.x-state.x,p.z-state.z)))
+    const vComp=hotspots.find((h)=>h.id==='projects'), vAch=hotspots.find((h)=>h.id==='achievements')
+    const lookingUp=vComp&&vAch?state.pitch>(elevOf(vComp.pos)+elevOf(vAch.pos))/2+.08:false
     for(const spot of hotspots){
       const dx=spot.pos.x-state.x, dz=spot.pos.z-state.z, dist=Math.hypot(dx,dz)
       const ang=Math.abs(Math.atan2(Math.sin(Math.atan2(-dx,-dz)-state.yaw),Math.cos(Math.atan2(-dx,-dz)-state.yaw)))
-      const score=dist+ang*1.2
+      let score=dist+ang*1.2
+      if(spot.vertical&&vComp&&vAch&&(spot.id==='achievements')!==lookingUp)continue
       if(((dist<1.6&&ang<.55)||(dist<1.05&&ang<1))&&score<best){best=score;active=spot}
+    }
+    // approaching the desk corner (computer + certificates above it): tell the UI so it can explain the look up / down choice
+    if(computer){
+      const dx=computer.x-state.x, dz=computer.z-state.z, d=Math.hypot(dx,dz)
+      const a=Math.abs(Math.atan2(Math.sin(Math.atan2(-dx,-dz)-state.yaw),Math.cos(Math.atan2(-dx,-dz)-state.yaw)))
+      const near=d<2.1&&a<1.05
+      if(near!==state.deskNear){state.deskNear=near;handlers.onDeskNear?.(near)}
     }
     if(active!==state.hotspot){state.hotspot=active;state.nearby=!!active;handlers.onHotspot?.(active?active.id:null);handlers.onNearby?.(!!active)}
     camera.position.set(state.x,roomBounds?floorY+EYE_HEIGHT:EYE_HEIGHT,state.z);camera.rotation.set(state.pitch,state.yaw,0)
@@ -784,8 +870,21 @@ function createScene(canvas, handlers) {
       }
       camera.updateProjectionMatrix()
       // the desk lamp sits right beside the phone; ease the exposure down so the wood still reads
-      renderer.toneMappingExposure=.9-.28*(focus?(focus.phase==='in'?e:1-e):0)
+      renderer.toneMappingExposure=.9-.28*(focus&&focus.to.id!=='music'&&focus.to.id!=='achievements'?(focus.phase==='in'?e:1-e):0)
     } else renderer.toneMappingExposure=.9
+    // the ceiling pendants hang between the far end of the room and the certificate wall: hide their
+    // fittings (not their light) while the wall close-up is on screen
+    const hidePend=!!(focus&&focus.to.id==='achievements'&&focus.to.turn)
+    if(hidePend!==pendantsHidden){pendantsHidden=hidePend;scene.traverse((o)=>{if(o.name==='linear-pendant')o.traverse((m)=>{if(m.isMesh)m.visible=!hidePend})})}
+    // the speaker's top lights up while its song card is open
+    if(!speakerObj)speakerObj=scene.getObjectByName('cabinet-speaker')
+    const sg=speakerObj?.userData.glow
+    if(sg){
+      const want=state.system&&state.hotspot?.id==='music'?1:0
+      sg.level+=(want-sg.level)*Math.min(1,dt*3)
+      sg.onMat.opacity=sg.level; sg.idle.opacity=.55*(1-sg.level)
+      if(sg.level>.01)sg.on.rotation.z-=dt*.7
+    }
     if(uiTime>.12){handlers.onPosition?.({x:state.x,z:state.z,minX:walkBounds?.min.x??-1,maxX:walkBounds?.max.x??1,minZ:walkBounds?.min.z??-1,maxZ:walkBounds?.max.z??1});uiTime=0}
     if(hold){
       hold.t=Math.min(1,hold.t+dt/(hold.phase==='in'?1:.8))
@@ -809,7 +908,7 @@ function createScene(canvas, handlers) {
     goTo(id){
       const spot=hotspots.find((h)=>h.id===id); if(!spot||state.system)return
       const view=spot.view, yaw=Math.atan2(-(spot.pos.x-view.x),-(spot.pos.z-view.z))
-      const eyeY=floorY+EYE_HEIGHT, pitch=THREE.MathUtils.clamp(Math.atan2(spot.pos.y-eyeY,Math.hypot(spot.pos.x-view.x,spot.pos.z-view.z)),-.75,.3)
+      const eyeY=floorY+EYE_HEIGHT, pitch=THREE.MathUtils.clamp(Math.atan2(spot.pos.y-eyeY,Math.hypot(spot.pos.x-view.x,spot.pos.z-view.z)),-.75,.5)
       const dYaw=Math.atan2(Math.sin(yaw-state.yaw),Math.cos(yaw-state.yaw))
       travel={t:0,duration:Math.min(1.8,.7+Math.hypot(view.x-state.x,view.z-state.z)*.35),from:{x:state.x,z:state.z,yaw:state.yaw,pitch:state.pitch},to:{x:view.x,z:view.z,pitch},dYaw}
     },
@@ -853,8 +952,8 @@ function createScene(canvas, handlers) {
   }
 }
 
-export default function OfficeScene({sceneRef,onPosition,onNearby,onHotspot,onSystem,onReady,onProgress}){
+export default function OfficeScene({sceneRef,onPosition,onNearby,onHotspot,onDeskNear,onSystem,onReady,onProgress}){
   const canvasRef=useRef(null)
-  useEffect(()=>{if(!canvasRef.current)return undefined;const office=createScene(canvasRef.current,{onPosition,onNearby,onHotspot,onSystem,onReady,onProgress});sceneRef.current=office;return()=>{office.dispose();if(sceneRef.current===office)sceneRef.current=null}},[sceneRef,onPosition,onNearby,onHotspot,onSystem,onReady,onProgress])
+  useEffect(()=>{if(!canvasRef.current)return undefined;const office=createScene(canvasRef.current,{onPosition,onNearby,onHotspot,onDeskNear,onSystem,onReady,onProgress});sceneRef.current=office;return()=>{office.dispose();if(sceneRef.current===office)sceneRef.current=null}},[sceneRef,onPosition,onNearby,onHotspot,onDeskNear,onSystem,onReady,onProgress])
   return <canvas ref={canvasRef} className="office-canvas" aria-label="First-person walkthrough of the home office. Use arrow keys to move, drag to look, and press Enter at the work desk." />
 }

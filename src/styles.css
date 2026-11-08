@@ -437,3 +437,76 @@ html,body{background:#fff;color-scheme:light}
 .stack-nav{left:14px}.stack-nav.up{bottom:calc(78px + env(safe-area-inset-bottom))}
 .stack-nav ~ .rotate-hint{max-width:calc(100vw - 156px)}
 .edu.exp img{height:7.2cqw;margin-top:0;border-radius:1.2cqw}
+/* Speaker: song card on the right (laptop) or under the speaker (phone) */
+.music-overlay{background:none}
+.music-card{position:absolute;left:47%;right:2.2%;top:3.5%;bottom:118px;display:flex;flex-direction:column;background:#fff;border:1px solid #e3e5e8;border-radius:18px;box-shadow:0 1px 2px rgba(0,0,0,.08),0 12px 32px rgba(0,0,0,.16);padding:26px 26px 14px;color:#1d1f22;overflow:hidden}
+.music-card header{padding:0 6px 14px;border-bottom:1px solid #eef0f2}
+.music-card h3{margin:4px 0 6px;font-size:26px;letter-spacing:-.01em}
+.music-card header p{margin:0;color:#6b7078;font-size:14px}
+.music-list{list-style:none;margin:0;padding:8px 0 0;overflow:auto;flex:1;display:flex;flex-direction:column;gap:2px}
+.music-list a{display:grid;grid-template-columns:22px 48px 1fr auto;align-items:center;gap:14px;padding:8px 6px;border-radius:12px;color:inherit;text-decoration:none}
+.music-list a:hover{background:#f4f5f7}
+.music-n{color:#9aa0a8;font:500 13px 'JetBrains Mono',monospace;text-align:right}
+.music-list img{width:48px;height:48px;border-radius:8px;object-fit:cover;background:#eceef1;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.music-text{display:flex;flex-direction:column;min-width:0}
+.music-text b{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.music-text small{font-size:13px;color:#6b7078;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.music-go{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#1a8f4c;padding:6px 10px;border-radius:99px;background:#eaf6ef}
+@media (max-aspect-ratio:1/1){
+  .music-card{left:14px;right:14px;top:50%;bottom:calc(150px + env(safe-area-inset-bottom));padding:18px 14px 8px;border-radius:16px}
+  .music-card h3{font-size:20px}.music-card header p{font-size:13px}
+  .music-list a{grid-template-columns:18px 42px 1fr auto;gap:10px;padding:7px 4px}.music-list img{width:42px;height:42px}
+  .music-go{padding:5px 8px;font-size:11px}
+}
+@media (max-aspect-ratio:1/1){.music-card{top:42%}.music-card header{padding-bottom:10px}.music-card header p{display:none}}
+/* speaker card v2: equal gap above it and above the bar, bigger title, no visible scrollbar */
+.music-card{top:28px;bottom:94px;padding:28px 26px 16px}
+.music-card header{padding:0 6px 16px}
+.music-card h3{margin:0;font-size:34px;letter-spacing:-.02em;line-height:1.1}
+.music-sub{display:block;margin-top:6px;font:600 11px 'DM Sans',system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#8a9098}
+.music-list{scrollbar-width:none;-ms-overflow-style:none;justify-content:space-between}
+.music-list::-webkit-scrollbar{display:none}
+@media (max-aspect-ratio:1/1){
+  .music-card{top:46%;bottom:calc(144px + env(safe-area-inset-bottom));padding:16px 12px 6px}
+  .music-card header{padding:0 6px 10px}.music-card h3{font-size:24px}
+  .music-list{justify-content:flex-start;-webkit-mask-image:linear-gradient(#000 calc(100% - 28px),transparent);mask-image:linear-gradient(#000 calc(100% - 28px),transparent)}
+}
+.achv-overlay{background:none}
+.achv-card{position:absolute;left:50%;top:20px;display:flex;flex-direction:column;align-items:center;gap:3px;padding:12px 20px;background:#fff;border:1px solid #e3e5e8;border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.1),0 6px 18px rgba(0,0,0,.14);color:#1d1f22;font-family:'DM Sans',system-ui,sans-serif;text-align:center;max-width:calc(100vw - 32px)}
+.achv-card b{font-size:15px}.achv-card small{font-size:12.5px;color:#6b7078}
+.achv-card ul{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}.achv-card li{display:flex;flex-direction:column}
+/* phone menu: shortcut buttons sized to their labels with equal gaps between them */
+@media(max-width:720px){
+  .bar-spots{display:flex;justify-content:space-between;gap:2px}
+  .bar-spots button{flex:0 0 auto;padding:0 9px}
+}
+.achv-card.turned{left:auto;right:50px;top:calc((100% - 132px) / 2);transform-origin:center}
+/* desk-corner cue: two rows, the one being looked at in full colour */
+.look-cue.desk-cue{flex-direction:column;align-items:stretch;gap:8px;padding:12px 16px}
+.desk-row{display:flex;align-items:center;gap:12px;font-size:13.5px;color:#8a9098;transition:color .2s}
+.desk-row .cue-cam{opacity:.55;transition:opacity .2s}
+.desk-row.on{color:#1d1f22;font-weight:600}.desk-row.on .cue-cam{opacity:1}
+/* desk-corner cue: compact, sized like the single-spot cues */
+.look-cue.desk-cue{gap:6px;padding:9px 14px;width:max-content;max-width:calc(100vw - 32px)}
+.desk-row{gap:10px;font-size:12.5px;line-height:1.25}
+.desk-row .cue-cam{width:28px;height:28px;border-radius:8px;flex:none}
+.desk-row .cue-cam svg{width:17px;height:17px}
+.look-cue.desk-cue{gap:10px;padding:11px 16px}
+.desk-row .cue-cam{width:34px;height:34px;border-radius:9px}.desk-row .cue-cam svg{width:20px;height:20px}
+.desk-row .cue-text{display:flex;flex-direction:column;gap:1px}
+.desk-row b{font-size:13.5px;font-weight:500;color:inherit}.desk-row small{font-size:12px;color:#8a9098;font-weight:400}
+.desk-row{color:#9aa0a8}.desk-row.on{font-weight:400}.desk-row.on b{color:#1d1f22;font-weight:600}
+/* desk cue v3: two rows that look exactly like the single-spot cue; the row not being looked at is greyed */
+.look-cue.cam-cue.desk-cue{flex-direction:column;align-items:stretch;gap:8px}
+.dc-row{display:flex;align-items:center;gap:12px;transition:opacity .2s}
+.dc-row:not(.on){opacity:.42}
+/* Things to explore: the original two-column rows (name left, what it opens right), each with a cue icon */
+.explore-cue ul.explore-rows li{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f0f1f3;font-size:13px}
+.explore-rows .cue-cam{flex:none;width:28px;height:28px;border-radius:8px}
+.explore-rows .cue-cam svg{width:17px;height:17px}
+.explore-rows .ex-name{font-weight:600;color:#1d1f22}
+.explore-rows small{margin-left:auto;padding-left:18px;color:#7a7f86;font-size:13px}
+.look-cue.explore-cue.is-touch{max-height:none;overflow:visible}
+/* Instructions panel: tall enough to show everything, no scrollbar (only very short windows can still scroll, invisibly) */
+.help-panel{max-height:calc(100vh - 110px);scrollbar-width:none}
+.help-panel::-webkit-scrollbar{display:none}
