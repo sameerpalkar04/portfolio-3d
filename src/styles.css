@@ -429,3 +429,11 @@
 /* light browser chrome: Safari/Chrome tint their toolbars from the page background */
 html,body{background:#fff;color-scheme:light}
 .app-shell{background:#fff}
+/* sideways book / camera on an upright phone: prev/next stacked bottom-left, beside the cue and BACK TO ROOM */
+.stack-nav{position:fixed;left:16px;width:56px;height:52px;border-radius:14px}
+.stack-nav.down{bottom:calc(16px + env(safe-area-inset-bottom))}
+.stack-nav.up{bottom:calc(80px + env(safe-area-inset-bottom))}
+.stack-nav ~ .rotate-hint{max-width:calc(100vw - 164px)}
+.stack-nav{left:14px}.stack-nav.up{bottom:calc(78px + env(safe-area-inset-bottom))}
+.stack-nav ~ .rotate-hint{max-width:calc(100vw - 156px)}
+.edu.exp img{height:7.2cqw;margin-top:0;border-radius:1.2cqw}

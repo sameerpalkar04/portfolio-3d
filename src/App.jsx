@@ -322,7 +322,7 @@ const bookSpread = (page, goTo) => page === 0 ? [
     <small>chapter two</small>
     <h3>Work experience</h3>
     <article className="edu exp">
-      <img src="/about/oracle-logo.png" alt="Oracle logo" draggable="false"/>
+      <img src="/about/oracle-tile.png" alt="Oracle logo" draggable="false"/>
       <div>
         <b>Application Software Engineer 1</b>
         <span>Oracle Financial Services Software Ltd.</span>
@@ -385,12 +385,13 @@ function BookPages({ onClose, getRect }) {
     const label = d < 0 ? 'Previous page' : 'Next page'
     const disabled = d < 0 ? page === 0 : page === BOOK_LAST
     // sideways book: previous above it, next below it; the button is turned with the book
+    // sideways book: both buttons stack bottom-left, beside the rotate cue and BACK TO ROOM
     const style = turned
-      ? { left: rect.left + rect.width / 2 - 28, top: d < 0 ? Math.max(8, rect.top - 56 - 18) : Math.min(window.innerHeight - 64, rect.top + rect.height + 18) }
+      ? {}
       : { left: d < 0 ? Math.max(8, rect.left - 56 - 22) : Math.min(window.innerWidth - 64, rect.left + rect.width + 22), top: rect.top + rect.height / 2 - 28 }
-    return <button className={`book-nav${touch ? ' show-tip' : ''}${turned ? ' turned' : ''}`} style={style} disabled={disabled} aria-label={label}
+    return <button className={`book-nav${touch ? ' show-tip' : ''}${turned ? ` stack-nav ${d < 0 ? 'up' : 'down'}` : ''}`} style={style} disabled={disabled} aria-label={label}
       onClick={(e) => { e.stopPropagation(); turn(d) }}>
-      <Arrow dir={d < 0 ? 'left' : 'right'} size={20}/>
+      <Arrow dir={turned ? (d < 0 ? 'up' : 'down') : d < 0 ? 'left' : 'right'} size={20}/>
       {!turned && <span className="book-tip">{label}</span>}
     </button>
   }
@@ -468,8 +469,8 @@ function CameraView({ onClose, getRect }) {
         <span className="cam-hud">{n ? `${i + 1} / ${n}` : '0 / 0'}</span>
       </motion.div>
       {rect.rotated ? <>
-        <button className="cam-nav" style={{ left: rect.left + rect.width / 2 - 28, top: Math.max(8, rect.bodyTop - 56 - 22) }} onClick={(e) => { e.stopPropagation(); step(-1) }} disabled={n < 2} aria-label="Previous photo"><Arrow dir="up" size={22}/></button>
-        <button className="cam-nav" style={{ left: rect.left + rect.width / 2 - 28, top: Math.min(window.innerHeight - 64, rect.bodyBottom + 22) }} onClick={(e) => { e.stopPropagation(); step(1) }} disabled={n < 2} aria-label="Next photo"><Arrow dir="down" size={22}/></button>
+        <button className="cam-nav stack-nav up" onClick={(e) => { e.stopPropagation(); step(-1) }} disabled={n < 2} aria-label="Previous photo"><Arrow dir="up" size={22}/></button>
+        <button className="cam-nav stack-nav down" onClick={(e) => { e.stopPropagation(); step(1) }} disabled={n < 2} aria-label="Next photo"><Arrow dir="down" size={22}/></button>
         <div className="rotate-hint"><RotateIcon/>Rotate your phone for a bigger view</div>
       </> : <>
         <button className="cam-nav" style={{ left: Math.max(8, rect.bodyLeft - 56 - 22), top: rect.top + rect.height / 2 - 28 }} onClick={(e) => { e.stopPropagation(); step(-1) }} disabled={n < 2} aria-label="Previous photo"><Arrow dir="left" size={22}/></button>

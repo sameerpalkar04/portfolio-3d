@@ -625,8 +625,9 @@ function createScene(canvas, handlers) {
       // upright phone: show the open book turned sideways (landscape) so it can fill the screen;
       // its left edge goes to the top. Room above and below for the page buttons, and the bar below.
       const up=new THREE.Vector3(-1,0,0).transformDirection(obj.matrixWorld); up.y=0; up.normalize()
-      const top=96, bottom=172+84, usableH=Math.max(200,r.height-top-bottom)
-      const hForLong=(spec.W/2)/(half*(usableH/r.height)*.97), hForShort=(spec.L/2)/(half*(r.width/r.height)*.94)
+      // the page buttons sit bottom-left beside the cue and BACK TO ROOM, so the book can use the full width
+      const top=20, bottom=152, usableH=Math.max(200,r.height-top-bottom)
+      const hForLong=(spec.W/2)/(half*(usableH/r.height)*.98), hForShort=(spec.L/2)/(half*(r.width/r.height)*.97)
       const h=Math.max(hForLong,hForShort)
       const shiftPx=(bottom-top)/2, shift=(shiftPx/(r.height/2))*h*half
       const pos=center.clone().addScaledVector(up,-shift); pos.y+=h
@@ -657,8 +658,10 @@ function createScene(canvas, handlers) {
     let d, lift
     if(turn){
       // long side vertical: body ≈ 62% of the height (room for buttons above and below), ≈ 80% of the width
-      const dH=(.105/2)/(t*.55), dW=(.06/2)/(t*(W/H)*.8)
-      d=Math.max(dH,dW); lift=(36/(H/2))*d*t // a little above centre, clear of the buttons at the bottom
+      // long side vertical, as big as fits: full width, and the height above the bottom controls
+      const top=20, bottom=152, usable=(H-top-bottom)/H
+      const dH=(.105/2)/(t*usable*.96), dW=(.06/2)/(t*(W/H)*.9)
+      d=Math.max(dH,dW); lift=(((bottom-top)/2)/(H/2))*d*t // centred in the space above the controls
     }else{
       const reserved=coarse?172:(W<=720?150:104)
       // body ≈ 62% of the view height, and narrow enough to leave room for the arrow buttons either side
