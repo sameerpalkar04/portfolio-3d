@@ -426,3 +426,152 @@ export function createFloorPlant() {
   plant.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })
   return plant
 }
+
+// An open hardcover book lying flat, ≈ 34 × 24 cm open. Origin at the bottom centre; the top
+// edge of the pages is local −Z. BOOK describes the two-page spread so pages can be laid over it.
+export const BOOK = { W: .34, L: .236, pageY: .0165, pagesW: .328, pagesL: .226 }
+export function createOpenBook() {
+  const book = new THREE.Group(); book.name = 'open-book'
+  const cover = new THREE.Mesh(new THREE.BoxGeometry(BOOK.W + .008, .005, BOOK.L + .01), new THREE.MeshStandardMaterial({ color: '#7d1d22', roughness: .6 }))
+  cover.position.y = .0025; book.add(cover)
+  // two page blocks: thick near the spine, thinning toward the outer edges, with a soft gutter
+  const paper = new THREE.MeshStandardMaterial({ color: '#f7f4ec', roughness: .9 })
+  const edge = new THREE.MeshStandardMaterial({ color: '#e9e3d4', roughness: .95 })
+  for (const side of [-1, 1]) {
+    const seg = 24, w = BOOK.pagesW / 2, l = BOOK.pagesL
+    const geo = new THREE.PlaneGeometry(w, l, seg, 1); geo.rotateX(-Math.PI / 2)
+    const pos = geo.attributes.position
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i) + w / 2 // 0 at the spine side … w at the outer edge (before mirroring)
+      const u = x / w
+      pos.setY(i, BOOK.pageY - .004 * u + (u < .12 ? -.006 * (1 - u / .12) ** 2 : 0))
+      pos.setX(i, side * (x + .001))
+    }
+    geo.computeVertexNormals()
+    const page = new THREE.Mesh(geo, paper); page.name = 'book-page'; if (side < 0) page.scale.x = 1; book.add(page)
+    // page edges (the paper block seen from the side)
+    const block = new THREE.Mesh(new THREE.BoxGeometry(w, .009, l), edge)
+    block.position.set(side * (w / 2 + .001), .0095, 0); book.add(block)
+  }
+  // ribbon bookmark down the gutter
+  const ribbon = new THREE.Mesh(new THREE.PlaneGeometry(.006, BOOK.L + .03), new THREE.MeshStandardMaterial({ color: '#b3202a', roughness: .6, side: THREE.DoubleSide }))
+  ribbon.rotation.x = -Math.PI / 2; ribbon.position.set(.004, BOOK.pageY - .005, .012); book.add(ribbon)
+  book.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })
+  return book
+}
+
+// A desk model of a twin-engine airliner on a chrome stand with a dark wooden base (plain livery).
+// Nose points along local +Z. About 30 cm long.
+export function createModelAirplane() {
+  const plane = new THREE.Group(); plane.name = 'model-airplane'
+  const white = new THREE.MeshPhysicalMaterial({ color: '#f4f5f7', roughness: .32, clearcoat: .6, clearcoatRoughness: .2 })
+  const navy = new THREE.MeshStandardMaterial({ color: '#0f1f3d', roughness: .4 })
+  const grey = new THREE.MeshStandardMaterial({ color: '#b9bcc2', metalness: .6, roughness: .3 })
+  const dark = new THREE.MeshStandardMaterial({ color: '#1a1c20', roughness: .5 })
+  const craft = new THREE.Group()
+  // fuselage: lathe profile along Y, then laid along Z
+  const prof = [[0, -.15], [.008, -.145], [.014, -.13], [.017, -.1], [.017, .09], [.0165, .11], [.014, .127], [.009, .14], [.003, .148], [0, .15]].map(([r, y]) => new THREE.Vector2(r, y))
+  const body = new THREE.Mesh(new THREE.LatheGeometry(prof, 32), white); body.rotation.x = Math.PI / 2; body.scale.set(1, 1, 1); craft.add(body)
+  // tail sweeps upward: shift the rear section by squashing
+  // cockpit windows and the line of cabin windows
+  const cockpit = new THREE.Mesh(new THREE.BoxGeometry(.016, .004, .008), dark); cockpit.position.set(0, .011, .133); cockpit.rotation.x = -.5; craft.add(cockpit)
+  for (const s of [-1, 1]) {
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(.0004, .0022, .17), dark); strip.position.set(s * .0168, .006, .005); craft.add(strip)
+  }
+  // swept main wings
+  const wingShape = new THREE.Shape([new THREE.Vector2(0, .03), new THREE.Vector2(.135, -.03), new THREE.Vector2(.135, -.045), new THREE.Vector2(0, -.015)])
+  const wingGeo = new THREE.ExtrudeGeometry(wingShape, { depth: .0025, bevelEnabled: false }); wingGeo.rotateX(Math.PI / 2)
+  for (const s of [-1, 1]) {
+    const wing = new THREE.Mesh(wingGeo, white); wing.scale.x = s; wing.position.set(0, -.006, .01); wing.rotation.z = s * .07; craft.add(wing)
+    // engine under each wing
+    const eng = new THREE.Mesh(new THREE.CylinderGeometry(.0105, .009, .045, 24, 1, true), white); eng.rotation.x = Math.PI / 2; eng.position.set(s * .05, -.018, .03); craft.add(eng)
+    const lip = new THREE.Mesh(new THREE.TorusGeometry(.0102, .0016, 8, 24), grey); lip.position.set(s * .05, -.018, .0525); craft.add(lip)
+    const fan = new THREE.Mesh(new THREE.CircleGeometry(.0098, 24), dark); fan.position.set(s * .05, -.018, .051); craft.add(fan)
+    const pylon = new THREE.Mesh(new THREE.BoxGeometry(.003, .01, .03), white); pylon.position.set(s * .05, -.01, .022); craft.add(pylon)
+    // horizontal stabiliser
+    const stab = new THREE.Mesh(wingGeo, white); stab.scale.set(s * .42, 1, .5); stab.position.set(0, .004, -.128); craft.add(stab)
+  }
+  // vertical fin in navy
+  const finShape = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(.05, 0), new THREE.Vector2(.075, .058), new THREE.Vector2(.058, .058)])
+  const finGeo = new THREE.ExtrudeGeometry(finShape, { depth: .002, bevelEnabled: false }); finGeo.rotateY(Math.PI / 2)
+  const fin = new THREE.Mesh(finGeo, navy); fin.position.set(-.001, .01, -.095); craft.add(fin)
+  // tail cone in navy
+  const cone = new THREE.Mesh(new THREE.CylinderGeometry(.012, .004, .03, 24), navy); cone.rotation.x = -Math.PI / 2; cone.position.set(0, .002, -.135); craft.add(cone)
+  // landing gear
+  for (const [x, z] of [[0, .11], [-.02, 0], [.02, 0]]) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(.0012, .0012, .018, 6), grey); leg.position.set(x, -.024, z); craft.add(leg)
+    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(.0045, .0045, .004, 12), dark); wheel.rotation.z = Math.PI / 2; wheel.position.set(x, -.034, z); craft.add(wheel)
+  }
+  craft.rotation.x = -.16 // nose-up, climbing
+  craft.position.y = .17
+  plane.add(craft)
+  // stand: angled chrome rod on a wooden base
+  const base = new THREE.Mesh(new THREE.BoxGeometry(.075, .018, .11), new THREE.MeshStandardMaterial({ color: '#4a1f1b', roughness: .45 }))
+  base.position.set(0, .009, -.02); plane.add(base)
+  const rod = new THREE.Mesh(new THREE.CylinderGeometry(.003, .003, .165, 10), new THREE.MeshStandardMaterial({ color: '#d8dade', metalness: .9, roughness: .2 }))
+  rod.position.set(0, .095, -.005); rod.rotation.x = .28; plane.add(rod)
+  plane.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })
+  return plane
+}
+
+// A compact digital camera (point-and-shoot) in black, ≈ 10.5 × 6 × 3 cm. Origin at the bottom
+// centre; the lens points along local +Z.
+// Where the camera's rear screen sits (local coords, facing −Z), so photos can be laid over it.
+export const CAMERA_SCREEN = { w: .062, h: .042, x: .01, y: .031, z: -.0146 }
+export function createDigitalCamera() {
+  const cam = new THREE.Group(); cam.name = 'desk-camera'
+  const W = .105, H = .06, D = .028, bevel = .004
+  const black = new THREE.MeshStandardMaterial({ color: '#141416', roughness: .5, metalness: .15 })
+  const satin = new THREE.MeshStandardMaterial({ color: '#2a2b2f', roughness: .35, metalness: .6 })
+  const glass = new THREE.MeshPhysicalMaterial({ color: '#07090d', roughness: .05, clearcoat: 1, clearcoatRoughness: .02 })
+  const bodyGeo = new THREE.ExtrudeGeometry(roundedRect(W - bevel * 2, H - bevel * 2, .008), { depth: D - bevel * 2, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 3, curveSegments: 10 })
+  bodyGeo.translate(0, H / 2, -D / 2 + bevel)
+  const body = new THREE.Mesh(bodyGeo, black); cam.add(body)
+  // lens: stepped barrel with a glass element, slightly right of centre
+  const lx = .016, ly = H / 2 - .002, front = D / 2
+  const barrel1 = new THREE.Mesh(new THREE.CylinderGeometry(.021, .022, .008, 40), satin); barrel1.rotation.x = Math.PI / 2; barrel1.position.set(lx, ly, front + .004); cam.add(barrel1)
+  const barrel2 = new THREE.Mesh(new THREE.CylinderGeometry(.016, .017, .01, 40), black); barrel2.rotation.x = Math.PI / 2; barrel2.position.set(lx, ly, front + .012); cam.add(barrel2)
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(.0135, .0018, 8, 40), satin); ring.position.set(lx, ly, front + .0172); cam.add(ring)
+  const lens = new THREE.Mesh(new THREE.CircleGeometry(.0125, 40), glass); lens.position.set(lx, ly, front + .0171); cam.add(lens)
+  const glint = new THREE.Mesh(new THREE.CircleGeometry(.0035, 20), new THREE.MeshBasicMaterial({ color: '#3a4a66', transparent: true, opacity: .55 })); glint.position.set(lx - .004, ly + .004, front + .0173); cam.add(glint)
+  // flash window and a small sensor dot on the front
+  const flash = new THREE.Mesh(new THREE.PlaneGeometry(.014, .007), new THREE.MeshStandardMaterial({ color: '#d9d6cf', roughness: .2, emissive: '#2a2a28' })); flash.position.set(-.03, H - .013, front + .0005); cam.add(flash)
+  const dot = new THREE.Mesh(new THREE.CircleGeometry(.0018, 12), new THREE.MeshStandardMaterial({ color: '#6b4a1a', roughness: .3 })); dot.position.set(-.012, H - .013, front + .0005); cam.add(dot)
+  // grip strip on the left of the front
+  const grip = new THREE.Mesh(new THREE.BoxGeometry(.012, H * .62, .003), satin); grip.position.set(-.04, H * .45, front + .0012); cam.add(grip)
+  // top: shutter button with a zoom ring, power button and mode dial
+  const top = H
+  const zoomRing = new THREE.Mesh(new THREE.CylinderGeometry(.0065, .0065, .002, 24), satin); zoomRing.position.set(.03, top + .001, 0); cam.add(zoomRing)
+  const shutter = new THREE.Mesh(new THREE.CylinderGeometry(.0045, .0048, .004, 24), satin); shutter.position.set(.03, top + .003, 0); cam.add(shutter)
+  const power = new THREE.Mesh(new THREE.CylinderGeometry(.0028, .0028, .0015, 16), black); power.position.set(.012, top + .0008, 0); cam.add(power)
+  const dial = new THREE.Mesh(new THREE.CylinderGeometry(.0075, .0075, .004, 24), black); dial.position.set(-.028, top + .002, 0); cam.add(dial)
+  // back: LCD screen (photos are shown over it) and a few buttons beside it
+  const lcd = new THREE.Mesh(new THREE.PlaneGeometry(CAMERA_SCREEN.w + .004, CAMERA_SCREEN.h + .004), new THREE.MeshPhysicalMaterial({ color: '#050608', roughness: .08, clearcoat: 1 }))
+  lcd.rotation.y = Math.PI; lcd.position.set(CAMERA_SCREEN.x, CAMERA_SCREEN.y, CAMERA_SCREEN.z + .0002); cam.add(lcd)
+  for (const [bx, by, r] of [[-.04, H * .7, .0045], [-.04, H * .42, .0085], [-.04, H * .18, .003]]) {
+    const btn = new THREE.Mesh(new THREE.CylinderGeometry(r, r, .002, 20), satin); btn.rotation.x = Math.PI / 2; btn.position.set(bx, by, -D / 2 - .001); cam.add(btn)
+  }
+  cam.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })
+  return cam
+}
+
+
+// A modern square table lamp: low wooden plinth, slim brass post and a tall square linen shade
+// that glows warm at night.
+export function createTableLamp() {
+  const group = new THREE.Group(); group.name = 'table-lamp'
+  const wood = new THREE.MeshStandardMaterial({ color: '#7a5233', roughness: .55 })
+  const brass = new THREE.MeshStandardMaterial({ color: '#c9a35a', roughness: .3, metalness: .85 })
+  const base = new THREE.Mesh(new RoundedBoxGeometry(.11, .028, .11, 3, .004), wood); base.position.y = .014; group.add(base)
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(.005, .005, .05, 12), brass); post.position.y = .05; group.add(post)
+  const c = document.createElement('canvas'); c.width = c.height = 128; const ctx = c.getContext('2d')
+  ctx.fillStyle = '#eee4cf'; ctx.fillRect(0, 0, 128, 128)
+  for (let i = 0; i < 1600; i++) { ctx.fillStyle = `rgba(${150 + Math.random() * 60},${130 + Math.random() * 50},${100 + Math.random() * 40},.12)`; ctx.fillRect(Math.random() * 128, Math.random() * 128, 1 + Math.random() * 2, 1) }
+  const linen = new THREE.CanvasTexture(c); linen.colorSpace = THREE.SRGBColorSpace; linen.wrapS = linen.wrapT = THREE.RepeatWrapping; linen.repeat.set(2, 3)
+  const glow = new THREE.MeshStandardMaterial({ map: linen, color: '#f3ead6', emissive: '#ffc777', emissiveMap: linen, emissiveIntensity: 0, roughness: .95, side: THREE.DoubleSide })
+  const H = .25, S = .1
+  const shadeGeo = new THREE.CylinderGeometry(S / Math.SQRT2, S / Math.SQRT2, H, 4, 1, true); shadeGeo.rotateY(Math.PI / 4)
+  const shade = new THREE.Mesh(shadeGeo, glow); shade.position.y = .07 + H / 2; group.add(shade)
+  group.traverse((o) => { if (o.isMesh) { o.castShadow = o !== shade; o.receiveShadow = true } })
+  return { group, glow, lightPoint: new THREE.Vector3(0, .07 + H * .45, 0) }
+}

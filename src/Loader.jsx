@@ -64,7 +64,7 @@ export default function Loader({ progress, loaded, total, ready, onEnter }) {
   useEffect(() => {
     let raf = 0, last = performance.now()
     const tick = (now) => {
-      const dt = Math.min(.05, (now - last) / 1000); last = now
+      const dt = Math.max(0, Math.min(.05, (now - last) / 1000)); last = now // rAF time can trail performance.now()
       const next = shownRef.current + (target - shownRef.current) * Math.min(1, dt * (ready ? 6 : 4))
       shownRef.current = Math.abs(target - next) < .002 ? target : next
       setShown(shownRef.current)
@@ -82,13 +82,13 @@ export default function Loader({ progress, loaded, total, ready, onEnter }) {
     return () => window.removeEventListener('keydown', onKey, true)
   }, [done, onEnter])
 
-  const pct = Math.round(shown * 100)
+  const pct = Math.max(0, Math.min(100, Math.round(shown * 100)))
   const status = done ? 'ready'
     : total ? `fetching home-office.glb · ${mb(loaded)} / ${mb(total)} MB`
     : progress >= 1 ? 'setting up the scene' : 'connecting'
 
   return <motion.div className={`loader${done ? ' is-done' : ''}`}
-    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .45 }}>
+    initial={false} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .45 }}>
     <DotField done={done}/>
     <div className="loader-inner">
       <p className="loader-name">sameer palkar <span>// software engineer</span></p>

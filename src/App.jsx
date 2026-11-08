@@ -23,6 +23,7 @@ const apps = [
   { id: 'projects', label: 'Projects', icon: '🗂️', title: 'Selected projects', body: <div className="project-list"><article><b>Full‑stack products</b><p>Responsive web applications, thoughtfully designed from interface through backend.</p></article><article><b>Applied AI experiments</b><p>Practical explorations that connect modern ML capabilities to real workflows.</p></article><article><b>Systems & tools</b><p>Small utilities and developer tools built to make everyday work simpler.</p></article></div> },
   { id: 'resume', label: 'Resume', icon: '📄', title: 'Experience & education', body: <><div className="timeline"><span>2022 — 2026</span><div><b>B.Tech in Computer Science</b><p>Vellore Institute of Technology · Vellore, India</p></div></div><div className="timeline"><span>Now</span><div><b>Building, learning, and looking ahead</b><p>Interested in software engineering, backend systems, and applied AI.</p></div></div><ResumeLink/></> },
   { id: 'skills', label: 'Skills', icon: '🧰', title: 'Tools I work with', body: <><p>From shaping an idea to shipping it, these are some of the tools in my kit.</p><div className="skill-pills">{['Java','Python','C++','JavaScript','TypeScript','React','Node.js','Spring Boot','FastAPI','SQL','Docker','Kubernetes','Git','Figma','AI / ML'].map((x) => <span key={x}>{x}</span>)}</div></> },
+  { id: 'photos', label: 'Photos', icon: '📷', title: 'Through my lens', body: <><p>Some of the places and moments I’ve photographed.</p><p className="note">The gallery is being put together. Check back soon.</p></> },
   { id: 'music', label: 'Music', icon: '🎧', title: 'On my speaker', body: <Playlist/> },
   { id: 'contact', label: 'Contact', icon: '✉️', title: 'Let’s make something', body: <><p className="lead">Have an interesting idea or opportunity?</p><p>I’d love to hear about it. The best way to reach me is by email.</p><a className="mail-link" href="mailto:palkarsameer04@gmail.com">palkarsameer04@gmail.com ↗</a><a className="mail-link" href="https://www.linkedin.com/in/sameer-palkar-9707b9286/" target="_blank" rel="noreferrer">LinkedIn · Sameer Palkar ↗</a><a className="mail-link" href="https://github.com/sameerpalkar04" target="_blank" rel="noreferrer">GitHub · sameerpalkar04 ↗</a><p className="note">Bengaluru · India</p></> },
 ]
@@ -87,12 +88,14 @@ const MoonIcon = () => <svg viewBox="0 0 24 24" width="18" height="18" fill="non
 
 // Explorable spots in the room and what each one opens.
 export const SPOTS = [
-  { id: 'projects', object: 'Computer', opens: 'Projects' },
-  { id: 'contact', object: 'Phone', opens: 'Contact' },
-  { id: 'resume', object: 'Files', opens: 'Résumé' },
   { id: 'about', object: 'Books', opens: 'About me' },
+  { id: 'projects', object: 'Computer', opens: 'Projects' },
+  { id: 'resume', object: 'Files', opens: 'Résumé' },
   { id: 'music', object: 'Speaker', opens: 'Song picks' },
+  { id: 'contact', object: 'Phone', opens: 'Contact' },
 ]
+// Explorable but without a shortcut in the bar.
+const ALL_SPOTS = [...SPOTS, { id: 'photos', object: 'Camera', opens: 'Through my lens' }]
 
 // A slider built from plain elements so dragging works the same with a mouse, a finger or a pen
 // (the native range input fights with touch scrolling on phones). Arrow keys also work.
@@ -133,7 +136,7 @@ function HelpPanel() {
       ? <ul><li><span className="keys"><kbd><Arrow dir="up" size={12}/></kbd><kbd><Arrow dir="down" size={12}/></kbd></span>tap to walk forward / back</li><li><span className="keys"><kbd><Arrow dir="left" size={12}/></kbd><kbd><Arrow dir="right" size={12}/></kbd></span>tap to turn</li><li><span className="keys">drag</span>look around</li><li><span className="keys">pinch</span>zoom</li></ul>
       : <ul><li><span className="keys"><kbd><Arrow dir="up" size={12}/></kbd><kbd><Arrow dir="down" size={12}/></kbd></span>walk forward / back</li><li><span className="keys"><kbd><Arrow dir="left" size={12}/></kbd><kbd><Arrow dir="right" size={12}/></kbd></span>turn left / right</li><li><span className="keys">drag</span>look around</li><li><span className="keys">scroll</span>zoom in / out</li><li><span className="keys"><kbd>↵</kbd></span>open what you're facing</li><li><span className="keys"><kbd>⌫</kbd></span>close it again</li></ul>}
     <h4>Things to explore</h4>
-    <ul className="explore">{SPOTS.map((s) => <li key={s.id}><b>{s.object}</b><span>{s.opens}</span></li>)}</ul>
+    <ul className="explore">{ALL_SPOTS.map((s) => <li key={s.id}><b>{s.object}</b><span>{s.opens}</span></li>)}</ul>
     <p>Walk up to one of them, or use the shortcuts in the bar to go straight there.</p>
   </div>
 }
@@ -150,7 +153,7 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interact
     return () => { window.removeEventListener('pointerdown', close); window.removeEventListener('keydown', esc) }
   }, [panel])
   const toggle = (name) => setPanel((p) => (p === name ? null : name))
-  const here = SPOTS.find((s) => s.id === hotspot)
+  const here = ALL_SPOTS.find((s) => s.id === hotspot)
   // Phones: the bar folds away into one menu button so the room gets the screen.
   // Only the action that matters right now (INTERACT / BACK TO ROOM) floats beside it.
   const compact = isTouch()
@@ -192,6 +195,41 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interact
 
 // First-time cue: "drag to look" on laptops (gone on hover), "use the arrows" on phones (gone on touch).
 const isTouch = () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
+// A cue for whatever the visitor is standing at: what it is and what it opens.
+const SVG = (d) => <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{d}</svg>
+const CUES = {
+  about: { name: 'the books', does: 'read about me', icon: SVG(<><path d="M4 5.5c2.5-1 5-1 8 1 3-2 5.5-2 8-1V19c-2.5-1-5-1-8 1-3-2-5.5-2-8-1z"/><path d="M12 6.5V20"/></>) },
+  projects: { name: 'the computer', does: 'see my projects', icon: SVG(<><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M9 20h6M12 16v4"/></>) },
+  resume: { name: 'the files', does: 'view my résumé', icon: SVG(<><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></>) },
+  music: { name: 'the speaker', does: 'hear my song picks', icon: SVG(<><rect x="6" y="3" width="12" height="18" rx="3"/><circle cx="12" cy="14" r="3"/><circle cx="12" cy="7.5" r="1"/></>) },
+  contact: { name: 'the phone', does: 'get in touch', icon: SVG(<><rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M11 18.5h2"/></>) },
+  photos: { name: 'the camera', does: 'see through my lens', icon: SVG(<><path d="M4 8h3l1.6-2.2h6.8L17 8h3v11H4z"/><circle cx="12" cy="13.3" r="3.4"/></>) },
+}
+function SpotCue({ id }) {
+  const touch = isTouch(), cue = CUES[id]
+  if (!cue) return null
+  return <motion.div className={`look-cue cam-cue${touch ? ' is-touch' : ''}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .35 }}>
+    <span className="cue-cam">{cue.icon}</span>
+    <span className="cue-text"><b>Interact with {cue.name}</b><small>{touch ? `Tap the Interact button to ${cue.does}` : `Press the Interact button or ↵ to ${cue.does}`}</small></span>
+  </motion.div>
+}
+
+// Shown once at the start, after the look-around cue: what there is to find in the room.
+function ExploreCue({ onDismiss }) {
+  const touch = isTouch()
+  useEffect(() => {
+    const dismiss = () => onDismiss()
+    const events = touch ? ['touchstart', 'pointerdown'] : ['pointermove']
+    const t = window.setTimeout(() => events.forEach((e) => window.addEventListener(e, dismiss, { once: true, passive: true })), 1400)
+    return () => { window.clearTimeout(t); events.forEach((e) => window.removeEventListener(e, dismiss)) }
+  }, [onDismiss, touch])
+  return <motion.div className={`look-cue explore-cue${touch ? ' is-touch' : ''}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .4 }}>
+    <b>Things to explore</b>
+    <ul>{ALL_SPOTS.map((s) => <li key={s.id}><span>{s.object}</span><small>{s.opens}</small></li>)}</ul>
+    <small className="explore-foot">{touch ? 'Walk up to one, or use the menu to go straight there' : 'Walk up to one, or use the shortcuts in the bar'}</small>
+  </motion.div>
+}
+
 function LookCue({ onDismiss }) {
   const touch = isTouch()
   useEffect(() => {
@@ -254,18 +292,104 @@ function PhoneScreen({ onClose, getRect }) {
   </motion.div>
 }
 
-function PortfolioSystem({ onClose, initial = 'about' }) {
-  const [active, setActive] = useState(initial)
+// The open book on the cabinet: once the camera settles over it, two pages about me appear on it.
+function BookPages({ onClose, getRect }) {
+  const [rect, setRect] = useState(null)
+  useEffect(() => {
+    let raf = 0
+    const tick = () => {
+      const r = getRect()
+      setRect((prev) => (!r ? null : prev && Math.abs(prev.left - r.left) + Math.abs(prev.top - r.top) + Math.abs(prev.width - r.width) < 1 ? prev : r))
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [getRect])
+  return <motion.div className="phone-overlay" onClick={onClose} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
+    {rect && <motion.div className="book-live" onClick={(e) => e.stopPropagation()} style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .5 }}>
+      <section className="book-page left">
+        <small>chapter one</small>
+        <h2>Hi, I’m Sameer.</h2>
+        <p>I’m a computer science student and builder who enjoys turning thoughtful ideas into useful, polished software.</p>
+        <dl><dt>Based in</dt><dd>Bengaluru, India</dd><dt>Studying</dt><dd>B.Tech, Computer Science · VIT Vellore</dd><dt>Graduating</dt><dd>August 2026</dd></dl>
+        <span className="folio">1</span>
+      </section>
+      <section className="book-page right">
+        <small>what I work with</small>
+        <h3>Tools in my kit</h3>
+        <ul>{['Java', 'Python', 'C++', 'JavaScript', 'TypeScript', 'React', 'Node.js', 'Spring Boot', 'FastAPI', 'SQL', 'Docker', 'Kubernetes', 'Git', 'Figma', 'AI / ML'].map((x) => <li key={x}>{x}</li>)}</ul>
+        <p className="aside">Interested in software engineering, backend systems and applied AI.</p>
+        <span className="folio">2</span>
+      </section>
+    </motion.div>}
+  </motion.div>
+}
+
+// The iMac: a desktop with one window, my projects. Everything else lives around the room.
+function PortfolioSystem({ onClose }) {
   const [now, setNow] = useState(new Date())
   useEffect(() => { const timer = window.setInterval(() => setNow(new Date()), 30000); return () => window.clearInterval(timer) }, [])
-  const selected = apps.find((app) => app.id === active)
+  const selected = apps.find((app) => app.id === 'projects')
   return <motion.div className="system-screen" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
     <div className="mac-menu"><span className="apple-mark">●</span><b>Finder</b><span>File</span><span>Edit</span><span>View</span><span>Go</span><span>Window</span><span>Help</span><span className="menu-time">⌁ &nbsp; Wi‑Fi &nbsp; ▰ &nbsp; {now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span></div>
-    <div className="desktop-welcome"><span>WELCOME TO MY DIGITAL WORKSPACE</span><h2>Good to have you here.</h2><p>Pick an app to explore my corner of the internet.</p></div>
-    <div className="desktop-icons">{apps.map((app) => <button key={app.id} className={`desktop-icon ${active === app.id ? 'selected' : ''}`} onClick={() => setActive(app.id)}><span>{app.icon}</span><b>{app.label}</b></button>)}</div>
-    <motion.section key={selected.id} className="app-window" initial={{ opacity: 0, y: 12, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: .22 }}>
-      <header className="app-titlebar"><TrafficLights onClose={onClose}/><span>{selected.title}</span><span className="title-spacer"/></header><div className="app-body"><div className="app-sidebar">{apps.map((app) => <button className={active === app.id ? 'current' : ''} onClick={() => setActive(app.id)} key={app.id}><span>{app.icon}</span>{app.label}</button>)}</div><article className="app-copy"><span className="section-eyebrow">SAMEER PALKAR · PORTFOLIO</span><h3>{selected.title}</h3>{selected.body}</article></div>
+    <div className="desktop-welcome"><span>WELCOME TO MY DIGITAL WORKSPACE</span><h2>Good to have you here.</h2><p>Here’s what I’ve been building.</p></div>
+    <motion.section className="app-window single" initial={{ opacity: 0, y: 12, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: .22 }}>
+      <header className="app-titlebar"><TrafficLights onClose={onClose}/><span>{selected.title}</span><span className="title-spacer"/></header><div className="app-body"><article className="app-copy"><span className="section-eyebrow">SAMEER PALKAR · PROJECTS</span><h3>{selected.title}</h3>{selected.body}</article></div>
     </motion.section>
+  </motion.div>
+}
+
+// Files (résumé) and the speaker (song picks): a plain card over the room.
+function SpotCard({ app, onClose }) {
+  const a = apps.find((x) => x.id === app)
+  return <motion.div className="phone-overlay spot-overlay" onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
+    <motion.article className="spot-card" onClick={(e) => e.stopPropagation()} initial={{ y: 14, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 10, opacity: 0 }} transition={{ duration: .3, ease: [.2, .8, .2, 1] }}>
+      <span className="section-eyebrow">{a.label}</span><h3>{a.title}</h3>{a.body}
+    </motion.article>
+  </motion.div>
+}
+
+// Photos dropped into src/photos show up on the camera's screen, in name order.
+const PHOTOS = Object.entries(import.meta.glob('./photos/*.{jpg,jpeg,png,webp,JPG,JPEG,PNG}', { eager: true, query: '?url', import: 'default' })).sort(([a], [b]) => a.localeCompare(b)).map(([, url]) => url)
+
+// The camera, picked up: photos appear on its rear screen, with buttons to step through them.
+function CameraView({ onClose, getRect }) {
+  const [rect, setRect] = useState(null)
+  const [i, setI] = useState(0)
+  useEffect(() => {
+    let raf = 0
+    const tick = () => { const r = getRect(); setRect((p) => (!r ? null : p && Math.abs(p.left - r.left) + Math.abs(p.top - r.top) + Math.abs(p.width - r.width) < 1 ? p : r)); raf = requestAnimationFrame(tick) }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [getRect])
+  const n = PHOTOS.length
+  const step = (d) => n && setI((v) => (v + d + n) % n)
+  useEffect(() => {
+    const key = (e) => { if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); step(-1) } if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); step(1) } }
+    window.addEventListener('keydown', key, true); return () => window.removeEventListener('keydown', key, true)
+  })
+  return <motion.div className="phone-overlay" onClick={onClose} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
+    {rect && <>
+      {/* rear screen: on an upright phone the camera is turned sideways, so the picture is too */}
+      <motion.div className="cam-screen" onClick={(e) => e.stopPropagation()}
+        style={rect.rotated
+          ? { left: rect.left + rect.width / 2 - rect.height / 2, top: rect.top + rect.height / 2 - rect.width / 2, width: rect.height, height: rect.width, rotate: 90 }
+          : { left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .4 }}>
+        {n ? <AnimatePresence initial={false} mode="popLayout"><motion.img key={i} src={PHOTOS[i]} alt="" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .25 }}/></AnimatePresence>
+          : <div className="cam-empty"><b>No photos yet</b><span>more coming soon</span></div>}
+        <span className="cam-hud">{n ? `${i + 1} / ${n}` : '0 / 0'}</span>
+      </motion.div>
+      {rect.rotated ? <>
+        <button className="cam-nav" style={{ left: rect.left + rect.width / 2 - 28, top: Math.max(8, rect.bodyTop - 56 - 22) }} onClick={(e) => { e.stopPropagation(); step(-1) }} disabled={n < 2} aria-label="Previous photo"><Arrow dir="up" size={22}/></button>
+        <button className="cam-nav" style={{ left: rect.left + rect.width / 2 - 28, top: Math.min(window.innerHeight - 64, rect.bodyBottom + 22) }} onClick={(e) => { e.stopPropagation(); step(1) }} disabled={n < 2} aria-label="Next photo"><Arrow dir="down" size={22}/></button>
+        <div className="rotate-hint"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M20 9a8 8 0 0 1-2 7M18.5 16.2 18 13.6l2.6.4"/></svg>Rotate your phone for a bigger view</div>
+      </> : <>
+        <button className="cam-nav" style={{ left: Math.max(8, rect.bodyLeft - 56 - 22), top: rect.top + rect.height / 2 - 28 }} onClick={(e) => { e.stopPropagation(); step(-1) }} disabled={n < 2} aria-label="Previous photo"><Arrow dir="left" size={22}/></button>
+        <button className="cam-nav" style={{ left: Math.min(window.innerWidth - 64, rect.bodyRight + 22), top: rect.top + rect.height / 2 - 28 }} onClick={(e) => { e.stopPropagation(); step(1) }} disabled={n < 2} aria-label="Next photo"><Arrow dir="right" size={22}/></button>
+      </>}
+    </>}
   </motion.div>
 }
 
@@ -303,10 +427,15 @@ export default function App() {
     window.setTimeout(() => setIntroPhase('corner'), 1500)
     window.setTimeout(() => setShowCue(true), 2600)
   }, [])
-  const dismissCue = useCallback(() => setShowCue(false), [])
+  // after the look-around cue goes, the list of things to explore shows once
+  const [showExplore, setShowExplore] = useState(false)
+  const dismissCue = useCallback(() => { setShowCue(false); window.setTimeout(() => setShowExplore(true), 450) }, [])
+  const dismissExplore = useCallback(() => setShowExplore(false), [])
   const onKey = (key, down) => window.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { key, bubbles: true }))
   const closeSystem = () => sceneRef.current?.closeSystem()
   const getPhoneRect = useCallback(() => sceneRef.current?.phoneScreenRect() ?? null, [])
+  const getCameraRect = useCallback(() => sceneRef.current?.cameraScreenRect() ?? null, [])
+  const getBookRect = useCallback(() => sceneRef.current?.focusRect('about') ?? null, [])
   useEffect(() => { sceneRef.current?.setTimeOfDay(hour) }, [hour, sceneReady])
   useEffect(() => { const timer = window.setInterval(() => setClockHour(systemHour()), 60000); return () => window.clearInterval(timer) }, [])
   return <main className="app-shell"><OfficeScene sceneRef={sceneRef} onHotspot={updateHotspot} onSystem={updateSystem} onReady={updateReady} onProgress={updateProgress}/>
@@ -314,7 +443,13 @@ export default function App() {
     <AnimatePresence>{loading && <Loader progress={load.progress} loaded={load.loaded} total={load.total} ready={sceneReady} onEnter={finishLoading}/>}</AnimatePresence>
     <AnimatePresence>{systemOpen && (systemApp === 'contact'
       ? <PhoneScreen key="phone" onClose={closeSystem} getRect={getPhoneRect}/>
-      : <PortfolioSystem key="system" initial={systemApp} onClose={closeSystem}/>)}</AnimatePresence>
+      : systemApp === 'about'
+      ? <BookPages key="book" onClose={closeSystem} getRect={getBookRect}/>
+      : systemApp === 'photos'
+      ? <CameraView key="camera" onClose={closeSystem} getRect={getCameraRect}/>
+      : systemApp === 'projects'
+      ? <PortfolioSystem key="system" onClose={closeSystem}/>
+      : <SpotCard key={systemApp} app={systemApp} onClose={closeSystem}/>)}</AnimatePresence>
     {!loading && <div className={`office-hud${systemOpen ? ' is-interacting' : ''}`}>
       {introPhase !== 'hidden' && !systemOpen && <NameTag phase={introPhase}/>}
       {introPhase === 'corner' && <>
@@ -324,6 +459,8 @@ export default function App() {
         {isTouch() && !systemOpen && <MobileControls onKey={onKey}/>}
       </>}
       <AnimatePresence>{showCue && introPhase === 'corner' && !systemOpen && <LookCue onDismiss={dismissCue}/>}</AnimatePresence>
+      <AnimatePresence>{showExplore && introPhase === 'corner' && !systemOpen && <ExploreCue key="explore" onDismiss={dismissExplore}/>}</AnimatePresence>
+      <AnimatePresence>{hotspot && !showCue && !showExplore && introPhase === 'corner' && !systemOpen && <SpotCue key={hotspot} id={hotspot}/>}</AnimatePresence>
     </div>}
   </main>
 }

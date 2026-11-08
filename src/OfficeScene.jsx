@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { createExteriorMaterial, WINDOW_UV } from './exteriorShader'
 import { buildCollisionGrid, createWalkTester } from './collision'
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
-import { PHONE, createPhone, createFloorPlant, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight } from './props'
+import { PHONE, BOOK, CAMERA_SCREEN, createOpenBook, createDigitalCamera, createTableLamp, createModelAirplane, createPhone, createFloorPlant, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight } from './props'
 import { createDesktopTexture, BEACH_PHOTO_URL } from './screens'
 
 const MODEL_URL = '/models/home-office.glb'
@@ -496,6 +496,50 @@ function createScene(canvas, handlers) {
       const o = find(n); if (!o) continue
       o.material = o.material.clone(); o.material.color.set(color); o.material.roughness = .5; o.material.map = null; o.material.needsUpdate = true
     }
+    // Cabinet top by the photo frame: an open book, a model airliner, and a camera where the
+    // single green book used to lie.
+    let cameraSpot = null
+    {
+      const stack = find('Line023'), single = find('Line040.001')
+      if (stack) {
+        const sb = new THREE.Box3().setFromObject(stack), top = sb.min.y // cabinet top
+        const sc = sb.getCenter(new THREE.Vector3())
+        // the cabinet runs along Z against the wall at −X (or the mirror of that)
+        const intoRoom = Math.sign(roomBounds.getCenter(new THREE.Vector3()).x - sc.x) || 1
+        const book = createOpenBook()
+        book.position.set(sc.x + intoRoom * .03, top, sb.max.z + .19)
+        book.rotation.y = intoRoom > 0 ? Math.PI / 2 : -Math.PI / 2 // top of the pages toward the wall
+        scene.add(book); meshColliders.push(book.children[0])
+        const plane = createModelAirplane()
+        plane.position.set(sc.x - intoRoom * .02, top, sb.max.z + .5); plane.rotation.y = intoRoom > 0 ? Math.PI / 2 - .5 : -Math.PI / 2 + .5
+        scene.add(plane)
+      }
+      if (single) {
+        const gb = new THREE.Box3().setFromObject(single), gc = gb.getCenter(new THREE.Vector3())
+        for (const n of ['Line040.001', 'Object038.001']) { const o = find(n); if (o) o.visible = false }
+        cameraSpot = new THREE.Vector3(gc.x, gb.min.y, gc.z)
+        // a compact black digital camera, lens pointing straight out at whoever is looking
+        const camModel = createDigitalCamera()
+        camModel.position.copy(cameraSpot)
+        camModel.rotation.y = Math.sign(roomBounds.getCenter(new THREE.Vector3()).x - cameraSpot.x) >= 0 ? Math.PI / 2 : -Math.PI / 2
+        scene.add(camModel)
+      }
+      // table lamp in the corner at the window end of this cabinet
+      const top = find('Cube.008')
+      if (top) {
+        const tb = new THREE.Box3().setFromObject(top)
+        const wallX = Math.abs(tb.min.x - roomBounds.min.x) < Math.abs(tb.max.x - roomBounds.max.x) ? tb.min.x + .13 : tb.max.x - .13
+        const towardEnd = Math.abs(tb.min.z - roomBounds.min.z) < Math.abs(tb.max.z - roomBounds.max.z) ? -1 : 1
+        // the cabinet runs into the wall, so find where the wall actually is above the top
+        const probe = new THREE.Raycaster(new THREE.Vector3((tb.min.x + tb.max.x) / 2, tb.max.y + .15, cameraSpot ? cameraSpot.z : (tb.min.z + tb.max.z) / 2), new THREE.Vector3(0, 0, towardEnd), 0, 6)
+        const wallHit = probe.intersectObject(model, true).find((h) => h.object.visible)
+        const endZ = (wallHit ? wallHit.point.z : (towardEnd < 0 ? tb.min.z : tb.max.z)) - towardEnd * .14
+        const { group: lamp, glow, lightPoint } = createTableLamp()
+        lamp.position.set(wallX, tb.max.y, endZ); scene.add(lamp); lamp.updateMatrixWorld(true)
+        const bulb = new THREE.PointLight('#ffc985', 0, 2.6, 2); bulb.position.copy(lamp.localToWorld(lightPoint.clone())); scene.add(bulb)
+        nightLights.push({ light: bulb, max: 1.6, glow, glowMax: 1.8 })
+      }
+    }
     grid = buildCollisionGrid(meshColliders, roomBounds, floorY)
     const imac = find('Apple iMac 27 - display')
     if (imac) { const p = imac.getWorldPosition(new THREE.Vector3()); computer = { x: p.x, z: p.z } }
@@ -517,7 +561,8 @@ function createScene(canvas, handlers) {
         { id:'projects', app:'projects', label:'Computer', pos:at(imac) },
         { id:'contact', app:'contact', label:'Phone', pos:at(scene.getObjectByName('desk-phone')) },
         { id:'resume', app:'resume', label:'Files', pos:filesSpot() },
-        { id:'about', app:'about', label:'Books', pos:at(find('Line023')) },
+        { id:'photos', app:'photos', label:'Camera', pos:cameraSpot ? cameraSpot.clone().add(new THREE.Vector3(0,.04,0)) : null },
+        { id:'about', app:'about', label:'Books', pos:at(scene.getObjectByName('open-book')) || at(find('Line023')) },
         { id:'music', app:'music', label:'Speaker', pos:at(scene.getObjectByName('cabinet-speaker')) },
       ]
       hotspots=spots.filter((h)=>h.pos).map((h)=>{
@@ -548,35 +593,70 @@ function createScene(canvas, handlers) {
       windowSun=new THREE.PointLight('#fff1d6',2.1,7,1.3);windowSun.position.set(windowCenter.x+inward.x*.45,windowCenter.y+.2,windowCenter.z+inward.z*.45);scene.add(windowSun)
     }
     handlers.onPosition?.({ x:state.x,z:state.z,minX:walkBounds.min.x,maxX:walkBounds.max.x,minZ:walkBounds.min.z,maxZ:walkBounds.max.z })
-    handlers.onReady?.()
+    handlers.onReady?.(); if (import.meta.env.DEV && !disposed) window.__dbg = { scene, camera, state, THREE }
   }, (xhr) => { if (xhr.total) handlers.onProgress?.(xhr.loaded / xhr.total, xhr.loaded, xhr.total) }, (error) => { console.error('Unable to load the home-office model.',error); loadError=true; handlers.onReady?.() })
 
   // Phone close-up: the camera glides down to look straight onto the phone lying on the desk.
   let focus=null
-  const tmpM=new THREE.Matrix4(), tmpV=new THREE.Vector3(), tmpQ=new THREE.Quaternion()
-  const phoneView=()=>{
-    const phone=scene.getObjectByName('desk-phone'); if(!phone)return null
-    phone.updateWorldMatrix(true,false)
-    const center=new THREE.Vector3(0,PHONE.T,0).applyMatrix4(phone.matrixWorld)
-    const up=new THREE.Vector3(0,0,-1).transformDirection(phone.matrixWorld); up.y=0; up.normalize()
-    const r=canvas.getBoundingClientRect(), fov=36, half=Math.tan(THREE.MathUtils.degToRad(fov/2))
+  const tmpM=new THREE.Matrix4(), tmpV=new THREE.Vector3(), tmpQ=new THREE.Quaternion(), tmpSize=new THREE.Vector2()
+  // Close-ups: the camera glides down to look straight onto an object lying on a surface.
+  const FOCUS = {
+    contact: { name: 'desk-phone', y: PHONE.T, L: PHONE.L, W: PHONE.W, rect: { w: PHONE.displayW, l: PHONE.displayL, y: PHONE.T + .0003, r: PHONE.displayR }, fill: .97 },
+    about: { name: 'open-book', y: BOOK.pageY, L: BOOK.L, W: BOOK.W, rect: { w: BOOK.pagesW, l: BOOK.pagesL, y: BOOK.pageY, r: 0 }, fill: .94 },
+  }
+  const focusView=(id)=>{
+    const spec=FOCUS[id], obj=spec&&scene.getObjectByName(spec.name); if(!obj)return null
+    obj.updateWorldMatrix(true,false)
+    const center=new THREE.Vector3(0,spec.y,0).applyMatrix4(obj.matrixWorld)
+    const up=new THREE.Vector3(0,0,-1).transformDirection(obj.matrixWorld); up.y=0; up.normalize()
+    const r={width:canvas.clientWidth,height:canvas.clientHeight}, fov=36, half=Math.tan(THREE.MathUtils.degToRad(fov/2))
     const reserved=window.matchMedia?.('(pointer: coarse)').matches?172:(r.width<=720?150:104) // keep clear of the bottom bar
     const usableH=Math.max(200,r.height-reserved-40), screenFrac=usableH/r.height
-    const L=PHONE.L, W=PHONE.W
-    const hForLength=(L/2)/(half*screenFrac*.97), hForWidth=(W/2)/(half*(r.width/r.height)*.9)
+    const hForLength=(spec.L/2)/(half*screenFrac*spec.fill), hForWidth=(spec.W/2)/(half*(r.width/r.height)*.92)
     const h=Math.max(hForLength,hForWidth)
-    // shift the view so the phone sits in the space above the bar
     const shiftPx=(reserved-40)/2, shift=(shiftPx/(r.height/2))*h*half
     const pos=center.clone().addScaledVector(up,-shift); pos.y+=h
     const look=pos.clone(); look.y-=1
     tmpM.lookAt(pos,look,up)
-    return {pos,quat:new THREE.Quaternion().setFromRotationMatrix(tmpM),fov}
+    return {pos,quat:new THREE.Quaternion().setFromRotationMatrix(tmpM),fov,id}
+  }
+  // Picking up the camera: it rises off the cabinet and turns its back screen to the visitor.
+  let hold=null, disposed=false
+  const HOLD_FOV=30 // zoom in while holding, so the camera can sit at arm's length without clipping
+  // On a phone held upright the camera is shown turned sideways (landscape), so it can be big;
+  // the visitor is asked to rotate the phone.
+  const sideways=()=>window.matchMedia?.('(pointer: coarse)').matches && canvas.clientHeight>canvas.clientWidth
+  const heldPose=()=>{
+    const fov=THREE.MathUtils.degToRad(HOLD_FOV), H=canvas.clientHeight, W=canvas.clientWidth, t=Math.tan(fov/2)
+    const coarse=window.matchMedia?.('(pointer: coarse)').matches, turn=sideways()
+    let d, lift
+    if(turn){
+      // long side vertical: body ≈ 62% of the height (room for buttons above and below), ≈ 80% of the width
+      const dH=(.105/2)/(t*.55), dW=(.06/2)/(t*(W/H)*.8)
+      d=Math.max(dH,dW); lift=(36/(H/2))*d*t // a little above centre, clear of the buttons at the bottom
+    }else{
+      const reserved=coarse?172:(W<=720?150:104)
+      // body ≈ 62% of the view height, and narrow enough to leave room for the arrow buttons either side
+      const side=2*(56+28), bodyFrac=Math.max(.42,Math.min(.62,(W-side)/W))
+      const dH=(.06/2)/(t*.5), dW=(.105/2)/(t*(W/H)*bodyFrac)
+      d=Math.max(dH,dW); lift=((reserved-20)/2/(H/2))*d*t
+    }
+    const q=camera.quaternion.clone().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),Math.PI))
+    if(turn)q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI/2)) // top of the camera to the right
+    // centre the camera body on the view
+    const local=new THREE.Vector3(0,.03,CAMERA_SCREEN.z)
+    const pos=new THREE.Vector3(0,lift,-d).applyQuaternion(camera.quaternion).add(camera.position).sub(local.applyQuaternion(q))
+    return {pos,quat:q}
   }
   const enterSystem=()=>{
     if(!state.hotspot||state.system)return
     state.system=true; keys.clear(); travel=null
-    if(state.hotspot.id==='contact'){
-      const to=phoneView()
+    if(state.hotspot.id==='photos'){
+      const obj=scene.getObjectByName('desk-camera')
+      if(obj){ if(!obj.userData.rest)obj.userData.rest={pos:obj.position.clone(),quat:obj.quaternion.clone()}; hold={phase:'in',t:0,obj,from:{pos:obj.position.clone(),quat:obj.quaternion.clone(),fov:camera.fov},savedFov:camera.fov} }
+    }
+    if(FOCUS[state.hotspot.id]){
+      const to=focusView(state.hotspot.id)
       if(to)focus={phase:'in',t:0,from:{pos:camera.position.clone(),quat:camera.quaternion.clone(),fov:camera.fov},to,savedFov:camera.fov}
     }
     handlers.onSystem(true,state.hotspot.app)
@@ -585,6 +665,7 @@ function createScene(canvas, handlers) {
     if(!state.system)return
     state.system=false
     if(focus)focus={...focus,phase:'out',t:0,from:{pos:camera.position.clone(),quat:camera.quaternion.clone(),fov:camera.fov}}
+    if(hold)hold={...hold,phase:'out',t:0,from:{pos:hold.obj.position.clone(),quat:hold.obj.quaternion.clone(),fov:camera.fov}}
     handlers.onSystem(false)
   }
   const keys = new Set()
@@ -604,7 +685,7 @@ function createScene(canvas, handlers) {
   canvas.addEventListener('pointerdown',pointerDown);canvas.addEventListener('pointermove',pointerMove);canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',pointerUp)
   const onWheel=(event)=>{event.preventDefault();camera.fov=THREE.MathUtils.clamp(camera.fov+Math.sign(event.deltaY)*2,46,80);camera.updateProjectionMatrix()}
   canvas.addEventListener('wheel',onWheel,{passive:false})
-  const resize=()=>{const r=canvas.getBoundingClientRect();renderer.setSize(r.width,r.height,false);camera.aspect=r.width/Math.max(r.height,1);camera.updateProjectionMatrix()}
+  const resize=()=>{const r={width:canvas.clientWidth,height:canvas.clientHeight};renderer.setSize(r.width,r.height,false);camera.aspect=r.width/Math.max(r.height,1);camera.updateProjectionMatrix()}
   const observer=new ResizeObserver(resize);observer.observe(canvas);resize()
   const nowHour=new Date().getHours()+new Date().getMinutes()/60
   // `light` eases toward `lightTarget` (set from the time of day); `night` is the eased darkness.
@@ -664,7 +745,7 @@ function createScene(canvas, handlers) {
       focus.t=Math.min(1,focus.t+dt/(focus.phase==='in'?1.15:.9))
       const e=focus.t<.5?4*focus.t**3:1-Math.pow(-2*focus.t+2,3)/2
       if(focus.phase==='in'){
-        if(focus.t>=1){const v=phoneView();if(v)focus.to=v} // follow window resizes
+        if(focus.t>=1){const v=focusView(focus.to.id);if(v)focus.to=v} // follow window resizes
         camera.position.lerpVectors(focus.from.pos,focus.to.pos,e); tmpQ.copy(focus.from.quat).slerp(focus.to.quat,e); camera.quaternion.copy(tmpQ)
         camera.fov=THREE.MathUtils.lerp(focus.from.fov,focus.to.fov,e)
       }else{
@@ -678,7 +759,20 @@ function createScene(canvas, handlers) {
       renderer.toneMappingExposure=.9-.28*(focus?(focus.phase==='in'?e:1-e):0)
     } else renderer.toneMappingExposure=.9
     if(uiTime>.12){handlers.onPosition?.({x:state.x,z:state.z,minX:walkBounds?.min.x??-1,maxX:walkBounds?.max.x??1,minZ:walkBounds?.min.z??-1,maxZ:walkBounds?.max.z??1});uiTime=0}
-    renderer.render(scene,camera);frame=requestAnimationFrame(tick)
+    if(hold){
+      hold.t=Math.min(1,hold.t+dt/(hold.phase==='in'?1:.8))
+      const e=hold.t<.5?4*hold.t**3:1-Math.pow(-2*hold.t+2,3)/2
+      const to=hold.phase==='in'?heldPose():hold.obj.userData.rest
+      hold.obj.position.lerpVectors(hold.from.pos,to.pos,e)
+      // a small arc: rise a little more in the middle of the move
+      if(hold.t<1)hold.obj.position.y+=Math.sin(Math.PI*e)*.05
+      hold.obj.quaternion.copy(hold.from.quat).slerp(to.quat,e)
+      camera.fov=THREE.MathUtils.lerp(hold.from.fov,hold.phase==='in'?HOLD_FOV:hold.savedFov,e); camera.updateProjectionMatrix()
+      if(hold.phase==='out'&&hold.t>=1)hold=null
+    }
+    // phones resize the page without always telling the observer (address bar, rotation)
+    const size=renderer.getSize(tmpSize); if(Math.abs(size.x-canvas.clientWidth)>1||Math.abs(size.y-canvas.clientHeight)>1)resize()
+        renderer.render(scene,camera);frame=requestAnimationFrame(tick)
   }
   frame=requestAnimationFrame(tick)
   return {
@@ -694,20 +788,40 @@ function createScene(canvas, handlers) {
     openSpot(){ enterSystem() },
     closeSystem(){ exitSystem() },
     // Where the phone's screen is on the page once the camera has settled over it (null until then).
-    phoneScreenRect(){
-      if(!focus||focus.phase!=='in'||focus.t<1)return null
-      const phone=scene.getObjectByName('desk-phone'); if(!phone)return null
-      const r=canvas.getBoundingClientRect(), w=PHONE.displayW/2, l=PHONE.displayL/2
+    // Where the close-up surface (phone screen, book pages) is on the page once the camera has
+    // settled over it (null until then).
+    focusRect(id){
+      if(!focus||focus.phase!=='in'||focus.t<1||focus.to.id!==id)return null
+      const spec=FOCUS[id], obj=scene.getObjectByName(spec.name); if(!obj)return null
+      // relative to the canvas (the overlay covers it exactly), using its CSS size
+      const W=canvas.clientWidth, H=canvas.clientHeight, w=spec.rect.w/2, l=spec.rect.l/2
       let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity
       for(const [x,z] of [[-w,-l],[w,-l],[w,l],[-w,l]]){
-        tmpV.set(x,PHONE.T+.0003,z).applyMatrix4(phone.matrixWorld).project(camera)
-        const px=(tmpV.x+1)/2*r.width, py=(1-tmpV.y)/2*r.height
+        tmpV.set(x,spec.rect.y,z).applyMatrix4(obj.matrixWorld).project(camera)
+        const px=(tmpV.x+1)/2*W, py=(1-tmpV.y)/2*H
         x0=Math.min(x0,px);x1=Math.max(x1,px);y0=Math.min(y0,py);y1=Math.max(y1,py)
       }
-      return {left:r.left+x0,top:r.top+y0,width:x1-x0,height:y1-y0,radius:(x1-x0)*PHONE.displayR/PHONE.displayW}
+      return {left:x0,top:y0,width:x1-x0,height:y1-y0,radius:(x1-x0)*spec.rect.r/spec.rect.w}
+    },
+    phoneScreenRect(){ return this.focusRect('contact') },
+    // The camera's rear screen once it has been picked up (null until then).
+    cameraScreenRect(){
+      if(!hold||hold.phase!=='in'||hold.t<1)return null
+      const W=canvas.clientWidth, H=canvas.clientHeight, s=CAMERA_SCREEN
+      let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity
+      hold.obj.updateMatrixWorld(true)
+      for(const [dx,dy] of [[-1,-1],[1,-1],[1,1],[-1,1]]){
+        tmpV.set(s.x+dx*s.w/2,s.y+dy*s.h/2,s.z).applyMatrix4(hold.obj.matrixWorld).project(camera)
+        const px=(tmpV.x+1)/2*W, py=(1-tmpV.y)/2*H
+        x0=Math.min(x0,px);x1=Math.max(x1,px);y0=Math.min(y0,py);y1=Math.max(y1,py)
+      }
+      // the camera body's left/right edges on the page, for the buttons either side
+      let bx0=Infinity,bx1=-Infinity,by0=Infinity,by1=-Infinity
+      for(const dx of [-.0525,.0525]){ tmpV.set(dx,.03,0).applyMatrix4(hold.obj.matrixWorld).project(camera); const px=(tmpV.x+1)/2*W, py=(1-tmpV.y)/2*H; bx0=Math.min(bx0,px); bx1=Math.max(bx1,px); by0=Math.min(by0,py); by1=Math.max(by1,py) }
+      return {left:x0,top:y0,width:x1-x0,height:y1-y0,bodyLeft:bx0,bodyRight:bx1,bodyTop:by0,bodyBottom:by1,rotated:sideways()}
     },
     goToSpot(index){if(!spots[index])return;const spot=nearestFree(spots[index].x,spots[index].z);state.x=spot.x;state.z=spot.z;const target=index===3?spots[0]:desk;state.yaw=target?Math.atan2(-(target.x-state.x),-(target.z-state.z)):-Math.PI/2;state.pitch=0},
-    dispose(){cancelAnimationFrame(frame);observer.disconnect();window.removeEventListener('keydown',onDown);window.removeEventListener('keyup',onUp);window.removeEventListener('blur',clearKeys);canvas.removeEventListener('pointerdown',pointerDown);canvas.removeEventListener('pointermove',pointerMove);canvas.removeEventListener('pointerup',pointerUp);canvas.removeEventListener('pointercancel',pointerUp);canvas.removeEventListener('wheel',onWheel);scene.traverse((object)=>{object.geometry?.dispose();if(Array.isArray(object.material))object.material.forEach((m)=>m.dispose());else object.material?.dispose()});groundMaterial?.map?.dispose();wallTexture.dispose();wallSource.dispose();floorTexture.dispose();cabinetTexture.dispose();doorTexture.dispose();desktopTexture.userData.dispose?.();desktopTexture.dispose();exteriorTexture.dispose();renderer.dispose()},
+    dispose(){disposed=true;cancelAnimationFrame(frame);observer.disconnect();window.removeEventListener('keydown',onDown);window.removeEventListener('keyup',onUp);window.removeEventListener('blur',clearKeys);canvas.removeEventListener('pointerdown',pointerDown);canvas.removeEventListener('pointermove',pointerMove);canvas.removeEventListener('pointerup',pointerUp);canvas.removeEventListener('pointercancel',pointerUp);canvas.removeEventListener('wheel',onWheel);scene.traverse((object)=>{object.geometry?.dispose();if(Array.isArray(object.material))object.material.forEach((m)=>m.dispose());else object.material?.dispose()});groundMaterial?.map?.dispose();wallTexture.dispose();wallSource.dispose();floorTexture.dispose();cabinetTexture.dispose();doorTexture.dispose();desktopTexture.userData.dispose?.();desktopTexture.dispose();exteriorTexture.dispose();renderer.dispose()},
   }
 }
 
