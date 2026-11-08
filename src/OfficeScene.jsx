@@ -570,6 +570,16 @@ function createScene(canvas, handlers) {
         wall.position.set(hit.point.x + n.x * .004, ib.max.y + .1 + wall.userData.size.h / 2 + .06, ic.z)
         wall.lookAt(wall.position.clone().add(n))
         scene.add(wall); achievementsWall = wall
+        // a picture light over the cluster, like the one above the beach print
+        const { group: pl, glow: plGlow, lightPoint: plPoint } = createPictureLight(.95)
+        pl.quaternion.copy(wall.quaternion); pl.position.copy(wall.position).add(new THREE.Vector3(0, wall.userData.size.h / 2 + .09, 0))
+        scene.add(pl); pl.updateMatrixWorld(true)
+        const wash = new THREE.SpotLight('#ffd49c', 0, 2.4, .75, .75, 1.5)
+        wash.position.copy(pl.localToWorld(plPoint.clone()))
+        wash.target.position.copy(wall.position).addScaledVector(n, .02); scene.add(wash); scene.add(wash.target)
+        nightLights.push({ light: wash, max: 5, glow: plGlow, glowMax: 3.2 })
+        const halo = new THREE.PointLight('#ffd49c', 0, 1.2, 2); halo.position.copy(wash.position).addScaledVector(n, .05); scene.add(halo)
+        nightLights.push({ light: halo, max: .5 })
       }
     }
     // Explorable spots: what each object opens, and where to stand to use it.

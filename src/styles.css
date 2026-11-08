@@ -510,3 +510,5 @@ html,body{background:#fff;color-scheme:light}
 /* Instructions panel: tall enough to show everything, no scrollbar (only very short windows can still scroll, invisibly) */
 .help-panel{max-height:calc(100vh - 110px);scrollbar-width:none}
 .help-panel::-webkit-scrollbar{display:none}
+/* phone menu open: hide the interaction controls until it closes */
+body.menu-open .stack-nav,body.menu-open .rotate-hint,body.menu-open .cam-nav,body.menu-open .book-nav{visibility:hidden;pointer-events:none}

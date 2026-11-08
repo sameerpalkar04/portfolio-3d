@@ -158,6 +158,8 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interact
   // Only the action that matters right now (INTERACT / BACK TO ROOM) floats beside it.
   const compact = isTouch()
   const [open, setOpen] = useState(false)
+  // phone: while the menu is open, the close-up controls (page / photo buttons, rotate cue) step aside
+  useEffect(() => { document.body.classList.toggle('menu-open', open); return () => document.body.classList.remove('menu-open') }, [open])
   useEffect(() => { if (interacting) setOpen(false) }, [interacting])
   if (compact && !open) return <motion.div key="fabs" className="touch-fabs" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4 }}>
     <AnimatePresence>
