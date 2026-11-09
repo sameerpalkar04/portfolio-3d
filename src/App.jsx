@@ -168,7 +168,7 @@ function HelpPanel() {
 }
 
 // All controls live in one plain bar along the bottom: time of day, instructions, shortcuts.
-function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interacting, onBack }) {
+function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interacting, onBack, locked }) {
   const [panel, setPanel] = useState(null)
   const ref = useRef(null)
   useEffect(() => {
@@ -179,7 +179,8 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interact
     return () => { window.removeEventListener('pointerdown', close); window.removeEventListener('keydown', esc) }
   }, [panel])
   const toggle = (name) => setPanel((p) => (p === name ? null : name))
-  const here = ALL_SPOTS.find((s) => s.id === hotspot)
+  // during the first-visit walkthrough only Instructions and the appearance slider work
+  const here = locked ? null : ALL_SPOTS.find((s) => s.id === hotspot)
   // Phones: the bar folds away into one menu button so the room gets the screen.
   // Only the action that matters right now (INTERACT / BACK TO ROOM) floats beside it.
   const compact = isTouch()
@@ -209,13 +210,13 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interact
       </div>
       <div className="bar-section sec-spots" role="group" aria-label="Go to">
         <div className="bar-spots">
-          {SPOTS.map((s) => <button key={s.id} className={hotspot === s.id ? 'here' : ''} onClick={() => { setPanel(null); setOpen(false); onGo(s.id) }} title={`Go to the ${s.object.toLowerCase()} · ${s.opens}`}>{s.object}</button>)}
+          {SPOTS.map((s) => <button key={s.id} className={hotspot === s.id && !locked ? 'here' : ''} disabled={locked} onClick={() => { setPanel(null); setOpen(false); onGo(s.id) }} title={locked ? 'Finish the walkthrough first' : `Go to the ${s.object.toLowerCase()} · ${s.opens}`}>{s.object}</button>)}
         </div>
         {compact
           ? <button className="bar-open is-close" onClick={() => { setPanel(null); setOpen(false) }} aria-label="Close menu"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg> CLOSE</button>
           : interacting
           ? <button className="bar-open is-back" onClick={onBack} title="Back to the room"><Arrow dir="left"/> BACK TO ROOM</button>
-          : <button className="bar-open" onClick={onOpen} disabled={!here} title={here ? `Open ${here.opens.toLowerCase()}` : 'Walk up to something first'}>INTERACT <Arrow/></button>}
+          : <button className="bar-open" onClick={onOpen} disabled={!here} title={here ? `Open ${here.opens.toLowerCase()}` : locked ? 'Finish the walkthrough first' : 'Walk up to something first'}>INTERACT <Arrow/></button>}
       </div>
     </nav>
   </motion.div>
@@ -857,10 +858,10 @@ export default function App() {
   // only the control being taught is live; after "Start exploring" everything is
   useEffect(() => {
     const scene = sceneRef.current; if (!scene?.setControls) return
-    scene.setControls(tourStep === 'done' ? { walk: true, look: true }
-      : tourStep === 'walk' ? { walk: true, look: false }
-      : tourStep === 'look' && !showExplore ? { walk: false, look: true }
-      : { walk: false, look: false })
+    scene.setControls(tourStep === 'done' ? { walk: true, look: true, open: true }
+      : tourStep === 'walk' ? { walk: true, look: false, open: false }
+      : tourStep === 'look' && !showExplore ? { walk: false, look: true, open: false }
+      : { walk: false, look: false, open: false })
   }, [tourStep, showExplore, introPhase])
   const onKey = (key, down) => window.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { key, bubbles: true }))
   const closeSystem = () => sceneRef.current?.closeSystem()
@@ -902,7 +903,7 @@ export default function App() {
       {introPhase === 'corner' && <>
         <BottomBar hour={hour} auto={manualHour === null} onHour={setManualHour} onAuto={() => { setManualHour(null); setClockHour(systemHour()) }} hotspot={hotspot}
           onGo={(id) => { if (systemOpen) closeSystem(); sceneRef.current?.goTo(id) }} onOpen={() => sceneRef.current?.openSpot()}
-          interacting={systemOpen} onBack={closeSystem}/>
+          interacting={systemOpen} onBack={closeSystem} locked={tourStep !== 'done'}/>
         {isTouch() && !systemOpen && <MobileControls onKey={onKey}/>}
       </>}
       <AnimatePresence>{showCue && introPhase === 'corner' && !systemOpen && <TourCue key={tourStep} step={tourStep} onDone={dismissCue}/>}</AnimatePresence>

@@ -888,7 +888,7 @@ function createScene(canvas, handlers) {
   const onDown = (event) => {
     const key=event.key.toLowerCase()
     if (state.system && ['backspace','delete','escape'].includes(key)) { event.preventDefault(); exitSystem(); return }
-    if (!state.system && key==='enter' && state.hotspot) { event.preventDefault(); enterSystem(); return }
+    if (!state.system && key==='enter' && state.hotspot && state.allowOpen!==false) { event.preventDefault(); enterSystem(); return }
     if (!state.system && ['arrowup','arrowdown','arrowleft','arrowright'].includes(key)) { event.preventDefault(); if(state.allowWalk===false)return; keys.add(key); travel=null }
   }
   const onUp=(event)=>keys.delete(event.key.toLowerCase()), clearKeys=()=>keys.clear()
@@ -1035,15 +1035,15 @@ function createScene(canvas, handlers) {
     setTimeOfDay(hour){lightTarget=lightAt(hour)},
     // Walk to one of the explorable spots and face it.
     goTo(id){
-      const spot=hotspots.find((h)=>h.id===id); if(!spot||state.system||state.allowWalk===false)return // not during the walkthrough
+      const spot=hotspots.find((h)=>h.id===id); if(!spot||state.system||state.allowWalk===false||state.allowOpen===false)return // not during the walkthrough
       const view=spot.view, yaw=Math.atan2(-(spot.pos.x-view.x),-(spot.pos.z-view.z))
       const eyeY=floorY+EYE_HEIGHT, pitch=THREE.MathUtils.clamp(Math.atan2(spot.pos.y-eyeY,Math.hypot(spot.pos.x-view.x,spot.pos.z-view.z)),-.75,.5)
       const dYaw=Math.atan2(Math.sin(yaw-state.yaw),Math.cos(yaw-state.yaw))
       travel={t:0,duration:Math.min(1.8,.7+Math.hypot(view.x-state.x,view.z-state.z)*.35),from:{x:state.x,z:state.z,yaw:state.yaw,pitch:state.pitch},to:{x:view.x,z:view.z,pitch},dYaw}
     },
-    openSpot(){ enterSystem() },
+    openSpot(){ if(state.allowOpen!==false)enterSystem() },
     // first-visit walkthrough: which controls are live yet
-    setControls({walk=true,look=true}={}){ state.allowWalk=walk; state.allowLook=look; if(!walk)keys.clear() },
+    setControls({walk=true,look=true,open=true}={}){ state.allowWalk=walk; state.allowLook=look; state.allowOpen=open; if(!walk)keys.clear() },
     closeSystem(){ exitSystem() },
     // Where the phone's screen is on the page once the camera has settled over it (null until then).
     // Where the close-up surface (phone screen, book pages) is on the page once the camera has

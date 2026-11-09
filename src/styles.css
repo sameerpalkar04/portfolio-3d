@@ -645,3 +645,5 @@ body.menu-open .resume-cue { visibility: hidden; }
 .mac-overlay .mac-frame .desktop-welcome h2 { font-size: 30px; }
 .mac-overlay .mac-frame .desktop-icons { display: none; }
 .mac-overlay .mac-frame .system-screen .app-window { position: absolute; left: auto; right: 4%; top: 44px; bottom: 4%; width: 60%; height: auto; min-height: 0; margin: 0; transform: none; }
+/* walkthrough not finished yet: the shortcuts are greyed out */
+.sec-spots button:not(.bar-open):disabled{color:#b3b7bd;cursor:default;background:transparent!important}
