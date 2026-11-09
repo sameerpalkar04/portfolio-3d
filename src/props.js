@@ -325,14 +325,15 @@ export function createShelfContents({ top, back, front, from, to, alongZ, maxHei
           const color = FILE_COLORS[Math.floor(rand() * FILE_COLORS.length)]
           const box = new THREE.Mesh(alongZ ? new THREE.BoxGeometry(d, h, w) : new THREE.BoxGeometry(w, h, d), mat(color, .55))
           box.name = 'box-file'
+          box.userData = { w, h, d, alongZ, depthSign, color }
           place(box, p + w / 2, d / 2 + .01, top + h / 2)
-          // spine label and finger hole on the room-facing side
+          // spine label and finger hole on the room-facing side (children, so they move with the file)
           const label = new THREE.Mesh(new THREE.PlaneGeometry(w * .62, h * .28), labelMat)
           const hole = new THREE.Mesh(new THREE.CircleGeometry(w * .17, 20), holeMat)
-          for (const [m, yy] of [[label, top + h * .66], [hole, top + h * .28]]) {
-            if (alongZ) { m.rotation.y = depthSign > 0 ? Math.PI / 2 : -Math.PI / 2; m.position.set(back + depthSign * (d + .0112), yy, p + w / 2) }
-            else { m.rotation.y = depthSign > 0 ? 0 : Math.PI; m.position.set(p + w / 2, yy, back + depthSign * (d + .0112)) }
-            group.add(m)
+          for (const [m, yy] of [[label, h * .16], [hole, -h * .22]]) {
+            if (alongZ) { m.rotation.y = depthSign > 0 ? Math.PI / 2 : -Math.PI / 2; m.position.set(depthSign * (d / 2 + .0012), yy, 0) }
+            else { m.rotation.y = depthSign > 0 ? 0 : Math.PI; m.position.set(0, yy, depthSign * (d / 2 + .0012)) }
+            box.add(m)
           }
           p += w + .002
         } else {
@@ -743,4 +744,54 @@ export function createCertificateWall() {
   }
   wall.userData.size = { w: 1.3, h: .74 }
   return wall
+}
+
+// The résumé file pulled off the shelf: a lever-arch file that opens like a book.
+// Local frame: the résumé sheet is centred at the origin on z = 0, facing +z; the spine is on -x.
+export const FOLDER = { sheetW: .19, sheetX: .012 }
+export function createFileFolder({ color = '#2f4a6b', thickness = .065, height = .3, width = .27 } = {}) {
+  const T = thickness, H = height, D = width
+  const g = new THREE.Group(); g.name = 'resume-folder'
+  const shell = new THREE.MeshStandardMaterial({ color, roughness: .55 })
+  const lining = new THREE.MeshStandardMaterial({ color: '#B1D3B9', emissive: '#B1D3B9', emissiveIntensity: .45, roughness: .85 }) // inside: pale pastel green (lifted so the room light doesn't dull it)
+  const metal = new THREE.MeshStandardMaterial({ color: '#c3c7cd', metalness: .35, roughness: .35 })
+  const add = (geo, mat, x, y, z, parent = g) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m }
+  // Built like a book lying open-side up: the back cover is flat at the back, the résumé lies on it
+  // (z = 0), and the spine and front cover fold over it. Opening lays both flat to the left,
+  // in the same plane as the back cover.
+  const L = T // closed thickness: back cover to front cover
+  add(new THREE.BoxGeometry(D, H, .004), [shell, shell, shell, shell, lining, shell], 0, 0, -.004)
+  // lever-arch mechanism beside the sheet
+  add(new THREE.BoxGeometry(.026, H * .62, .003), metal, -D / 2 + .026, 0, -.0005)
+  for (const y of [-H * .2, H * .2]) {
+    const ring = add(new THREE.TorusGeometry(.011, .0018, 8, 20, Math.PI), metal, -D / 2 + .026, y, 0)
+    ring.rotation.x = Math.PI / 2
+  }
+  // the résumé (unlit, so it reads like the overlay laid on it later)
+  const sheetMat = new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false })
+  const sheet = add(new THREE.PlaneGeometry(1, 1), sheetMat, FOLDER.sheetX, 0, .0004)
+  sheet.castShadow = false; sheet.scale.set(FOLDER.sheetW, FOLDER.sheetW * 1.4142, 1)
+  // spine, hinged at the back cover's edge, with its label and finger hole
+  const spine = new THREE.Group(); spine.position.set(-D / 2, 0, -.006); g.add(spine)
+  add(new THREE.BoxGeometry(.004, H, L), [shell, shell, shell, shell, shell, shell], -.002, 0, L / 2, spine)
+  const label = add(new THREE.PlaneGeometry(T * .62, H * .28), new THREE.MeshStandardMaterial({ color: '#f4f1ea', roughness: .8 }), -.0042, H * .16, L / 2, spine)
+  const hole = add(new THREE.CircleGeometry(T * .17, 20), new THREE.MeshStandardMaterial({ color: '#111111', roughness: .6 }), -.0042, -H * .22, L / 2, spine)
+  label.rotation.y = hole.rotation.y = -Math.PI / 2
+  // front cover, hinged at the spine's other edge
+  const cover = new THREE.Group(); cover.position.set(0, 0, L); spine.add(cover)
+  add(new THREE.BoxGeometry(D, H, .004), [shell, shell, shell, shell, shell, lining], D / 2, 0, -.002, cover)
+  let tex = null
+  g.userData = {
+    sheet,
+    depth: L, width: D, height: H, // closed: from z = -.006 to L - .006
+    openCenter: -(L + D) / 2, // middle of the opened file along x
+    open(k) { spine.rotation.y = -Math.PI / 2 * k; cover.rotation.y = -Math.PI / 2 * k },
+    setPage(canvas, aspect) {
+      tex?.dispose(); tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8
+      sheetMat.map = tex; sheetMat.needsUpdate = true
+      sheet.scale.y = FOLDER.sheetW * Math.min(aspect, (H - .03) / FOLDER.sheetW)
+    },
+    dispose() { tex?.dispose(); g.traverse((o) => { o.geometry?.dispose(); (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m?.dispose()) }) },
+  }
+  return g
 }

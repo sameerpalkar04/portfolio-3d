@@ -603,3 +603,45 @@ html[data-lock] .rotate-hint{display:none}
 .xc-role strong{font-size:1.72cqw}.xc-role em{font-size:1.42cqw}.book-page .edu-note{font-size:1.58cqw}.book-page .edu-meta{font-size:1.52cqw}
 .book-page.edu-page article.edu:only-of-type{flex:none;padding-top:1.6cqw}
 .book-page .edu > img[src*="riviera-mark"]{object-fit:contain}
+
+/* Résumé in the open file */
+.resume-overlay { background: transparent; }
+.resume-sheet { position: absolute; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.12); overflow: hidden; }
+.resume-sheet img { display: block; width: 100%; height: 100%; object-fit: fill; user-select: none; }
+.resume-link { position: absolute; display: block; border-radius: 2px; }
+.resume-link:hover { background: rgba(37, 99, 235, .12); outline: 1px solid rgba(37, 99, 235, .35); }
+.resume-wait { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #6b6b6b; font-size: 13px; text-align: center; padding: 16px; }
+.resume-wait b { color: #222; font-weight: 600; }
+.resume-spin { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #ddd; border-top-color: #333; animation: resume-spin .8s linear infinite; }
+@keyframes resume-spin { to { transform: rotate(360deg); } }
+.resume-actions { position: fixed; display: flex; flex-direction: column; gap: 8px; }
+.resume-actions .resume-btn { justify-content: flex-start; }
+.resume-actions.row { flex-direction: row; }
+/* phone: stacked bottom-left, level with BACK TO ROOM and the menu button */
+.resume-actions.stacked { left: 14px; bottom: calc(16px + env(safe-area-inset-bottom)); }
+.resume-actions.stacked { gap: 10px; }
+/* same as the phone's BACK TO ROOM and menu buttons */
+.resume-actions.stacked .resume-btn { height: 52px; border-radius: 14px; padding: 0 16px; } /* same font as on the laptop */
+body.menu-open .resume-actions { visibility: hidden; pointer-events: none; }
+.resume-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid #dcdee2; background: #fff; color: #1d1f22; font: 500 12px 'DM Sans', system-ui, sans-serif; text-decoration: none; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,.12), 0 4px 12px rgba(0,0,0,.16); transition: background .15s ease; }
+.resume-btn:hover { background: #f4f5f6; }
+.resume-btn.primary { background: #1d1f22; color: #fff; border-color: #1d1f22; }
+.resume-btn.primary:hover { background: #000; }
+/* BACK TO ROOM: same type on phone as on the laptop bar */
+.fab-action{font-size:11px;letter-spacing:.06em}
+
+/* résumé: pinch-to-zoom layer, and the cue above it on phones */
+.resume-sheet { touch-action: none; }
+.resume-zoom { position: absolute; inset: 0; transform-origin: 0 0; will-change: transform; }
+body.menu-open .resume-cue { visibility: hidden; }
+
+/* The desktop on the iMac's screen: a fixed-size layout scaled to the screen */
+.mac-overlay { background: transparent; }
+.mac-display { position: absolute; overflow: hidden; border-radius: 2px; transform-origin: 50% 50%; }
+.mac-frame { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.mac-overlay .mac-frame .system-screen { position: absolute; inset: 0; z-index: auto; }
+/* (scoped under .mac-overlay so the phone rules, also applied when the phone is turned sideways, don't resize it) */
+.mac-overlay .mac-frame .desktop-welcome { left: 5%; top: 14%; max-width: 30%; }
+.mac-overlay .mac-frame .desktop-welcome h2 { font-size: 30px; }
+.mac-overlay .mac-frame .desktop-icons { display: none; }
+.mac-overlay .mac-frame .system-screen .app-window { position: absolute; left: auto; right: 4%; top: 44px; bottom: 4%; width: 60%; height: auto; min-height: 0; margin: 0; transform: none; }

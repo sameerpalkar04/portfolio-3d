@@ -5,7 +5,7 @@ import { createExteriorMaterial, WINDOW_UV } from './exteriorShader'
 import { buildCollisionGrid, createWalkTester } from './collision'
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
 import { toLocal } from './orientation'
-import { PHONE, BOOK, CAMERA_SCREEN, createOpenBook, createDigitalCamera, createTableLamp, createGlobe, createCertificateWall, createPolaroid, createModelAirplane, createPhone, createFloorPlant, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight } from './props'
+import { PHONE, BOOK, CAMERA_SCREEN, createOpenBook, createDigitalCamera, createTableLamp, createGlobe, createCertificateWall, createPolaroid, createModelAirplane, createPhone, createFloorPlant, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight, createFileFolder, FOLDER } from './props'
 import { createDesktopTexture, BEACH_PHOTO_URL } from './screens'
 
 const MODEL_URL = '/models/home-office.glb'
@@ -698,8 +698,50 @@ function createScene(canvas, handlers) {
     tmpM.lookAt(pos,pos.clone().sub(n),new THREE.Vector3(0,1,0))
     return {pos,quat:new THREE.Quaternion().setFromRotationMatrix(tmpM),fov,id:'achievements'}
   }
+  // The computer: sit in front of the iMac, looking straight at its (slightly tilted) screen.
+  let screenCache=null
+  const screenInfo=()=>{
+    if(screenCache)return screenCache
+    let mesh=null; scene.traverse((o)=>{ if(o.isMesh&&o.material===screenMaterial)mesh=o })
+    if(!mesh)return null
+    mesh.updateWorldMatrix(true,false)
+    const pa=mesh.geometry.attributes.position, pts=[]
+    for(let i=0;i<pa.count;i++)pts.push(new THREE.Vector3().fromBufferAttribute(pa,i).applyMatrix4(mesh.matrixWorld))
+    const c=pts.reduce((a,p)=>a.add(p),new THREE.Vector3()).divideScalar(pts.length)
+    const edges=pts.slice(1).map((p)=>p.clone().sub(pts[0])).sort((a,b)=>a.length()-b.length()).slice(0,2) // the two sides (not the diagonal)
+    let [U,R]=Math.abs(edges[0].y)>Math.abs(edges[1].y)?edges:[edges[1],edges[0]]
+    const h=U.length(), w=R.length(); U=U.clone().normalize(); if(U.y<0)U.negate(); R=R.clone().normalize()
+    let n=new THREE.Vector3().crossVectors(R,U)
+    if(n.dot(roomBounds.getCenter(new THREE.Vector3()).sub(c))<0){R.negate();n.negate()} // face into the room
+    return (screenCache={c,R,U,n,w,h})
+  }
+  const screenView=()=>{
+    const sc=screenInfo(); if(!sc)return null
+    const W=canvas.clientWidth, H=canvas.clientHeight, aspect=W/H, fov=36, t=Math.tan(THREE.MathUtils.degToRad(fov/2))
+    const coarse=window.matchMedia?.('(pointer: coarse)').matches
+    if(sideways()){
+      // upright phone: the screen turned sideways so its long side runs down the phone, as big as fits
+      // above the controls (its top on the right; the visitor is asked to rotate the phone)
+      const top=16, bottom=152, usable=(H-top-bottom)/H
+      const dist=Math.max((sc.w/2)/(t*usable*.99),(sc.h/2)/(t*aspect*.98))
+      const up=sc.R.clone().negate()
+      const pos=sc.c.clone().addScaledVector(sc.n,dist).addScaledVector(sc.R,((bottom-top)/2/(H/2))*t*dist)
+      tmpM.lookAt(pos,pos.clone().sub(sc.n),up)
+      return {pos,quat:new THREE.Quaternion().setFromRotationMatrix(tmpM),fov,id:'projects',turn:true}
+    }
+    // laptop: the screen fills the view above the bar; phone held sideways: clear of the buttons at the sides
+    // (phone sideways: BACK TO ROOM and the menu sit on the right, so the screen moves left of them)
+    const reserved=coarse?16:100, left=coarse?14:24, right=coarse?(W>H?168:14):24
+    const usable=(H-reserved-(coarse?12:28))/H, across=(W-left-right)/W
+    const dist=Math.max((sc.h/2)/(t*usable),(sc.w/2)/(t*aspect*across))
+    const pos=sc.c.clone().addScaledVector(sc.n,dist).addScaledVector(sc.U,-((reserved-(coarse?12:28))/2/(H/2))*t*dist)
+      .addScaledVector(sc.R,((right-left)/2/(W/2))*t*aspect*dist)
+    tmpM.lookAt(pos,pos.clone().sub(sc.n),sc.U)
+    return {pos,quat:new THREE.Quaternion().setFromRotationMatrix(tmpM),fov,id:'projects'}
+  }
   const focusView=(id)=>{
     if(id==='music')return speakerView()
+    if(id==='projects')return screenView()
     if(id==='achievements')return wallView()
     const spec=FOCUS[id], obj=spec&&scene.getObjectByName(spec.name); if(!obj)return null
     obj.updateWorldMatrix(true,false)
@@ -760,6 +802,66 @@ function createScene(canvas, handlers) {
     const pos=new THREE.Vector3(0,lift,-d).applyQuaternion(camera.quaternion).add(camera.position).sub(local.applyQuaternion(q))
     return {pos,quat:q}
   }
+  // The files: the nearest box file slides off the shelf, turns to face the visitor a little way off,
+  // opens, then zooms in on the résumé. u runs 0 → 1 and back to 0 when closing.
+  let folder=null, resumePage=null, resumeBottom=null, resumeFull=false // px kept free at the bottom (bar + buttons), from the UI
+  const FOLDER_IN=2.9, FOLDER_OUT=2.1
+  // far: how many times further than the reading distance; centerX: which local x lands mid-screen
+  const folderPose=(far=1,centerX=FOLDER.sheetX,maxD=Infinity)=>{
+    const W=canvas.clientWidth, H=canvas.clientHeight, aspect=W/H, t=Math.tan(THREE.MathUtils.degToRad(camera.fov/2))
+    const sw=FOLDER.sheetW, sh=sw*(resumePage?.aspect||1.4142)
+    const coarse=window.matchMedia?.('(pointer: coarse)').matches, narrow=W<=720
+    // upright phone: the sheet uses the width, with the download button between it and the controls;
+    // laptop: the sheet as tall as fits above the bar, buttons on its right
+    const top=narrow?(coarse?100:24):28, bottom=resumeBottom??(narrow?(coarse?150:140):104), fW=narrow||resumeFull?.9:Math.min(.62,(W-400)/W)
+    const fH=(H-top-bottom)/H*.97
+    const d0=Math.max((sh/2)/(t*fH),(sw/2)/(t*aspect*fW)), d=Math.max(d0,Math.min(d0*far,maxD))
+    const q=camera.quaternion.clone()
+    const pos=new THREE.Vector3(0,((bottom-top)/2)/(H/2)*t*d,-d).applyQuaternion(q).add(camera.position)
+      .sub(new THREE.Vector3(centerX,0,0).applyQuaternion(q))
+    return {pos,quat:q}
+  }
+  // How far back the file can open: start at the preferred distance and come closer until the
+  // fully opened file (cover laid out to the left) is clear of the furniture, i.e. nothing sits between
+  // the eye and any of its corners.
+  const folderRay=new THREE.Raycaster()
+  const shown=(o)=>{for(let p=o;p;p=p.parent)if(!p.visible)return false;return true}
+  const pickFar=(f,want,maxD)=>{
+    const ud=f.obj.userData, C=ud.openCenter, x0=-ud.width/2-ud.depth-ud.width, x1=ud.width/2, h=ud.height/2
+    const targets=scene.children.filter((o)=>o!==f.obj&&!o.isLight)
+    const m=new THREE.Matrix4(), p=new THREE.Vector3(), dir=new THREE.Vector3()
+    for(let k=want;k>1;k-=.1){
+      const pose=folderPose(k,C,maxD); m.compose(pose.pos,pose.quat,new THREE.Vector3(1,1,1))
+      let clear=true
+      for(const x of [x0,(x0+x1)/2,x1])for(const y of [-h,0,h])for(const z of [-.01,ud.width*.5]){ // z: the cover's swing toward the eye
+        p.set(x,y,z).applyMatrix4(m); dir.subVectors(p,camera.position); const dist=dir.length()
+        folderRay.set(camera.position,dir.normalize()); folderRay.far=dist+.02
+        if(folderRay.intersectObjects(targets,true).some((hit)=>shown(hit.object))){clear=false;break}
+      }
+      if(clear)return k
+    }
+    return 1
+  }
+  const startFolder=()=>{
+    if(folder){folder.dir=1;return}
+    const spot=state.hotspot; let box=null, best=Infinity
+    scene.traverse((m)=>{ if(m.name==='box-file'&&m.visible){ const dd=m.getWorldPosition(tmpV).distanceTo(spot.pos); if(dd<best){best=dd;box=m} } })
+    if(!box)return
+    const {w,h,d,alongZ,depthSign,color}=box.userData
+    const obj=createFileFolder({color,thickness:w,height:h,width:d})
+    const n=alongZ?new THREE.Vector3(depthSign,0,0):new THREE.Vector3(0,0,depthSign) // out of the shelf
+    const x=n.clone().negate(), y=new THREE.Vector3(0,1,0), z=new THREE.Vector3().crossVectors(x,y)
+    const quat=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x,y,z))
+    const pos=box.getWorldPosition(new THREE.Vector3()).addScaledVector(z,-(obj.userData.depth/2-.006)) // file centred where the box was
+    obj.position.copy(pos); obj.quaternion.copy(quat); scene.add(obj)
+    if(resumePage)obj.userData.setPage(resumePage.canvas,resumePage.aspect)
+    box.visible=false
+    folder={obj,box,u:0,dir:1,rest:{pos,quat},out:pos.clone().addScaledVector(n,d+.06)}
+    // never further back than where it came off the shelf, and only as far as there's free room
+    const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion)
+    folder.maxD=folder.out.clone().sub(camera.position).dot(fwd)-.12-obj.userData.depth
+    folder.far=pickFar(folder,canvas.clientWidth<=720?3.2:2.5,folder.maxD)
+  }
   const enterSystem=()=>{
     if(!state.hotspot||state.system)return
     state.system=true; keys.clear(); travel=null
@@ -767,7 +869,8 @@ function createScene(canvas, handlers) {
       const obj=scene.getObjectByName('desk-camera')
       if(obj){ if(!obj.userData.rest)obj.userData.rest={pos:obj.position.clone(),quat:obj.quaternion.clone()}; hold={phase:'in',t:0,obj,from:{pos:obj.position.clone(),quat:obj.quaternion.clone(),fov:camera.fov},savedFov:camera.fov} }
     }
-    if(FOCUS[state.hotspot.id]||state.hotspot.id==='music'||state.hotspot.id==='achievements'){
+    if(state.hotspot.id==='resume')startFolder()
+    if(FOCUS[state.hotspot.id]||['music','achievements','projects'].includes(state.hotspot.id)){
       const to=focusView(state.hotspot.id)
       if(to)focus={phase:'in',t:0,from:{pos:camera.position.clone(),quat:camera.quaternion.clone(),fov:camera.fov},to,savedFov:camera.fov}
     }
@@ -777,6 +880,7 @@ function createScene(canvas, handlers) {
     if(!state.system)return
     state.system=false
     if(focus)focus={...focus,phase:'out',t:0,from:{pos:camera.position.clone(),quat:camera.quaternion.clone(),fov:camera.fov}}
+    if(folder)folder.dir=-1
     if(hold)hold={...hold,phase:'out',t:0,from:{pos:hold.obj.position.clone(),quat:hold.obj.quaternion.clone(),fov:camera.fov}}
     handlers.onSystem(false)
   }
@@ -881,7 +985,7 @@ function createScene(canvas, handlers) {
       }
       camera.updateProjectionMatrix()
       // the desk lamp sits right beside the phone; ease the exposure down so the wood still reads
-      renderer.toneMappingExposure=.9-.28*(focus&&focus.to.id!=='music'&&focus.to.id!=='achievements'?(focus.phase==='in'?e:1-e):0)
+      renderer.toneMappingExposure=.9-.28*(focus&&!['music','achievements','projects'].includes(focus.to.id)?(focus.phase==='in'?e:1-e):0)
     } else renderer.toneMappingExposure=.9
     // the ceiling pendants hang between the far end of the room and the certificate wall: hide their
     // fittings (not their light) while the wall close-up is on screen
@@ -907,6 +1011,20 @@ function createScene(canvas, handlers) {
       hold.obj.quaternion.copy(hold.from.quat).slerp(to.quat,e)
       camera.fov=THREE.MathUtils.lerp(hold.from.fov,hold.phase==='in'?HOLD_FOV:hold.savedFov,e); camera.updateProjectionMatrix()
       if(hold.phase==='out'&&hold.t>=1)hold=null
+    }
+    if(folder){
+      const f=folder
+      f.u=THREE.MathUtils.clamp(f.u+f.dir*dt/(f.dir>0?FOLDER_IN:FOLDER_OUT),0,1)
+      const seg=(a,b)=>{const k=THREE.MathUtils.clamp((f.u-a)/(b-a),0,1);return k<.5?4*k**3:1-Math.pow(-2*k+2,3)/2}
+      // slide out → turn to face the visitor, held back so the whole file shows → open → zoom in
+      const s1=seg(0,.2), s2=seg(.2,.46), s3=seg(.46,.7), s4=seg(.7,1)
+      // held back only as far as there's free room (worked out when it came off the shelf)
+      const C=f.obj.userData.openCenter, far=f.far, maxD=f.maxD
+      if(s4>0){const a=folderPose(far,C,maxD), b=folderPose(); f.obj.position.lerpVectors(a.pos,b.pos,s4); f.obj.quaternion.copy(b.quat)}
+      else if(s2>0){const a=folderPose(far,C*s3,maxD); f.obj.position.lerpVectors(f.out,a.pos,s2); f.obj.position.y+=Math.sin(Math.PI*s2)*.03; f.obj.quaternion.copy(f.rest.quat).slerp(a.quat,s2)}
+      else{f.obj.position.lerpVectors(f.rest.pos,f.out,s1); f.obj.quaternion.copy(f.rest.quat)}
+      f.obj.userData.open(s3)
+      if(f.dir<0&&f.u<=0){scene.remove(f.obj);f.obj.userData.dispose();f.box.visible=true;folder=null}
     }
     // phones resize the page without always telling the observer (address bar, rotation)
     const size=renderer.getSize(tmpSize); if(Math.abs(size.x-canvas.clientWidth)>1||Math.abs(size.y-canvas.clientHeight)>1)resize()
@@ -944,6 +1062,35 @@ function createScene(canvas, handlers) {
       return {left:x0,top:y0,width:x1-x0,height:y1-y0,radius:(x1-x0)*spec.rect.r/spec.rect.w,rotated:!!focus.to.turn}
     },
     phoneScreenRect(){ return this.focusRect('contact') },
+    // The iMac's screen once the camera has settled in front of it (null until then).
+    computerScreenRect(){
+      if(!focus||focus.phase!=='in'||focus.t<1||focus.to.id!=='projects')return null
+      const sc=screenInfo(); if(!sc)return null
+      const W=canvas.clientWidth, H=canvas.clientHeight
+      let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity
+      for(const [a,b] of [[-1,-1],[1,-1],[1,1],[-1,1]]){
+        tmpV.copy(sc.c).addScaledVector(sc.R,a*sc.w/2).addScaledVector(sc.U,b*sc.h/2).project(camera)
+        const px=(tmpV.x+1)/2*W, py=(1-tmpV.y)/2*H
+        x0=Math.min(x0,px);x1=Math.max(x1,px);y0=Math.min(y0,py);y1=Math.max(y1,py)
+      }
+      return {left:x0,top:y0,width:x1-x0,height:y1-y0,rotated:!!focus.to.turn}
+    },
+    // The résumé sheet in the open file, once it has settled in front of the visitor (null until then).
+    resumeRect(){
+      if(!folder||folder.dir<0||folder.u<1)return null
+      const s=folder.obj.userData.sheet; s.updateWorldMatrix(true,false)
+      const W=canvas.clientWidth, H=canvas.clientHeight
+      let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity
+      for(const [x,y] of [[-.5,-.5],[.5,-.5],[.5,.5],[-.5,.5]]){
+        tmpV.set(x,y,0).applyMatrix4(s.matrixWorld).project(camera)
+        const px=(tmpV.x+1)/2*W, py=(1-tmpV.y)/2*H
+        x0=Math.min(x0,px);x1=Math.max(x1,px);y0=Math.min(y0,py);y1=Math.max(y1,py)
+      }
+      return {left:x0,top:y0,width:x1-x0,height:y1-y0}
+    },
+    // The rendered résumé page, laid on the sheet in the file (aspect = height / width).
+    setResumeInsets({bottom=null,full=false}={}){ resumeBottom=bottom; resumeFull=full },
+    setResumePage(canvas,aspect){ resumePage={canvas,aspect}; folder?.obj.userData.setPage(canvas,aspect) },
     // The camera's rear screen once it has been picked up (null until then).
     cameraScreenRect(){
       if(!hold||hold.phase!=='in'||hold.t<1)return null

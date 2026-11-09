@@ -13,11 +13,35 @@ function Playlist() {
   return <><p>A few songs I keep on repeat while I work.</p><ol className="playlist">{songs.map((s) => <li key={s.title}><b>{s.title}</b><span>{s.artist}</span>{s.link && <a href={s.link} target="_blank" rel="noreferrer">listen ↗</a>}</li>)}</ol></>
 }
 
-// Résumé download: shown only once a /resume.pdf is actually in the public folder.
+// The résumé is the latest PDF in my Google Drive folder, served by /api/resume (api/resume.js).
+const RESUME_URL = '/api/resume', RESUME_VIEW = '/api/resume?view=1', RESUME_DOWNLOAD = '/api/resume?dl=1', RESUME_NAME = 'Sameer-Palkar-Resume.pdf'
 function ResumeLink() {
-  const [ok, setOk] = useState(false)
-  useEffect(() => { fetch('/resume.pdf', { method: 'HEAD' }).then((r) => setOk(r.ok && (r.headers.get('content-type') || '').includes('pdf'))).catch(() => {}) }, [])
-  return ok ? <a className="mail-link" href="/resume.pdf" download="Sameer-Palkar-Resume.pdf">Download résumé (PDF) <Arrow dir="down" size={13}/></a> : <p className="note">A complete resume can be shared on request.</p>
+  return <a className="mail-link" href={RESUME_DOWNLOAD} download={RESUME_NAME}>Download résumé (PDF) <Arrow dir="down" size={13}/></a>
+}
+// Fetch the PDF once and render its first page with pdf.js (served from /public/pdfjs):
+// { canvas, url (image), aspect (height / width), links: [{ href, left, top, width, height } in %] }
+let resumeJob = null
+function loadResume() {
+  if (resumeJob) return resumeJob
+  resumeJob = (async () => {
+    // a plain browser import: Vite would otherwise rewrite it and refuse a file from /public
+    const pdfjs = await new Function('u', 'return import(u)')('/pdfjs/pdf.min.mjs')
+    pdfjs.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.mjs'
+    const res = await fetch(RESUME_URL); if (!res.ok) throw new Error(await res.text())
+    const doc = await pdfjs.getDocument({ data: await res.arrayBuffer() }).promise
+    const page = await doc.getPage(1)
+    const base = page.getViewport({ scale: 1 }), view = page.getViewport({ scale: 2200 / base.width })
+    const canvas = document.createElement('canvas'); canvas.width = Math.round(view.width); canvas.height = Math.round(view.height)
+    const ctx = canvas.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height)
+    await page.render({ canvasContext: ctx, viewport: view }).promise
+    const [x0, y0, x1, y1] = page.view, pw = x1 - x0, ph = y1 - y0
+    const links = (await page.getAnnotations()).filter((a) => a.subtype === 'Link' && a.url).map((a) => ({
+      href: a.url, left: (a.rect[0] - x0) / pw * 100, top: (y1 - a.rect[3]) / ph * 100, width: (a.rect[2] - a.rect[0]) / pw * 100, height: (a.rect[3] - a.rect[1]) / ph * 100,
+    }))
+    return { canvas, url: canvas.toDataURL('image/png'), aspect: canvas.height / canvas.width, links }
+  })()
+  resumeJob.catch(() => { resumeJob = null }) // try again next time
+  return resumeJob
 }
 
 const apps = [
@@ -460,6 +484,18 @@ const bookSpread = (page, goTo) => page === 0 ? [
         </ul>
       </div>
     </article>
+    <article className="edu xc">
+      <img src="/about/riviera-mark.png" alt="Riviera logo" draggable="false"/>
+      <div>
+        <b>Riviera 2024</b>
+        <span className="xc-role"><strong>Volunteer, Design &amp; Media</strong><em>February 2024</em></span>
+        <span className="edu-note">The annual international sports and cultural festival of VIT Vellore, with a footfall of 40,000+.</span>
+        <ul className="xc-points">
+          <li>Designed social media posts and promotional creatives for Aikya, the cultural parade of Riviera.</li>
+          <li>Supported the design and media team in the smooth, on-schedule execution of the parade.</li>
+        </ul>
+      </div>
+    </article>
     <span className="folio">7</span>
   </section>,
   <section className="book-page right edu-page end-page" key="r3">
@@ -537,6 +573,33 @@ function PortfolioSystem({ onClose }) {
   </motion.div>
 }
 
+// The computer: the camera sits down in front of the iMac and the desktop appears on its screen.
+// The desktop is laid out at a fixed size and scaled onto the screen (smaller layout on phones, so
+// the text comes out bigger). On an upright phone the screen is shown sideways.
+function ComputerView({ onClose, getRect }) {
+  const [rect, setRect] = useState(null)
+  useEffect(() => {
+    let raf = 0
+    const tick = () => { const r = getRect(); setRect((p) => (!r ? null : p && p.rotated === r.rotated && Math.abs(p.left - r.left) + Math.abs(p.top - r.top) + Math.abs(p.width - r.width) + Math.abs(p.height - r.height) < 1 ? p : r)); raf = requestAnimationFrame(tick) }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [getRect])
+  const long = rect ? (rect.rotated ? rect.height : rect.width) : 0, short = rect ? (rect.rotated ? rect.width : rect.height) : 0
+  const DW = isTouch() ? 680 : 1180, scale = long / DW, DH = short / scale
+  return <motion.div className="phone-overlay mac-overlay" onClick={onClose} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
+    {rect && <>
+      <motion.div className="mac-display" onClick={(e) => e.stopPropagation()}
+        style={rect.rotated
+          ? { left: rect.left + rect.width / 2 - long / 2, top: rect.top + rect.height / 2 - short / 2, width: long, height: short, rotate: 90 }
+          : { left: rect.left, top: rect.top, width: long, height: short }}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .4 }}>
+        <div className="mac-frame" style={{ width: DW, height: DH, transform: `scale(${scale})` }}><PortfolioSystem onClose={onClose}/></div>
+      </motion.div>
+      {rect.rotated && <div className="rotate-hint"><RotateIcon/>Rotate your phone for a bigger view</div>}
+    </>}
+  </motion.div>
+}
+
 // Achievements: the camera faces the framed certificates above the iMac; a small caption sits on top.
 // Add entries here ({ title, issuer, year }) as certificates come in.
 const ACHIEVEMENTS = []
@@ -590,6 +653,106 @@ function SpotCard({ app, onClose }) {
     <motion.article className="spot-card" onClick={(e) => e.stopPropagation()} initial={{ y: 14, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 10, opacity: 0 }} transition={{ duration: .3, ease: [.2, .8, .2, 1] }}>
       <span className="section-eyebrow">{a.label}</span><h3>{a.title}</h3>{a.body}
     </motion.article>
+  </motion.div>
+}
+
+// The files: a box file comes off the shelf and opens; my résumé lies on top of the papers inside.
+const DownloadIcon = () => <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+const OpenIcon = () => <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+function ResumeView({ onClose, getRect, setInsets }) {
+  const [rect, setRect] = useState(null)
+  const [doc, setDoc] = useState(null)
+  const [failed, setFailed] = useState(false)
+  useEffect(() => { loadResume().then(setDoc, () => setFailed(true)) }, [])
+  useEffect(() => {
+    let raf = 0
+    const tick = () => {
+      const r = getRect(); setRect((p) => (!r ? null : p && Math.abs(p.left - r.left) + Math.abs(p.top - r.top) + Math.abs(p.width - r.width) + Math.abs(p.height - r.height) < 1 ? p : r))
+      // laptop: the buttons stack beside the bottom bar, or sit in a row above its right end when the
+      // window is too narrow for that; phone: stacked bottom-left (CSS)
+      // measure the bar row itself, not the whole dock: the appearance / instructions panels open above
+      // the bar and should cover the résumé, not move it (as in the book and the other close-ups)
+      const bar = !document.querySelector('.touch-fabs') && (document.querySelector('.hud-dock .bottom-bar') || document.querySelector('.hud-dock'))
+      const d = bar && bar.getBoundingClientRect()
+      const next = !d ? null : viewW() - d.right >= 230 ? { mode: 'beside', right: d.right, mid: d.top + d.height / 2, top: d.top } : { mode: 'above', right: d.right, mid: d.top + d.height / 2, top: d.top }
+      setDock((p) => (!next ? null : p && p.mode === next.mode && Math.abs(p.right - next.right) + Math.abs(p.top - next.top) + Math.abs(p.mid - next.mid) < 1 ? p : next))
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [getRect])
+  const [dock, setDock] = useState(null)
+  // pinch to zoom (and drag to pan when zoomed) on the sheet; double-tap resets
+  const zoomEl = useRef(null), sheetEl = useRef(null), z = useRef({ s: 1, x: 0, y: 0 }), pts = useRef(new Map()), g = useRef(null), moved = useRef(false), lastTap = useRef(0)
+  const applyZoom = () => {
+    const el = zoomEl.current, box = sheetEl.current; if (!el || !box) return
+    const c = z.current, w = box.clientWidth, h = box.clientHeight
+    c.s = Math.min(4, Math.max(1, c.s)); c.x = Math.min(0, Math.max(-(c.s - 1) * w, c.x)); c.y = Math.min(0, Math.max(-(c.s - 1) * h, c.y))
+    el.style.transform = `translate(${c.x}px, ${c.y}px) scale(${c.s})`
+  }
+  const local = (e) => { const r = sheetEl.current.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top } }
+  const startGesture = () => {
+    const p = [...pts.current.values()], c = z.current
+    if (p.length >= 2) g.current = { d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1, mid: { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 }, s: c.s, x: c.x, y: c.y }
+    else if (p.length === 1) g.current = { px: p[0].x, py: p[0].y, x: c.x, y: c.y }
+    else g.current = null
+  }
+  const zoomHandlers = {
+    onPointerDown: (e) => { pts.current.set(e.pointerId, local(e)); if (pts.current.size === 1) moved.current = false; startGesture() },
+    onPointerMove: (e) => {
+      if (!pts.current.has(e.pointerId) || !g.current) return
+      pts.current.set(e.pointerId, local(e))
+      const p = [...pts.current.values()], c = z.current, s0 = g.current
+      if (p.length >= 2 && s0.d) {
+        const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y), mid = { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 }
+        const ns = Math.min(4, Math.max(1, s0.s * d / s0.d)), cx = (s0.mid.x - s0.x) / s0.s, cy = (s0.mid.y - s0.y) / s0.s
+        c.s = ns; c.x = mid.x - cx * ns; c.y = mid.y - cy * ns; moved.current = true; applyZoom()
+      } else if (p.length === 1 && c.s > 1) {
+        const dx = p[0].x - s0.px, dy = p[0].y - s0.py
+        if (Math.abs(dx) + Math.abs(dy) > 4) moved.current = true
+        c.x = s0.x + dx; c.y = s0.y + dy; applyZoom()
+      }
+    },
+    onPointerUp: (e) => {
+      pts.current.delete(e.pointerId); startGesture()
+      if (!pts.current.size && !moved.current && e.pointerType === 'touch') {
+        const now = performance.now()
+        if (now - lastTap.current < 300) { z.current = { s: 1, x: 0, y: 0 }; applyZoom() }
+        lastTap.current = now
+      }
+    },
+    onPointerCancel: (e) => { pts.current.delete(e.pointerId); startGesture() },
+    onClickCapture: (e) => { if (moved.current) { e.preventDefault(); e.stopPropagation() } }, // a drag isn't a tap on a link
+  }
+  const touch = isTouch()
+  // keep the sheet clear of the bar (and of the buttons when they sit above it)
+  useEffect(() => {
+    setInsets(dock ? { bottom: viewH() - dock.top + (dock.mode === 'above' ? 44 + 22 : 14), full: dock.mode === 'above' } : {})
+  }, [dock, setInsets])
+  useEffect(() => () => setInsets({}), [setInsets])
+  const stop = (e) => e.stopPropagation()
+  return <motion.div className="phone-overlay resume-overlay" onClick={onClose} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
+    {rect && <>
+      <motion.div ref={sheetEl} className="resume-sheet" onClick={stop} style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .35 }} {...zoomHandlers}>
+        {doc ? <div className="resume-zoom" ref={zoomEl}>
+          <img src={doc.url} alt="Résumé of Sameer Palkar" draggable="false"/>
+          {doc.links.map((l, i) => <a key={i} className="resume-link" href={l.href} target={l.href.startsWith('http') ? '_blank' : undefined} rel="noreferrer" aria-label={l.href.replace(/^(mailto:|tel:|https?:\/\/)/, '')}
+            style={{ left: `${l.left}%`, top: `${l.top}%`, width: `${l.width}%`, height: `${l.height}%` }}/>)}
+        </div> : <div className="resume-wait">{failed ? <><b>Couldn’t load the résumé</b><span>Use the download button instead.</span></> : <><i className="resume-spin"/><span>Fetching the latest résumé…</span></>}</div>}
+      </motion.div>
+      <motion.div className={`resume-actions${dock ? (dock.mode === 'above' ? ' row' : '') : ' stacked'}`} onClick={stop}
+        style={!dock ? undefined : dock.mode === 'beside' ? { left: dock.right + 8, bottom: viewH() - dock.mid - 22 } : { right: viewW() - dock.right, bottom: viewH() - dock.top + 8 }}
+        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .15, duration: .35 }}>
+        <a className="resume-btn primary" href={RESUME_DOWNLOAD} download={RESUME_NAME}><DownloadIcon/>Download résumé</a>
+        {/* phones: Google Drive's viewer, since some (Android) have no built-in PDF viewer and would just download it */}
+        <a className="resume-btn" href={touch ? RESUME_VIEW : RESUME_URL} target="_blank" rel="noreferrer"><OpenIcon/>Open in new tab</a>
+      </motion.div>
+      {touch && <motion.div className="look-cue cam-cue is-touch resume-cue" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .3, duration: .35 }}>
+        <span className="cue-cam"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.9-4.9M10.5 8v5M8 10.5h5"/></svg></span>
+        <span className="cue-text"><b>Pinch to zoom or open it in a new tab</b><small>If the text is too small to read</small></span>
+      </motion.div>}
+    </>}
   </motion.div>
 }
 
@@ -656,8 +819,8 @@ export default function App() {
   const hour = manualHour ?? clockHour
   const [hotspot, setHotspot] = useState(null)
   const [systemOpen, setSystemOpen] = useState(false)
-  // phone held sideways: keep the portrait layout (turned back), except the computer, which uses the
-  // natural landscape screen. Outside the sideways close-ups, ask to turn the phone upright.
+  // phone held sideways: keep the portrait layout (turned back) in the book, camera, achievements and
+  // computer close-ups. Everywhere else, ask to turn the phone upright.
   const [land, setLand] = useState(phoneLandscape)
   useEffect(() => {
     const on = () => setLand(phoneLandscape())
@@ -666,7 +829,7 @@ export default function App() {
   }, [])
   const [systemApp, setSystemApp] = useState('about')
   const landOK = systemOpen && ['about', 'photos', 'achievements', 'projects'].includes(systemApp)
-  const lockOn = land && !(systemOpen && systemApp === 'projects')
+  const lockOn = land // the computer too: same portrait layout, turned back, as the book and the camera
   useLayoutEffect(() => { setPortraitLock(lockOn); window.dispatchEvent(new Event('portrait-lock')) }, [lockOn, land])
   const sceneRef = useRef(null)
   const updateHotspot = useCallback((v) => setHotspot(v), [])
@@ -703,7 +866,16 @@ export default function App() {
   const closeSystem = () => sceneRef.current?.closeSystem()
   const getPhoneRect = useCallback(() => sceneRef.current?.phoneScreenRect() ?? null, [])
   const getCameraRect = useCallback(() => sceneRef.current?.cameraScreenRect() ?? null, [])
+  const getComputerRect = useCallback(() => sceneRef.current?.computerScreenRect?.() ?? null, [])
   const getBookRect = useCallback(() => sceneRef.current?.focusRect('about') ?? null, [])
+  const getResumeRect = useCallback(() => sceneRef.current?.resumeRect?.() ?? null, [])
+  const setResumeInsets = useCallback((v) => sceneRef.current?.setResumeInsets?.(v), [])
+  // fetch the résumé in the background once the room is up, so it's already on the sheet in the file
+  useEffect(() => {
+    if (!sceneReady) return
+    const t = window.setTimeout(() => loadResume().then((r) => sceneRef.current?.setResumePage(r.canvas, r.aspect)).catch(() => {}), 1500)
+    return () => window.clearTimeout(t)
+  }, [sceneReady])
   useEffect(() => { sceneRef.current?.setTimeOfDay(hour) }, [hour, sceneReady])
   useEffect(() => { const timer = window.setInterval(() => setClockHour(systemHour()), 60000); return () => window.clearInterval(timer) }, [])
   return <main className="app-shell"><OfficeScene sceneRef={sceneRef} onHotspot={updateHotspot} onDeskNear={updateDeskNear} onSystem={updateSystem} onReady={updateReady} onProgress={updateProgress}/>
@@ -717,11 +889,13 @@ export default function App() {
       : systemApp === 'photos'
       ? <CameraView key="camera" onClose={closeSystem} getRect={getCameraRect}/>
       : systemApp === 'projects'
-      ? <PortfolioSystem key="system" onClose={closeSystem}/>
+      ? <ComputerView key="system" onClose={closeSystem} getRect={getComputerRect}/>
       : systemApp === 'music'
       ? <MusicPanel key="music" onClose={closeSystem}/>
       : systemApp === 'achievements'
       ? <AchievementsView key="achievements" onClose={closeSystem}/>
+      : systemApp === 'resume'
+      ? <ResumeView key="resume" onClose={closeSystem} getRect={getResumeRect} setInsets={setResumeInsets}/>
       : <SpotCard key={systemApp} app={systemApp} onClose={closeSystem}/>)}</AnimatePresence>
     {!loading && <div className={`office-hud${systemOpen ? ' is-interacting' : ''}`}>
       {introPhase !== 'hidden' && !systemOpen && <NameTag phase={introPhase}/>}
