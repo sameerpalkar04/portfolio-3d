@@ -231,7 +231,7 @@ const CUES = {
   projects: { name: 'the computer', does: 'see my projects', icon: SVG(<><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M9 20h6M12 16v4"/></>) },
   resume: { name: 'the files', does: 'view my résumé', icon: SVG(<><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></>) },
   music: { name: 'the speaker', does: 'hear my song picks', icon: SVG(<><rect x="6" y="3" width="12" height="18" rx="3"/><circle cx="12" cy="14" r="3"/><circle cx="12" cy="7.5" r="1"/></>) },
-  achievements: { name: 'my achievements', does: 'view my achievements', icon: SVG(<><circle cx="12" cy="9" r="5"/><path d="M9 13.5 7.5 21l4.5-2.5 4.5 2.5L15 13.5"/></>) },
+  achievements: { name: 'my achievements', tap: 'the certificates', does: 'view my achievements', icon: SVG(<><circle cx="12" cy="9" r="5"/><path d="M9 13.5 7.5 21l4.5-2.5 4.5 2.5L15 13.5"/></>) },
   contact: { name: 'the phone', does: 'get in touch', icon: SVG(<><rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M11 18.5h2"/></>) },
   photos: { name: 'the camera', does: 'see through my lens', icon: SVG(<><path d="M4 8h3l1.6-2.2h6.8L17 8h3v11H4z"/><circle cx="12" cy="13.3" r="3.4"/></>) },
 }
@@ -260,7 +260,7 @@ function SpotCue({ id }) {
   if (!cue) return null
   return <motion.div className={`look-cue cam-cue${touch ? ' is-touch' : ''}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .35 }}>
     <span className="cue-cam">{cue.icon}</span>
-    <span className="cue-text"><b>Interact with {cue.name}</b><small>{touch ? `Tap the Interact button to ${cue.does}` : `Press the Interact button or ↵ to ${cue.does}`}</small></span>
+    <span className="cue-text"><b>Interact with {cue.name}</b><small>{touch ? `Tap ${cue.tap || cue.name} or the Interact button to ${cue.does}` : `Press the Interact button or ↵ to ${cue.does}`}</small></span>
   </motion.div>
 }
 

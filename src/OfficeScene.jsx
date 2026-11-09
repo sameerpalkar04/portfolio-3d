@@ -601,13 +601,14 @@ function createScene(canvas, handlers) {
         return run.reduce((s,p)=>s.add(p),new THREE.Vector3()).divideScalar(run.length)
       }
       const spots=[
-        { id:'projects', app:'projects', label:'Computer', pos:at(imac), vertical:true },
-        { id:'achievements', app:'achievements', label:'Achievements', pos:achievementsWall?achievementsWall.position.clone():null, vertical:true, viewFrom:imac?at(imac):null },
-        { id:'contact', app:'contact', label:'Phone', pos:at(scene.getObjectByName('desk-phone')) },
-        { id:'resume', app:'resume', label:'Files', pos:filesSpot() },
-        { id:'photos', app:'photos', label:'Camera', pos:cameraSpot ? cameraSpot.clone().add(new THREE.Vector3(0,.04,0)) : null },
-        { id:'about', app:'about', label:'Books', pos:at(scene.getObjectByName('open-book')) || at(find('Line023')) },
-        { id:'music', app:'music', label:'Speaker', pos:at(scene.getObjectByName('cabinet-speaker')) },
+        // obj / reach: what a tap has to land on (the object itself, or within reach of the spot)
+        { id:'projects', app:'projects', label:'Computer', pos:at(imac), vertical:true, obj:imac, reach:.42 },
+        { id:'achievements', app:'achievements', label:'Achievements', pos:achievementsWall?achievementsWall.position.clone():null, vertical:true, viewFrom:imac?at(imac):null, obj:achievementsWall, reach:.75 },
+        { id:'contact', app:'contact', label:'Phone', pos:at(scene.getObjectByName('desk-phone')), obj:scene.getObjectByName('desk-phone'), reach:.14 },
+        { id:'resume', app:'resume', label:'Files', pos:filesSpot(), reach:.5 },
+        { id:'photos', app:'photos', label:'Camera', pos:cameraSpot ? cameraSpot.clone().add(new THREE.Vector3(0,.04,0)) : null, obj:scene.getObjectByName('desk-camera'), reach:.14 },
+        { id:'about', app:'about', label:'Books', pos:at(scene.getObjectByName('open-book')) || at(find('Line023')), obj:scene.getObjectByName('open-book'), reach:.2 },
+        { id:'music', app:'music', label:'Speaker', pos:at(scene.getObjectByName('cabinet-speaker')), obj:scene.getObjectByName('cabinet-speaker'), reach:.14 },
       ]
       hotspots=spots.filter((h)=>h.pos).map((h)=>{
         // stand in the walkway about an arm's length back from the object, facing it
@@ -897,8 +898,24 @@ function createScene(canvas, handlers) {
   const onUp=(event)=>keys.delete(event.key.toLowerCase()), clearKeys=()=>keys.clear()
   window.addEventListener('keydown',onDown); window.addEventListener('keyup',onUp); window.addEventListener('blur',clearKeys)
   let pointer=null
-  const pointerDown=(event)=>{ if(event.button!==0)return; travel=null; pointer={id:event.pointerId,x:event.clientX,y:event.clientY}; canvas.setPointerCapture?.(event.pointerId) }
-  const pointerUp=()=>{pointer=null}
+  const pointerDown=(event)=>{ if(event.button!==0)return; travel=null; pointer={id:event.pointerId,x:event.clientX,y:event.clientY,x0:event.clientX,y0:event.clientY,t0:performance.now()}; canvas.setPointerCapture?.(event.pointerId) }
+  // Phones: a quick tap (not a drag) on the object the cue is about opens it, like the Interact button.
+  const tapRay=new THREE.Raycaster(), tapNdc=new THREE.Vector2()
+  const isPart=(o,root)=>{for(let p=o;p;p=p.parent)if(p===root)return true;return false}
+  const visibleHit=(o)=>{for(let p=o;p;p=p.parent)if(!p.visible)return false;return true}
+  const tapOpen=(event)=>{
+    const spot=state.hotspot; if(!spot||state.system||state.allowOpen===false)return
+    const r=canvas.getBoundingClientRect(); tapNdc.set((event.clientX-r.left)/r.width*2-1,-((event.clientY-r.top)/r.height)*2+1)
+    tapRay.setFromCamera(tapNdc,camera)
+    const hit=tapRay.intersectObjects(scene.children,true).find((h)=>h.object.isMesh&&visibleHit(h.object))
+    if(!hit)return
+    if((spot.obj&&isPart(hit.object,spot.obj))||hit.point.distanceTo(spot.pos)<(spot.reach||.2))enterSystem()
+  }
+  const pointerUp=(event)=>{
+    const p=pointer; pointer=null
+    if(!p||event.type!=='pointerup'||event.pointerType!=='touch')return
+    if(Math.hypot(event.clientX-p.x0,event.clientY-p.y0)<10&&performance.now()-p.t0<350)tapOpen(event)
+  }
   const pointerMove=(event)=>{ if(!pointer||pointer.id!==event.pointerId||state.system||state.allowLook===false)return; const [dx,dy]=toLocal(event.clientX-pointer.x,event.clientY-pointer.y); pointer.x=event.clientX;pointer.y=event.clientY;state.yaw-=dx*.003;state.pitch=THREE.MathUtils.clamp(state.pitch-dy*.002,-.75,.32) }
 
   canvas.addEventListener('pointerdown',pointerDown);canvas.addEventListener('pointermove',pointerMove);canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',pointerUp)
