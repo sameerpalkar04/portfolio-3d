@@ -34,32 +34,50 @@ export function createPhone() {
   return phone
 }
 
+// Knitted acoustic mesh: a fine diamond weave (two sets of diagonal threads), tileable.
 function fabricTexture() {
-  const c = document.createElement('canvas'); c.width = c.height = 256
-  const ctx = c.getContext('2d'); ctx.fillStyle = '#7a7b7e'; ctx.fillRect(0, 0, 256, 256)
-  for (let y = 0; y < 256; y += 2) for (let x = 0; x < 256; x += 2) {
-    const v = 110 + ((x * 7 + y * 13) % 17) * 3 + (Math.random() * 18 | 0)
-    ctx.fillStyle = `rgb(${v},${v},${v + 3})`; ctx.fillRect(x, y, 1.6, 1.6)
+  const c = document.createElement('canvas'); c.width = c.height = 128
+  const ctx = c.getContext('2d'); ctx.fillStyle = '#3c3c3c'; ctx.fillRect(0, 0, 128, 128) // the gaps between threads
+  ctx.lineWidth = 4.2; ctx.lineCap = 'round'
+  for (const dir of [1, -1]) {
+    ctx.strokeStyle = dir > 0 ? '#c4c4c4' : '#a8a8a8'
+    for (let i = -128; i <= 256; i += 16) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i + dir * 128, 128); ctx.stroke() }
   }
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(10, 4); t.colorSpace = THREE.SRGBColorSpace
+  // soft knots where the threads cross
+  ctx.fillStyle = '#dadada'
+  for (let y = 0; y <= 128; y += 8) for (let x = (y / 8) % 2 ? 8 : 0; x <= 128; x += 16) { ctx.beginPath(); ctx.arc(x, y, 1.6, 0, Math.PI * 2); ctx.fill() }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(34, 14); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8
   return t
 }
 
-// Compact fabric-wrapped smart speaker (≈ 13 cm wide, 16 cm tall). Origin at the bottom centre.
+// Smart speaker in the style of a mesh-wrapped home speaker (≈ 13 cm wide, 16 cm tall): a soft
+// cylinder with a generously rounded base, slightly full sides, rounded shoulders and a recessed
+// glass top. Origin at the bottom centre.
 export function createSpeaker() {
   const speaker = new THREE.Group(); speaker.name = 'cabinet-speaker'
-  const R = .066, H = .158, r = .02
-  const pts = [new THREE.Vector2(0, 0)]
-  for (let i = 0; i <= 8; i++) { const a = -Math.PI / 2 + (i / 8) * Math.PI / 2; pts.push(new THREE.Vector2(R - r + Math.cos(a) * r, r + Math.sin(a) * r)) }
-  for (let i = 0; i <= 8; i++) { const a = (i / 8) * Math.PI / 2; pts.push(new THREE.Vector2(R - r + Math.cos(a) * r, H - r + Math.sin(a) * r)) }
-  pts.push(new THREE.Vector2(0, H))
-  const body = new THREE.Mesh(new THREE.LatheGeometry(pts, 64),
-    new THREE.MeshStandardMaterial({ map: fabricTexture(), color: '#b9b8b4', roughness: .95 }))
+  const R = .066, H = .158
+  const pts = [new THREE.Vector2(0, .003)]
+  // base: a deep quarter-ellipse, so it sits on a small footprint and curves up into the sides
+  const bx = .024, by = .046
+  for (let i = 0; i <= 16; i++) { const a = -Math.PI / 2 + (i / 16) * Math.PI / 2; pts.push(new THREE.Vector2(R - bx + Math.cos(a) * bx, .003 + by + Math.sin(a) * by)) }
+  // sides: very slightly full in the middle
+  const sy0 = .003 + by, sy1 = H - .026
+  for (let i = 1; i < 8; i++) { const t = i / 8; pts.push(new THREE.Vector2(R + Math.sin(Math.PI * t) * .0016, sy0 + (sy1 - sy0) * t)) }
+  // shoulders: rounded into the top rim
+  const tx = .016, ty = .026
+  for (let i = 0; i <= 12; i++) { const a = (i / 12) * Math.PI / 2; pts.push(new THREE.Vector2(R - tx + Math.cos(a) * tx, sy1 + Math.sin(a) * ty)) }
+  // a thin rim, then down a step into the recessed top
+  const topR = R - tx - .003, topY = H - .0028
+  pts.push(new THREE.Vector2(topR, H), new THREE.Vector2(topR - .0008, topY), new THREE.Vector2(0, topY))
+  const mesh = fabricTexture(), bump = mesh.clone(); bump.colorSpace = THREE.NoColorSpace; bump.needsUpdate = true
+  const body = new THREE.Mesh(new THREE.LatheGeometry(pts, 96),
+    new THREE.MeshStandardMaterial({ map: mesh, bumpMap: bump, bumpScale: 1.2, color: '#a9adb3', roughness: .85 }))
   body.castShadow = true; body.receiveShadow = true; speaker.add(body)
-  const top = new THREE.Mesh(new THREE.CircleGeometry(R - r * .55, 48), new THREE.MeshPhysicalMaterial({ color: '#141416', roughness: .25, clearcoat: .6 }))
-  top.rotation.x = -Math.PI / 2; top.position.y = H + .0006; speaker.add(top)
-  const glow = new THREE.Mesh(new THREE.RingGeometry(.016, .021, 48), new THREE.MeshBasicMaterial({ color: '#d9e4ff', transparent: true, opacity: .55 }))
-  glow.rotation.x = -Math.PI / 2; glow.position.y = H + .0012; speaker.add(glow)
+  // black glass top, set into the rim
+  const top = new THREE.Mesh(new THREE.CircleGeometry(topR - .0008, 64), new THREE.MeshPhysicalMaterial({ color: '#0b0b0d', roughness: .18, clearcoat: 1, clearcoatRoughness: .1 }))
+  top.rotation.x = -Math.PI / 2; top.position.y = topY + .0004; speaker.add(top)
+  const glow = new THREE.Mesh(new THREE.RingGeometry(topR * .32, topR * .42, 48), new THREE.MeshBasicMaterial({ color: '#d9e4ff', transparent: true, opacity: .55 }))
+  glow.rotation.x = -Math.PI / 2; glow.position.y = topY + .001; speaker.add(glow)
   // "on" glow: a swirl of teal / violet / magenta light across the top, faded in while music is open
   const c = document.createElement('canvas'); c.width = c.height = 256; const ctx = c.getContext('2d')
   const cg = ctx.createConicGradient ? ctx.createConicGradient(0, 128, 128) : null
@@ -69,7 +87,7 @@ export function createSpeaker() {
   ctx.fillStyle = fade; ctx.fill()
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace
   const onMat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })
-  const on = new THREE.Mesh(new THREE.CircleGeometry(R - r * .6, 64), onMat); on.rotation.x = -Math.PI / 2; on.position.y = H + .0016; speaker.add(on)
+  const on = new THREE.Mesh(new THREE.CircleGeometry(topR - .002, 64), onMat); on.rotation.x = -Math.PI / 2; on.position.y = topY + .0014; speaker.add(on)
   speaker.userData.glow = { on, onMat, idle: glow.material, level: 0 }
   speaker.userData.height = H
   return speaker

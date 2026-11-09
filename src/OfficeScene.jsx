@@ -241,6 +241,9 @@ function createScene(canvas, handlers) {
     })
     // iMac screen: a lit desktop (wallpaper, menu bar, dock) instead of a black panel.
     model.traverse((o) => { if (o.isMesh && o.material?.name === 'display') o.material = screenMaterial })
+    // Book and magazine page edges: the model uses a streaky stock photo of paper; plain paper white reads cleaner
+    const pageMaterial = new THREE.MeshStandardMaterial({ color: '#f4f2ec', roughness: .92, metalness: 0 })
+    model.traverse((o) => { if (o.isMesh && o.material?.name === 'Material__41') { o.material.dispose(); o.material = pageMaterial } })
     // Wall photo: a beach scene. If the photo can't load, the original print stays.
     textureLoader.load(BEACH_PHOTO_URL, (beach) => {
       beach.colorSpace = THREE.SRGBColorSpace; beach.flipY = false; beach.anisotropy = 8
