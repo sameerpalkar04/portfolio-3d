@@ -4,7 +4,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { createExteriorMaterial, WINDOW_UV } from './exteriorShader'
 import { buildCollisionGrid, createWalkTester } from './collision'
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
-import { toLocal } from './orientation'
+import { toLocal, isLocked } from './orientation'
+import { ACHIEVEMENTS } from './achievements'
 import { PHONE, BOOK, CAMERA_SCREEN, createOpenBook, createDigitalCamera, createTableLamp, createGlobe, createCertificateWall, createPolaroid, createModelAirplane, createPhone, createFloorPlant, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight, createFileFolder, FOLDER } from './props'
 import { createDesktopTexture, BEACH_PHOTO_URL } from './screens'
 
@@ -569,7 +570,7 @@ function createScene(canvas, handlers) {
       const probe = new THREE.Raycaster(new THREE.Vector3(ic.x, ib.max.y + .3, ic.z), toWall, 0, 2)
       const hit = probe.intersectObject(model, true).find((h) => h.object.visible)
       if (hit) {
-        const wall = createCertificateWall()
+        const wall = createCertificateWall({ certs: ACHIEVEMENTS })
         const n = toWall.clone().negate()
         wall.position.set(hit.point.x + n.x * .004, ib.max.y + .1 + wall.userData.size.h / 2 + .06, ic.z)
         wall.lookAt(wall.position.clone().add(n))
@@ -672,6 +673,8 @@ function createScene(canvas, handlers) {
     else pos.addScaledVector(right,(.5-.26)*2*t*aspect*dist)
     return {pos,quat,fov,id:'music'}
   }
+  // phones: how far along the wall the view has been swiped (m from the centre; null = start at the left end)
+  let wallPan=null, wallPanMax=0, wallPxPerM=1000
   const wallView=()=>{
     const wall=scene.getObjectByName('achievements-wall'); if(!wall)return null
     wall.updateWorldMatrix(true,false)
@@ -681,20 +684,22 @@ function createScene(canvas, handlers) {
     // never back out through the opposite wall: stay inside the room
     const back=new THREE.Raycaster(center.clone().addScaledVector(n,.05),n,0,10).intersectObject(model,true).find((x)=>x.object.visible)
     const maxDist=back?Math.max(.4,back.distance+.05-.25):2
-    if(sideways()){
-      // upright phone: turn the view so the long side of the frame cluster runs down the screen
-      // a wider lens so the whole cluster fits without backing out of the room; the caption takes the right edge
-      const up=new THREE.Vector3(-1,0,0).transformDirection(wall.matrixWorld), wUp=new THREE.Vector3(0,1,0).transformDirection(wall.matrixWorld)
-      const tfov=56, tt=Math.tan(THREE.MathUtils.degToRad(tfov/2)), cap=110
-      const top=20, bottom=152, usable=(H-top-bottom)/H, across=(W-cap-24)/W
-      const dist=Math.min(maxDist,Math.max((w/2)/(tt*usable*.94),(h/2)/(tt*aspect*across)))
-      const pos=center.clone().addScaledVector(n,dist)
-        .addScaledVector(up,-((bottom-top)/2/(H/2))*tt*dist) // centred in the space above the controls
-        .addScaledVector(wUp,((cap/2)/(W/2))*tt*aspect*dist) // and nudged left of the caption
-      tmpM.lookAt(pos,pos.clone().sub(n),up)
-      return {pos,quat:new THREE.Quaternion().setFromRotationMatrix(tmpM),fov:tfov,id:'achievements',turn:true}
+    if(window.matchMedia?.('(pointer: coarse)').matches&&H>W){
+      // upright phone: up close, so the certificates are big enough to tap, and the wall wider than the
+      // screen: swipe sideways along it (wallPan, starting at its left end). The two cues sit above.
+      const right=new THREE.Vector3(1,0,0).transformDirection(wall.matrixWorld), wUp=new THREE.Vector3(0,1,0).transformDirection(wall.matrixWorld)
+      const top=214, bottom=160, usable=(H-top-bottom)/H
+      let tt=t, dist=(h*.49)/(tt*usable)
+      if(dist>maxDist){dist=maxDist;tt=(h*.49)/(dist*usable)} // no room to back off: a wider lens instead
+      const visHalf=tt*aspect*dist
+      wallPanMax=Math.max(0,w/2+.02-visHalf); wallPxPerM=W/(2*visHalf)
+      if(wallPan==null)wallPan=-wallPanMax
+      wallPan=THREE.MathUtils.clamp(wallPan,-wallPanMax,wallPanMax)
+      const pos=center.clone().addScaledVector(n,dist).addScaledVector(right,wallPan).addScaledVector(wUp,((top-bottom)/H)*tt*dist)
+      tmpM.lookAt(pos,pos.clone().sub(n),wUp)
+      return {pos,quat:new THREE.Quaternion().setFromRotationMatrix(tmpM),fov:THREE.MathUtils.radToDeg(2*Math.atan(tt)),id:'achievements'}
     }
-    const reserved=window.matchMedia?.('(pointer: coarse)').matches?150:100
+    const reserved=window.matchMedia?.('(pointer: coarse)').matches?150:166 // (laptop: the bar, and the cue above it)
     const usable=(H-reserved-40)/H
     const dist=Math.min(maxDist,Math.max((h/2)/(t*usable*.92),(w/2)/(t*aspect*.92)))
     const pos=center.clone().addScaledVector(n,dist)
@@ -743,7 +748,50 @@ function createScene(canvas, handlers) {
     tmpM.lookAt(pos,pos.clone().sub(sc.n),sc.U)
     return {pos,quat:new THREE.Quaternion().setFromRotationMatrix(tmpM),fov,id:'projects'}
   }
+  // One certificate, straight on: on the left of a laptop screen (its description card takes the right),
+  // or near the top of an upright phone (description below).
+  const certFrame=(id)=>scene.getObjectByName('achievements-wall')?.userData.frames.find((f)=>f.userData.cert===id)
+  const certView=(id)=>{
+    const f=certFrame(id); if(!f)return null
+    f.updateWorldMatrix(true,false)
+    const n=new THREE.Vector3(0,0,1).transformDirection(f.matrixWorld), right=new THREE.Vector3(1,0,0).transformDirection(f.matrixWorld), up=new THREE.Vector3(0,1,0).transformDirection(f.matrixWorld)
+    const center=f.getWorldPosition(new THREE.Vector3()), {w:fw,h:fh}=f.userData.outer
+    const W=canvas.clientWidth, H=canvas.clientHeight, aspect=W/H, fov=36, t=Math.tan(THREE.MathUtils.degToRad(fov/2))
+    const back=new THREE.Raycaster(center.clone().addScaledVector(n,.05),n,0,10).intersectObject(model,true).find((x)=>x.object.visible)
+    const maxDist=back?Math.max(.3,back.distance+.05-.25):2
+    const phone=window.matchMedia?.('(pointer: coarse)').matches&&H>W
+    // where the frame's centre goes on screen (NDC) and how much of the screen it may fill
+    const nx=phone?0:-.395, ny=phone?1-2*(24+(W*.9*fh/fw)/2)/H:((100-24)/2)/(H/2)
+    let tt=t, dist=phone?(fw/2)/(tt*aspect*.9):Math.max((fw/2)/(tt*aspect*.54),(fh/2)/(tt*.8))
+    // phone: the frame itself fills the width (its details card goes below); with no room to back off
+    // that far from the wall, a longer lens instead
+    if(dist>maxDist){ if(phone)tt=(fw/2)/(maxDist*aspect*.9); dist=maxDist }
+    const pos=center.clone().addScaledVector(n,dist).addScaledVector(right,-nx*tt*aspect*dist).addScaledVector(up,-ny*tt*dist)
+    tmpM.lookAt(pos,pos.clone().sub(n),up)
+    return {pos,quat:new THREE.Quaternion().setFromRotationMatrix(tmpM),fov:THREE.MathUtils.radToDeg(2*Math.atan(tt)),id:'cert:'+id}
+  }
+  // glide from wherever the camera is now to another view (keeping the walking fov to return to);
+  // `chain` follows straight after (the "next certificate" move: out to the wall, then in to the next)
+  const refocus=(to,chain=null,pan=false)=>{
+    if(!to)return
+    focus={phase:'in',t:0,from:{pos:camera.position.clone(),quat:camera.quaternion.clone(),fov:camera.fov},to,chain,pan,savedFov:focus?.savedFov??camera.fov}
+  }
+  let bookSide=-1 // phones: which page of the open book is on screen
+  // the pull-back between two certificates: the whole wall
+  const wallBackView=()=>wallView()
+  let certSel=null
+  const certIds=()=>ACHIEVEMENTS.map((a)=>a.id).filter((id)=>certFrame(id))
+  const openCert=(id)=>{ if(certSel===id)return; certSel=id; refocus(certView(id)); handlers.onCert?.(id) }
+  const backToWall=()=>{ if(!certSel)return; const f=certFrame(certSel); if(f)wallPan=f.position.x; certSel=null; refocus(wallView()); handlers.onCert?.(null) }
+  const nextCert=()=>{
+    const ids=certIds(); if(!ids.length)return
+    const j=ids[(ids.indexOf(certSel)+1)%ids.length]
+    if(!certSel){openCert(j);return}
+    certSel=j; refocus(wallBackView(),certView(j)); handlers.onCert?.(j)
+  }
   const focusView=(id)=>{
+    if(String(id).startsWith('cert:'))return certView(String(id).slice(5))
+    if(id==='cert-back')return wallBackView()
     if(id==='music')return speakerView()
     if(id==='projects')return screenView()
     if(id==='achievements')return wallView()
@@ -752,21 +800,21 @@ function createScene(canvas, handlers) {
     const center=new THREE.Vector3(0,spec.y,0).applyMatrix4(obj.matrixWorld)
     const r={width:canvas.clientWidth,height:canvas.clientHeight}, fov=36, half=Math.tan(THREE.MathUtils.degToRad(fov/2))
     if(id==='about'&&sideways()){
-      // upright phone: show the open book turned sideways (landscape) so it can fill the screen;
-      // its left edge goes to the top. Room above and below for the page buttons, and the bar below.
-      const up=new THREE.Vector3(-1,0,0).transformDirection(obj.matrixWorld); up.y=0; up.normalize()
-      // the page buttons sit bottom-left beside the cue and BACK TO ROOM, so the book can use the full width
-      const top=20, bottom=152, usableH=Math.max(200,r.height-top-bottom)
-      const hForLong=(spec.W/2)/(half*(usableH/r.height)*.98), hForShort=(spec.L/2)/(half*(r.width/r.height)*.97)
-      const h=Math.max(hForLong,hForShort)
-      const shiftPx=(bottom-top)/2, shift=(shiftPx/(r.height/2))*h*half
-      const pos=center.clone().addScaledVector(up,-shift); pos.y+=h
+      // upright phone: one page of the real book at a time, upright and filling the width (bookSide:
+      // -1 left page, 1 right page); the camera pans across as the pages turn. The cue sits above it,
+      // the controls below.
+      const up=new THREE.Vector3(0,0,-1).transformDirection(obj.matrixWorld); up.y=0; up.normalize()
+      const pw=spec.rect.w/2, pl=spec.rect.l, top=150, bottom=144, usable=(r.height-top-bottom)/r.height
+      const h=Math.max((pw/2)/(half*(r.width/r.height)*.93),(pl/2)/(half*usable*.98))
+      const c=new THREE.Vector3(bookSide*pw/2,spec.y,0).applyMatrix4(obj.matrixWorld)
+      const shift=(((bottom-top)/2)/(r.height/2))*h*half
+      const pos=c.addScaledVector(up,-shift); pos.y+=h
       const look=pos.clone(); look.y-=1
       tmpM.lookAt(pos,look,up)
-      return {pos,quat:new THREE.Quaternion().setFromRotationMatrix(tmpM),fov,id,turn:true}
+      return {pos,quat:new THREE.Quaternion().setFromRotationMatrix(tmpM),fov,id}
     }
     const up=new THREE.Vector3(0,0,-1).transformDirection(obj.matrixWorld); up.y=0; up.normalize()
-    const reserved=window.matchMedia?.('(pointer: coarse)').matches?172:(r.width<=720?150:104) // keep clear of the bottom bar
+    const reserved=window.matchMedia?.('(pointer: coarse)').matches?172:(r.width<=720?150:id==='about'?168:104) // keep clear of the bottom bar (and the book's arrows cue above it)
     const usableH=Math.max(200,r.height-reserved-40), screenFrac=usableH/r.height
     const hForLength=(spec.L/2)/(half*screenFrac*spec.fill), hForWidth=(spec.W/2)/(half*(r.width/r.height)*.92)
     const h=Math.max(hForLength,hForWidth)
@@ -874,6 +922,8 @@ function createScene(canvas, handlers) {
       if(obj){ if(!obj.userData.rest)obj.userData.rest={pos:obj.position.clone(),quat:obj.quaternion.clone()}; hold={phase:'in',t:0,obj,from:{pos:obj.position.clone(),quat:obj.quaternion.clone(),fov:camera.fov},savedFov:camera.fov} }
     }
     if(state.hotspot.id==='resume')startFolder()
+    if(state.hotspot.id==='about')bookSide=-1
+    if(state.hotspot.id==='achievements')wallPan=null // phones: start at the wall's left end
     if(FOCUS[state.hotspot.id]||['music','achievements','projects'].includes(state.hotspot.id)){
       const to=focusView(state.hotspot.id)
       if(to)focus={phase:'in',t:0,from:{pos:camera.position.clone(),quat:camera.quaternion.clone(),fov:camera.fov},to,savedFov:camera.fov}
@@ -883,6 +933,8 @@ function createScene(canvas, handlers) {
   const exitSystem=()=>{
     if(!state.system)return
     state.system=false
+    if(certSel){certSel=null;handlers.onCert?.(null)}
+    canvas.style.cursor=''
     if(focus)focus={...focus,phase:'out',t:0,from:{pos:camera.position.clone(),quat:camera.quaternion.clone(),fov:camera.fov}}
     if(folder)folder.dir=-1
     if(hold)hold={...hold,phase:'out',t:0,from:{pos:hold.obj.position.clone(),quat:hold.obj.quaternion.clone(),fov:camera.fov}}
@@ -903,9 +955,24 @@ function createScene(canvas, handlers) {
   const tapRay=new THREE.Raycaster(), tapNdc=new THREE.Vector2()
   const isPart=(o,root)=>{for(let p=o;p;p=p.parent)if(p===root)return true;return false}
   const visibleHit=(o)=>{for(let p=o;p;p=p.parent)if(!p.visible)return false;return true}
+  // pointer position → normalised device coords (the sideways phone has the app turned -90°)
+  const setNdc=(event)=>{
+    const r=canvas.getBoundingClientRect()
+    if(isLocked()){ const lx=r.bottom-event.clientY, ly=event.clientX-r.left; tapNdc.set(lx/canvas.clientWidth*2-1,-(ly/canvas.clientHeight)*2+1) }
+    else tapNdc.set((event.clientX-r.left)/r.width*2-1,-((event.clientY-r.top)/r.height)*2+1)
+  }
+  // which certificate (with a real achievement behind it) is under the pointer, if any
+  const pickCert=(event)=>{
+    const wall=scene.getObjectByName('achievements-wall'); if(!wall)return null
+    setNdc(event); tapRay.setFromCamera(tapNdc,camera)
+    const hit=tapRay.intersectObject(wall,true)[0]; if(!hit)return null
+    for(let o=hit.object;o;o=o.parent)if(o.name==='cert-frame')return o.userData.cert
+    return null
+  }
+  const inAchievements=()=>state.system&&state.hotspot?.id==='achievements'
   const tapOpen=(event)=>{
     const spot=state.hotspot; if(!spot||state.system||state.allowOpen===false)return
-    const r=canvas.getBoundingClientRect(); tapNdc.set((event.clientX-r.left)/r.width*2-1,-((event.clientY-r.top)/r.height)*2+1)
+    setNdc(event)
     tapRay.setFromCamera(tapNdc,camera)
     const hit=tapRay.intersectObjects(scene.children,true).find((h)=>h.object.isMesh&&visibleHit(h.object))
     if(!hit)return
@@ -913,12 +980,24 @@ function createScene(canvas, handlers) {
   }
   const pointerUp=(event)=>{
     const p=pointer; pointer=null
-    if(!p||event.type!=='pointerup'||event.pointerType!=='touch')return
-    if(Math.hypot(event.clientX-p.x0,event.clientY-p.y0)<10&&performance.now()-p.t0<350)tapOpen(event)
+    if(!p||event.type!=='pointerup')return
+    const tap=Math.hypot(event.clientX-p.x0,event.clientY-p.y0)<10&&performance.now()-p.t0<(event.pointerType==='touch'?350:600)
+    if(!tap)return
+    // achievements: click / tap a certificate to see it; anywhere else goes back to the whole wall
+    if(inAchievements()){ const id=pickCert(event); if(id)openCert(id); else backToWall(); return }
+    if(event.pointerType==='touch')tapOpen(event)
   }
-  const pointerMove=(event)=>{ if(!pointer||pointer.id!==event.pointerId||state.system||state.allowLook===false)return; const [dx,dy]=toLocal(event.clientX-pointer.x,event.clientY-pointer.y); pointer.x=event.clientX;pointer.y=event.clientY;state.yaw-=dx*.003;state.pitch=THREE.MathUtils.clamp(state.pitch-dy*.002,-.75,.32) }
+  // laptop: a hand cursor over the certificates that open
+  const hoverCert=(event)=>{ if(pointer||event.pointerType!=='mouse'||!inAchievements())return; canvas.style.cursor=pickCert(event)?'pointer':'' }
+  const pointerMove=(event)=>{
+    // phones, on the achievements wall: drag sideways to move along it (drag right → further right)
+    if(pointer&&pointer.id===event.pointerId&&inAchievements()&&!certSel&&wallPanMax>0){
+      const [dx]=toLocal(event.clientX-pointer.x,event.clientY-pointer.y); pointer.x=event.clientX; pointer.y=event.clientY
+      wallPan=THREE.MathUtils.clamp((wallPan??-wallPanMax)+dx/wallPxPerM,-wallPanMax,wallPanMax); return
+    }
+    if(!pointer||pointer.id!==event.pointerId||state.system||state.allowLook===false)return; const [dx,dy]=toLocal(event.clientX-pointer.x,event.clientY-pointer.y); pointer.x=event.clientX;pointer.y=event.clientY;state.yaw-=dx*.003;state.pitch=THREE.MathUtils.clamp(state.pitch-dy*.002,-.75,.32) }
 
-  canvas.addEventListener('pointerdown',pointerDown);canvas.addEventListener('pointermove',pointerMove);canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',pointerUp)
+  canvas.addEventListener('pointerdown',pointerDown);canvas.addEventListener('pointermove',pointerMove);canvas.addEventListener('pointermove',hoverCert);canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',pointerUp)
   const onWheel=(event)=>{event.preventDefault();camera.fov=THREE.MathUtils.clamp(camera.fov+Math.sign(event.deltaY)*2,46,80);camera.updateProjectionMatrix()}
   canvas.addEventListener('wheel',onWheel,{passive:false})
   const resize=()=>{const r={width:canvas.clientWidth,height:canvas.clientHeight};renderer.setSize(r.width,r.height,false);camera.aspect=r.width/Math.max(r.height,1);camera.updateProjectionMatrix()}
@@ -992,9 +1071,11 @@ function createScene(canvas, handlers) {
     camera.position.set(state.x,roomBounds?floorY+EYE_HEIGHT:EYE_HEIGHT,state.z);camera.rotation.set(state.pitch,state.yaw,0)
     if(focus){
       focus.t=Math.min(1,focus.t+dt/(focus.phase==='in'?1.15:.9))
-      const e=focus.t<.5?4*focus.t**3:1-Math.pow(-2*focus.t+2,3)/2
+      let e=focus.t<.5?4*focus.t**3:1-Math.pow(-2*focus.t+2,3)/2
       if(focus.phase==='in'){
         if(focus.t>=1){const v=focusView(focus.to.id);if(v)focus.to=v} // follow window resizes
+        // the next leg (Next certificate: wall → next one) starts here, from where this one ended
+        if(focus.t>=1&&focus.chain){const c=focusView(focus.chain.id)||focus.chain; focus={...focus,t:0,from:{pos:focus.to.pos.clone(),quat:focus.to.quat.clone(),fov:focus.to.fov},to:c,chain:null}; e=0}
         camera.position.lerpVectors(focus.from.pos,focus.to.pos,e); tmpQ.copy(focus.from.quat).slerp(focus.to.quat,e); camera.quaternion.copy(tmpQ)
         camera.fov=THREE.MathUtils.lerp(focus.from.fov,focus.to.fov,e)
       }else{
@@ -1005,7 +1086,7 @@ function createScene(canvas, handlers) {
       }
       camera.updateProjectionMatrix()
       // the desk lamp sits right beside the phone; ease the exposure down so the wood still reads
-      renderer.toneMappingExposure=.9-.28*(focus&&!['music','achievements','projects'].includes(focus.to.id)?(focus.phase==='in'?e:1-e):0)
+      renderer.toneMappingExposure=.9-.28*(focus&&!['music','achievements','projects'].includes(focus.to.id)&&!String(focus.to.id).startsWith('cert')?(focus.phase==='in'?e:1-e):0)
     } else renderer.toneMappingExposure=.9
     // the ceiling pendants hang between the far end of the room and the certificate wall: hide their
     // fittings (not their light) while the wall close-up is on screen
@@ -1069,7 +1150,8 @@ function createScene(canvas, handlers) {
     // Where the close-up surface (phone screen, book pages) is on the page once the camera has
     // settled over it (null until then).
     focusRect(id){
-      if(!focus||focus.phase!=='in'||focus.t<1||focus.to.id!==id)return null
+      // (also while panning across the book from one page to the other)
+      if(!focus||focus.phase!=='in'||(focus.t<1&&!focus.pan)||focus.to.id!==id)return null
       const spec=FOCUS[id], obj=scene.getObjectByName(spec.name); if(!obj)return null
       // relative to the canvas (the overlay covers it exactly), using its CSS size
       const W=canvas.clientWidth, H=canvas.clientHeight, w=spec.rect.w/2, l=spec.rect.l/2
@@ -1082,6 +1164,28 @@ function createScene(canvas, handlers) {
       return {left:x0,top:y0,width:x1-x0,height:y1-y0,radius:(x1-x0)*spec.rect.r/spec.rect.w,rotated:!!focus.to.turn}
     },
     phoneScreenRect(){ return this.focusRect('contact') },
+    // phones: show the left (-1) or right (1) page of the open book
+    setBookSide(side){ if(side===bookSide)return; bookSide=side; if(state.system&&focus?.to.id==='about'&&sideways())refocus(focusView('about'),null,true) },
+    // achievements: open / step through / leave the certificates
+    openCert(id){ if(inAchievements())openCert(id) },
+    nextCert(){ if(inAchievements())nextCert() },
+    backToWall(){ backToWall() },
+    // the certificate on screen once the camera has settled on it: {id, left, top, width, height} (null until then)
+    certRect(){
+      if(!focus||focus.phase!=='in'||focus.t<1||focus.chain||!String(focus.to.id).startsWith('cert:'))return null
+      const id=focus.to.id.slice(5), f=certFrame(id); if(!f)return null
+      const art=f.userData.art, W=canvas.clientWidth, H=canvas.clientHeight; art.updateWorldMatrix(true,false)
+      const g=art.geometry.parameters; let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity
+      for(const [a,b] of [[-1,-1],[1,-1],[1,1],[-1,1]]){
+        tmpV.set(a*g.width/2,b*g.height/2,0).applyMatrix4(art.matrixWorld).project(camera)
+        const px=(tmpV.x+1)/2*W, py=(1-tmpV.y)/2*H
+        x0=Math.min(x0,px);x1=Math.max(x1,px);y0=Math.min(y0,py);y1=Math.max(y1,py)
+      }
+      // and the whole frame's bottom edge (the phone's details card starts below it)
+      const o=f.userData.outer; f.updateWorldMatrix(true,false)
+      tmpV.set(0,-o.h/2,0).applyMatrix4(f.matrixWorld).project(camera)
+      return {id,left:x0,top:y0,width:x1-x0,height:y1-y0,frameBottom:(1-tmpV.y)/2*H}
+    },
     // The iMac's screen once the camera has settled in front of it (null until then).
     computerScreenRect(){
       if(!focus||focus.phase!=='in'||focus.t<1||focus.to.id!=='projects')return null
@@ -1128,12 +1232,12 @@ function createScene(canvas, handlers) {
       return {left:x0,top:y0,width:x1-x0,height:y1-y0,bodyLeft:bx0,bodyRight:bx1,bodyTop:by0,bodyBottom:by1,rotated:sideways()}
     },
     goToSpot(index){if(!spots[index])return;const spot=nearestFree(spots[index].x,spots[index].z);state.x=spot.x;state.z=spot.z;const target=index===3?spots[0]:desk;state.yaw=target?Math.atan2(-(target.x-state.x),-(target.z-state.z)):-Math.PI/2;state.pitch=0},
-    dispose(){disposed=true;cancelAnimationFrame(frame);observer.disconnect();window.removeEventListener('keydown',onDown);window.removeEventListener('keyup',onUp);window.removeEventListener('blur',clearKeys);canvas.removeEventListener('pointerdown',pointerDown);canvas.removeEventListener('pointermove',pointerMove);canvas.removeEventListener('pointerup',pointerUp);canvas.removeEventListener('pointercancel',pointerUp);canvas.removeEventListener('wheel',onWheel);scene.traverse((object)=>{object.geometry?.dispose();if(Array.isArray(object.material))object.material.forEach((m)=>m.dispose());else object.material?.dispose()});groundMaterial?.map?.dispose();wallTexture.dispose();wallSource.dispose();floorTexture.dispose();cabinetTexture.dispose();doorTexture.dispose();desktopTexture.userData.dispose?.();desktopTexture.dispose();exteriorTexture.dispose();renderer.dispose()},
+    dispose(){disposed=true;cancelAnimationFrame(frame);observer.disconnect();window.removeEventListener('keydown',onDown);window.removeEventListener('keyup',onUp);window.removeEventListener('blur',clearKeys);canvas.removeEventListener('pointerdown',pointerDown);canvas.removeEventListener('pointermove',pointerMove);canvas.removeEventListener('pointermove',hoverCert);canvas.removeEventListener('pointerup',pointerUp);canvas.removeEventListener('pointercancel',pointerUp);canvas.removeEventListener('wheel',onWheel);scene.traverse((object)=>{object.geometry?.dispose();if(Array.isArray(object.material))object.material.forEach((m)=>m.dispose());else object.material?.dispose()});groundMaterial?.map?.dispose();wallTexture.dispose();wallSource.dispose();floorTexture.dispose();cabinetTexture.dispose();doorTexture.dispose();desktopTexture.userData.dispose?.();desktopTexture.dispose();exteriorTexture.dispose();renderer.dispose()},
   }
 }
 
-export default function OfficeScene({sceneRef,onPosition,onNearby,onHotspot,onDeskNear,onSystem,onReady,onProgress}){
+export default function OfficeScene({sceneRef,onPosition,onNearby,onHotspot,onDeskNear,onSystem,onReady,onProgress,onCert}){
   const canvasRef=useRef(null)
-  useEffect(()=>{if(!canvasRef.current)return undefined;const office=createScene(canvasRef.current,{onPosition,onNearby,onHotspot,onDeskNear,onSystem,onReady,onProgress});sceneRef.current=office;return()=>{office.dispose();if(sceneRef.current===office)sceneRef.current=null}},[sceneRef,onPosition,onNearby,onHotspot,onDeskNear,onSystem,onReady,onProgress])
+  useEffect(()=>{if(!canvasRef.current)return undefined;const office=createScene(canvasRef.current,{onPosition,onNearby,onHotspot,onDeskNear,onSystem,onReady,onProgress,onCert});sceneRef.current=office;return()=>{office.dispose();if(sceneRef.current===office)sceneRef.current=null}},[sceneRef,onPosition,onNearby,onHotspot,onDeskNear,onSystem,onReady,onProgress,onCert])
   return <canvas ref={canvasRef} className="office-canvas" aria-label="First-person walkthrough of the home office. Use arrow keys to move, drag to look, and press Enter at the work desk." />
 }

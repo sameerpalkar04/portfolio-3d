@@ -732,7 +732,7 @@ function certificateArt(kind, accent) {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8
   return t
 }
-export function createCertificateWall() {
+export function createCertificateWall({ certs = [] } = {}) {
   const wall = new THREE.Group(); wall.name = 'achievements-wall'
   const frameMat = new THREE.MeshStandardMaterial({ color: '#121214', roughness: .45, metalness: .2 })
   const matMat = new THREE.MeshStandardMaterial({ color: '#f4f2ec', roughness: .9 })
@@ -748,18 +748,26 @@ export function createCertificateWall() {
     [.504, -.188, .17, .17, 'square', '#1f3c6e'],
   ]
   const F = .016, M = .022, D = .018
-  for (const [x, y, w, h, kind, accent] of layout) {
-    const g = new THREE.Group(); g.position.set(x, y, 0)
+  const loader = new THREE.TextureLoader(), frames = []
+  layout.forEach(([x, y, w, h, kind, accent], slot) => {
+    // a real certificate in this slot: its scan, sized to its own proportions
+    const cert = certs.find((c) => c.frame === slot)
+    if (cert) h = Math.min(h, w / cert.aspect)
+    const g = new THREE.Group(); g.position.set(x, y, 0); g.name = 'cert-frame'
     const ow = w + 2 * (M + F), oh = h + 2 * (M + F)
     for (const [bw, bh, bx, by] of [[ow, F, 0, (oh - F) / 2], [ow, F, 0, -(oh - F) / 2], [F, oh - 2 * F, -(ow - F) / 2, 0], [F, oh - 2 * F, (ow - F) / 2, 0]]) {
       const bar = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, D), frameMat); bar.position.set(bx, by, D / 2); g.add(bar)
     }
     const back = new THREE.Mesh(new THREE.PlaneGeometry(ow - 2 * F, oh - 2 * F), kind === 'plaque' || kind === 'square' ? frameMat : matMat); back.position.z = .004; g.add(back)
-    const art = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: certificateArt(kind, accent), roughness: .7 })); art.position.z = .005; g.add(art)
+    let map
+    if (cert) { map = loader.load(cert.image); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 8 } else map = certificateArt(kind, accent)
+    const art = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map, roughness: .7 })); art.position.z = .005; g.add(art)
+    g.userData = { slot, cert: cert?.id || null, art, outer: { w: ow, h: oh } }
     const glass = new THREE.Mesh(new THREE.PlaneGeometry(ow - 2 * F, oh - 2 * F), new THREE.MeshPhysicalMaterial({ color: '#ffffff', transparent: true, opacity: .06, roughness: .05, clearcoat: 1 })); glass.position.z = D - .002; g.add(glass)
     g.traverse((o) => { if (o.isMesh) { o.castShadow = o !== glass; o.receiveShadow = true } })
-    wall.add(g)
-  }
+    wall.add(g); frames.push(g)
+  })
+  wall.userData.frames = frames
   wall.userData.size = { w: 1.3, h: .74 }
   return wall
 }

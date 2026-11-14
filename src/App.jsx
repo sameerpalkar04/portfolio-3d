@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import OfficeScene from './OfficeScene'
 import Loader from './Loader'
 import { viewW, viewH, fracAlong, phoneLandscape, setPortraitLock } from './orientation'
+import { ACHIEVEMENTS } from './achievements'
 
 // Songs on the speaker: add your picks here as { title, artist, link? }.
 const songs = []
@@ -373,7 +374,7 @@ const bookSpread = (page, goTo) => page === 0 ? [
     <p className="lede">I’m a software engineer working across backend development, full‑stack technologies, and artificial intelligence. I build scalable applications, solve complex problems, and explore new technologies to develop efficient and practical solutions for real‑world challenges.</p>
     <nav className="book-index" aria-label="Contents">
       <span className="book-index-title">Contents</span>
-      {BOOK_INDEX.map(([label, n, spread]) => <button key={label} onClick={(e) => { e.stopPropagation(); goTo(spread) }}><span>{label}</span><i/><b>{n}</b></button>)}
+      {BOOK_INDEX.map(([label, n, spread]) => <button key={label} onClick={(e) => { e.stopPropagation(); goTo(spread, n) }}><span>{label}</span><i/><b>{n}</b></button>)}
     </nav>
     <span className="folio">2</span>
   </section>,
@@ -506,57 +507,91 @@ const bookSpread = (page, goTo) => page === 0 ? [
   </section>,
 ]
 const BOOK_LAST = 3
-function BookPages({ onClose, getRect }) {
+// ← → keys, for the "use the arrows" cues
+const ArrowsIcon = () => <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2.5" y="7" width="8.5" height="10" rx="2"/><rect x="13" y="7" width="8.5" height="10" rx="2"/><path d="m7.8 10-2 2 2 2M16.2 10l2 2-2 2"/></svg>
+// laptop: a cue above the bar (like the "Interact with …" ones) until the arrows are first used
+const ArrowCue = ({ title, hint }) => <motion.div className="look-cue cam-cue arrow-cue" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ delay: .4, duration: .35 }}>
+  <span className="cue-cam"><ArrowsIcon/></span><span className="cue-text"><b>{title}</b><small>{hint}</small></span>
+</motion.div>
+
+const BOOK_PAGES = BOOK_LAST * 2 + 2
+function BookPages({ onClose, getRect, setSide }) {
   const [rect, setRect] = useState(null)
-  const [page, setPage] = useState(0)
-  const [dir, setDir] = useState(1)
+  const [idx, setIdx] = useState(0) // the page (0 … 7); the spread is idx >> 1
+  const [flip, setFlip] = useState(null) // a page turning over: { from (spread), dir, key }
   const touch = isTouch()
+  // upright phone: one page at a time (the camera pans across the real book); laptop: the whole spread
+  const solo = touch && viewH() > viewW()
   useEffect(() => {
     let raf = 0
     const tick = () => {
       const r = getRect()
-      setRect((prev) => (!r ? null : prev && prev.rotated === r.rotated && Math.abs(prev.left - r.left) + Math.abs(prev.top - r.top) + Math.abs(prev.width - r.width) < 1 ? prev : r))
+      setRect((prev) => (!r ? null : prev && Math.abs(prev.left - r.left) + Math.abs(prev.top - r.top) + Math.abs(prev.width - r.width) < .5 ? prev : r))
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
   }, [getRect])
-  const goTo = (n) => setPage((p) => { n = Math.min(BOOK_LAST, Math.max(0, n)); if (n !== p) setDir(n > p ? 1 : -1); return n })
-  const turn = (d) => setPage((p) => { const n = Math.min(BOOK_LAST, Math.max(0, p + d)); if (n !== p) setDir(d); return n })
+  const spread = idx >> 1
+  // move to page n; crossing into another spread turns a page over
+  const show = (n) => setIdx((i) => {
+    n = Math.min(BOOK_PAGES - 1, Math.max(0, n)); if (n === i) return i
+    if (n >> 1 !== i >> 1) setFlip({ from: i >> 1, dir: n > i ? 1 : -1, key: Date.now() })
+    return n
+  })
+  const [hint, setHint] = useState(true) // the cue goes once the pages have been turned
+  const step = (d) => { setHint(false); show(solo ? idx + d : ((idx >> 1) + d) * 2) }
+  const goTo = (sp, n) => show(solo && n ? n - 1 : sp * 2)
+  useEffect(() => { if (solo) setSide?.(idx % 2 ? 1 : -1) }, [idx, solo, setSide])
   useEffect(() => {
-    const key = (e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); turn(e.key === 'ArrowRight' ? 1 : -1) } }
+    const key = (e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); step(e.key === 'ArrowRight' ? 1 : -1) } }
     window.addEventListener('keydown', key, true); return () => window.removeEventListener('keydown', key, true)
   })
-  const turned = rect?.rotated
+  // phones: swipe left for the next page, right for the previous one
+  const sw = useRef(null)
+  const swipe = solo ? {
+    onPointerDown: (e) => { sw.current = { x: e.clientX, y: e.clientY } },
+    onPointerUp: (e) => { const s0 = sw.current; sw.current = null; if (!s0) return; const dx = e.clientX - s0.x, dy = e.clientY - s0.y; if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.2) step(dx < 0 ? 1 : -1) },
+    onPointerCancel: () => { sw.current = null },
+  } : {}
+  const first = idx === 0, last = solo ? idx === BOOK_PAGES - 1 : spread === BOOK_LAST
+  const stop = (e) => e.stopPropagation()
   const navBtn = (d) => {
     const label = d < 0 ? 'Previous page' : 'Next page'
-    const disabled = d < 0 ? page === 0 : page === BOOK_LAST
-    // sideways book: previous above it, next below it; the button is turned with the book
-    // sideways book: both buttons stack bottom-left, beside the rotate cue and BACK TO ROOM
-    const style = turned
-      ? {}
-      : { left: d < 0 ? Math.max(8, rect.left - 56 - 22) : Math.min(viewW() - 64, rect.left + rect.width + 22), top: rect.top + rect.height / 2 - 28 }
-    return <button className={`book-nav${touch ? ' show-tip' : ''}${turned ? ` stack-nav ${d < 0 ? 'up' : 'down'}` : ''}`} style={style} disabled={disabled} aria-label={label}
-      onClick={(e) => { e.stopPropagation(); turn(d) }}>
-      <Arrow dir={turned ? (d < 0 ? 'up' : 'down') : d < 0 ? 'left' : 'right'} size={20}/>
-      {!turned && <span className="book-tip">{label}</span>}
+    const style = solo ? undefined : { left: d < 0 ? Math.max(8, rect.left - 56 - 22) : Math.min(viewW() - 64, rect.left + rect.width + 22), top: rect.top + rect.height / 2 - 28 }
+    return <button className={`book-nav${touch && !solo ? ' show-tip' : ''}${solo ? ` solo-nav ${d < 0 ? 'prev' : 'next'}` : ''}`} style={style} disabled={d < 0 ? first : last} aria-label={label}
+      onClick={(e) => { stop(e); step(d) }}>
+      <Arrow dir={d < 0 ? 'left' : 'right'} size={20}/>
+      {!solo && <span className="book-tip">{label}</span>}
     </button>
   }
+  // the page turning over: forward, the old right page swings over to become the new left one; back, the reverse
+  const leaf = flip && (() => {
+    const old = bookSpread(flip.from, goTo), now = bookSpread(spread, goTo)
+    const fwd = flip.dir > 0
+    return <motion.div key={flip.key} className={`book-leaf ${fwd ? 'fwd' : 'back'}`} initial={{ rotateY: 0 }} animate={{ rotateY: fwd ? -180 : 180 }}
+      transition={{ duration: .8, ease: [.4, .1, .25, 1] }} onAnimationComplete={() => setFlip((f) => (f && f.key === flip.key ? null : f))}>
+      <div className="leaf-face front">{fwd ? old[1] : old[0]}</div>
+      <div className="leaf-face back">{fwd ? now[0] : now[1]}</div>
+    </motion.div>
+  })()
+  // under a turning page, the half it's leaving still shows the old spread until it has gone over
+  const base = bookSpread(spread, goTo)
+  const under = flip ? (() => { const old = bookSpread(flip.from, goTo); return flip.dir > 0 ? [old[0], base[1]] : [base[0], old[1]] })() : base
   return <motion.div className="phone-overlay" onClick={onClose} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
-    {rect && <motion.div key={turned ? 'turned' : 'flat'} className="book-live" onClick={(e) => e.stopPropagation()}
-      style={turned
-        ? { left: rect.left + rect.width / 2 - rect.height / 2, top: rect.top + rect.height / 2 - rect.width / 2, width: rect.height, height: rect.width, rotate: 90 }
-        : { left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
+    <AnimatePresence>{!solo && rect && hint && <ArrowCue key="arrows" title="Use the arrows to turn the pages" hint="Click ← → or press the arrow keys"/>}</AnimatePresence>
+    <AnimatePresence>{solo && rect && hint && <motion.div key="book-cue" className="look-cue cam-cue is-touch book-cue" onClick={stop} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ delay: .3, duration: .35 }}>
+      <span className="cue-cam"><SwipeIcon/></span>
+      <span className="cue-text"><b>Turn the pages</b><small>Swipe or use the arrow keys</small></span>
+    </motion.div>}</AnimatePresence>
+    {rect && <motion.div className="book-live" onClick={stop} {...swipe}
+      style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .5 }}>
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div key={page} className="book-spread"
-          initial={{ opacity: 0, x: dir * 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -dir * 18 }} transition={{ duration: .22, ease: [.2, .8, .2, 1] }}>
-          {bookSpread(page, goTo)}
-        </motion.div>
-      </AnimatePresence>
+      <div className="book-spread">{under}</div>
+      {leaf}
     </motion.div>}
     {rect && navBtn(-1)}{rect && navBtn(1)}
-    {turned && <div className="rotate-hint"><RotateIcon/>Rotate your phone for a bigger view</div>}
+    {solo && rect && <div className="book-pageno" onClick={stop}>Page {idx + 1} of {BOOK_PAGES}</div>}
   </motion.div>
 }
 
@@ -603,21 +638,105 @@ function ComputerView({ onClose, getRect }) {
 
 // Achievements: the camera faces the framed certificates above the iMac; a small caption sits on top.
 // Add entries here ({ title, issuer, year }) as certificates come in.
-const ACHIEVEMENTS = []
-function AchievementsView({ onClose }) {
-  // on an upright phone the wall is shown sideways, so the caption turns with it
-  const turned = isTouch() // phones: always the portrait layout (turned back when held sideways)
-  return <motion.div className="phone-overlay achv-overlay" onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
-    {turned && <div className="rotate-hint"><RotateIcon/>Rotate your phone for a bigger view</div>}
-    <motion.div className={`achv-card${turned ? ' turned' : ''}`} onClick={(e) => e.stopPropagation()}
-      initial={turned ? { opacity: 0, x: '50%', y: '-50%', rotate: 90 } : { y: -10, x: '-50%', opacity: 0 }}
-      animate={turned ? { opacity: 1, x: '50%', y: '-50%', rotate: 90 } : { y: 0, x: '-50%', opacity: 1 }}
-      exit={{ opacity: 0 }} transition={{ delay: .8, duration: .35 }}>
-      <b>Achievements</b>
-      {ACHIEVEMENTS.length
-        ? <ul>{ACHIEVEMENTS.map((a) => <li key={a.title}><span>{a.title}</span><small>{a.issuer} · {a.year}</small></li>)}</ul>
-        : <small>Certificates and awards. Details coming soon.</small>}
-    </motion.div>
+// Where the bottom bar's row is on a laptop (null on phones, which have the BACK TO ROOM / menu buttons instead):
+// buttons that belong to a close-up sit beside it, or above its right end when the window is narrow.
+function useBarSpot() {
+  const [dock, setDock] = useState(null)
+  useEffect(() => {
+    let raf = 0
+    const tick = () => {
+      const bar = !document.querySelector('.touch-fabs') && (document.querySelector('.hud-dock .bottom-bar') || document.querySelector('.hud-dock'))
+      const d = bar && bar.getBoundingClientRect()
+      const next = !d ? null : { mode: viewW() - d.right >= 230 ? 'beside' : 'above', right: d.right, mid: d.top + d.height / 2, top: d.top }
+      setDock((p) => (!next ? null : p && p.mode === next.mode && Math.abs(p.right - next.right) + Math.abs(p.top - next.top) + Math.abs(p.mid - next.mid) < 1 ? p : next))
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+  return dock
+}
+
+// The description of one achievement (laptop: the card on the right; phone: the box under the certificate).
+// the place badge: gold for 1st, silver for 2nd, bronze for 3rd
+const placeTone = (place) => (/^1/.test(place) ? 'gold' : /^2/.test(place) ? 'silver' : /^3/.test(place) ? 'bronze' : 'gold')
+const MedalIcon = () => <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 3h8l-2.5 6h-3z"/><circle cx="12" cy="15" r="5.5"/><path d="m12 12.3.9 1.8 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2-1.45-1.4 2-.3z" fill="currentColor" stroke="none"/></svg>
+function CertDetails({ a }) {
+  return <>
+    <span className={`cert-place ${placeTone(a.place)}`}><MedalIcon/>{a.place}</span>
+    <h3>{a.title}</h3>
+    <p className="cert-meta">{a.event} · {a.date}</p>
+    <p className="cert-summary">{a.summary}</p>
+    {a.points.length > 0 && <ul className="cert-points">{a.points.map((p) => <li key={p}>{p}</li>)}</ul>}
+    <div className="cert-links">
+      <a className="resume-btn" href={a.image} target="_blank" rel="noreferrer"><OpenIcon/>Open certificate</a>
+      {a.project && <a className="resume-btn primary" href={a.project} target="_blank" rel="noreferrer"><CodeIcon/>View project</a>}
+    </div>
+  </>
+}
+
+// a hand swiping right
+const SwipeIcon = () => <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 13V6.5a1.5 1.5 0 0 1 3 0V12"/><path d="M12 11.5v-1a1.5 1.5 0 0 1 3 0v1.5M15 11.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-.6a5 5 0 0 1-4-2l-2.6-3.5a1.5 1.5 0 0 1 2.3-1.9L9 15"/><path d="M15 3.5h5M18 1.5l2 2-2 2"/></svg>
+
+// Achievements: the camera faces the framed certificates above the iMac. Click (or tap) a certificate to
+// see it up close with its description; Next pans out to the wall and in to the next one.
+function AchievementsView({ certId, getRect, onNext, onBack }) {
+  const phone = isTouch() // phones: the wall is shown sideways; a certificate opens upright with its details below
+  const [rect, setRect] = useState(null)
+  useEffect(() => {
+    let raf = 0
+    const tick = () => {
+      const r = getRect(); setRect((p) => (!r ? null : p && p.id === r.id && Math.abs(p.left - r.left) + Math.abs(p.top - r.top) + Math.abs(p.width - r.width) < 1 ? p : r))
+      // phones: where the buttons start (the details box stops the same distance above them as below the frame)
+      const b = document.querySelector('.cert-next')?.getBoundingClientRect().top
+      if (b) setBtnTop((p) => (Math.abs((p || 0) - b) < 1 ? p : b))
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [getRect])
+  const dock = useBarSpot()
+  const [btnTop, setBtnTop] = useState(null)
+  const a = ACHIEVEMENTS.find((x) => x.id === certId)
+  const shown = a && rect && rect.id === certId ? a : null
+  const nextStyle = dock ? (dock.mode === 'beside' ? { left: dock.right + 8, bottom: viewH() - dock.mid - 22 } : { right: viewW() - dock.right, bottom: viewH() - dock.top + 8 }) : undefined
+  return <motion.div className="phone-overlay achv-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
+    <AnimatePresence>{!certId && <motion.div key="wall" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .25 }}>
+      {/* the same cue boxes as "Pinch to zoom" on the résumé; phones also get one for swiping along the wall */}
+      {phone
+        // phones: one box with two rows, like the cue at the desk corner
+        ? <motion.div className="look-cue cam-cue desk-cue is-touch" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .8, duration: .35 }}>
+            <span className="dc-row on"><span className="cue-cam"><SwipeIcon/></span><span className="cue-text"><b>Swipe right to see the whole wall</b><small>Drag across to move along it</small></span></span>
+            <span className="dc-row on"><span className="cue-cam">{CUES.achievements.icon}</span><span className="cue-text"><b>Tap a certificate to view it</b><small>See what each achievement was for</small></span></span>
+          </motion.div>
+        : <motion.div className="look-cue cam-cue achv-cue" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .8, duration: .35 }}>
+            <span className="cue-cam">{CUES.achievements.icon}</span>
+            <span className="cue-text"><b>Click a certificate to view it</b><small>See what each achievement was for</small></span>
+          </motion.div>}
+    </motion.div>}</AnimatePresence>
+    <AnimatePresence>{shown && (phone
+      // phone: the framed certificate on the wall up top (the room stays in view), its details below
+      ? <motion.div key={shown.id} className="cert-sheet" onClick={(e) => { if (e.target === e.currentTarget) onBack() }}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .3 }}>
+          {/* fixed in place, equal gaps above and below; its text scrolls inside it */}
+          <article className="cert-box fixed" style={{ top: rect.frameBottom + 16, bottom: viewH() - (btnTop ?? viewH() - 130) + 16 }}>
+            <div className="cert-box-scroll"><CertDetails a={shown}/></div>
+          </article>
+        </motion.div>
+      // laptop: the certificate on the left, this card on the right
+      : <div key={shown.id} className="cert-card-wrap" style={{ left: rect.left + rect.width * 1.11 + 24 }}>
+          <motion.i className="cert-scrim" aria-hidden="true" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .35 }}/>
+          <motion.article className="cert-card" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} transition={{ duration: .35, ease: [.2, .8, .2, 1] }}>
+            <CertDetails a={shown}/>
+          </motion.article>
+        </div>)}</AnimatePresence>
+    {/* beside the bar (laptop) or bottom-left (phone): back to the whole wall, and on to the next certificate */}
+    {certId && <motion.div className={`resume-actions cert-next${dock ? (dock.mode === 'above' ? ' row' : '') : ' stacked'}`} style={nextStyle}
+      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .3 }}>
+      {/* like the résumé: the dark button on top, the white one level with the bar */}
+      {ACHIEVEMENTS.length > 1 && <button className="resume-btn primary" onClick={onNext}>Next certificate <Arrow size={14}/></button>}
+      <button className="resume-btn" onClick={onBack}><Arrow dir="left" size={14}/> Back to certificates</button>
+    </motion.div>}
   </motion.div>
 }
 
@@ -659,6 +778,7 @@ function SpotCard({ app, onClose }) {
 
 // The files: a box file comes off the shelf and opens; my résumé lies on top of the papers inside.
 const DownloadIcon = () => <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+const CodeIcon = () => <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg>
 const OpenIcon = () => <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
 function ResumeView({ onClose, getRect, setInsets }) {
   const [rect, setRect] = useState(null)
@@ -771,7 +891,8 @@ function CameraView({ onClose, getRect }) {
     return () => cancelAnimationFrame(raf)
   }, [getRect])
   const n = PHOTOS.length
-  const step = (d) => n && setI((v) => (v + d + n) % n)
+  const [hint, setHint] = useState(true)
+  const step = (d) => { setHint(false); n && setI((v) => (v + d + n) % n) }
   useEffect(() => {
     const key = (e) => { if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); step(-1) } if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); step(1) } }
     window.addEventListener('keydown', key, true); return () => window.removeEventListener('keydown', key, true)
@@ -788,6 +909,8 @@ function CameraView({ onClose, getRect }) {
           : <div className="cam-empty"><b>No photos yet</b><span>more coming soon</span></div>}
         <span className="cam-hud">{n ? `${i + 1} / ${n}` : '0 / 0'}</span>
       </motion.div>
+      {/* laptop only: a cue above the bar until the arrows are first used (phones stay as they are) */}
+      <AnimatePresence>{!isTouch() && hint && <ArrowCue key="arrows" title="Use the arrows to browse the photos" hint="Click ← → or press the arrow keys"/>}</AnimatePresence>
       {rect.rotated ? <>
         <button className="cam-nav stack-nav up" onClick={(e) => { e.stopPropagation(); step(-1) }} disabled={n < 2} aria-label="Previous photo"><Arrow dir="up" size={22}/></button>
         <button className="cam-nav stack-nav down" onClick={(e) => { e.stopPropagation(); step(1) }} disabled={n < 2} aria-label="Next photo"><Arrow dir="down" size={22}/></button>
@@ -829,7 +952,8 @@ export default function App() {
     return () => { window.removeEventListener('resize', on); window.removeEventListener('orientationchange', on) }
   }, [])
   const [systemApp, setSystemApp] = useState('about')
-  const landOK = systemOpen && ['about', 'photos', 'achievements', 'projects'].includes(systemApp)
+  const [certId, setCertId] = useState(null) // the certificate open on the achievements wall
+  const landOK = systemOpen && ['photos', 'projects'].includes(systemApp) // (the book and the achievements wall are portrait only on phones) // (the achievements wall is portrait only on phones)
   const lockOn = land // the computer too: same portrait layout, turned back, as the book and the camera
   useLayoutEffect(() => { setPortraitLock(lockOn); window.dispatchEvent(new Event('portrait-lock')) }, [lockOn, land])
   const sceneRef = useRef(null)
@@ -838,6 +962,7 @@ export default function App() {
   const updateDeskNear = useCallback((v) => setDeskNear(v), [])
   const updateSystem = useCallback((open, app) => { if (open && app) setSystemApp(app); setSystemOpen(open) }, [])
   const updateReady = useCallback(() => setSceneReady(true), [])
+  const updateCert = useCallback((id) => setCertId(id), [])
   const [load, setLoad] = useState({ progress: 0, loaded: 0, total: 0 })
   const updateProgress = useCallback((progress, loaded, total) => setLoad((prev) => (progress - prev.progress > .005 || progress >= 1 ? { progress, loaded, total } : prev)), [])
   const [introPhase, setIntroPhase] = useState('hidden') // hidden → center → corner
@@ -867,7 +992,9 @@ export default function App() {
   const closeSystem = () => sceneRef.current?.closeSystem()
   const getPhoneRect = useCallback(() => sceneRef.current?.phoneScreenRect() ?? null, [])
   const getCameraRect = useCallback(() => sceneRef.current?.cameraScreenRect() ?? null, [])
+  const getCertRect = useCallback(() => sceneRef.current?.certRect?.() ?? null, [])
   const getComputerRect = useCallback(() => sceneRef.current?.computerScreenRect?.() ?? null, [])
+  const setBookSide = useCallback((side) => sceneRef.current?.setBookSide?.(side), [])
   const getBookRect = useCallback(() => sceneRef.current?.focusRect('about') ?? null, [])
   const getResumeRect = useCallback(() => sceneRef.current?.resumeRect?.() ?? null, [])
   const setResumeInsets = useCallback((v) => sceneRef.current?.setResumeInsets?.(v), [])
@@ -879,14 +1006,14 @@ export default function App() {
   }, [sceneReady])
   useEffect(() => { sceneRef.current?.setTimeOfDay(hour) }, [hour, sceneReady])
   useEffect(() => { const timer = window.setInterval(() => setClockHour(systemHour()), 60000); return () => window.clearInterval(timer) }, [])
-  return <main className="app-shell"><OfficeScene sceneRef={sceneRef} onHotspot={updateHotspot} onDeskNear={updateDeskNear} onSystem={updateSystem} onReady={updateReady} onProgress={updateProgress}/>
+  return <main className="app-shell"><OfficeScene sceneRef={sceneRef} onHotspot={updateHotspot} onDeskNear={updateDeskNear} onSystem={updateSystem} onReady={updateReady} onProgress={updateProgress} onCert={updateCert}/>
     <div className="ambient-vignette"/>
     <AnimatePresence>{loading && <Loader progress={load.progress} loaded={load.loaded} total={load.total} ready={sceneReady} onEnter={finishLoading}/>}</AnimatePresence>
     <AnimatePresence>{land && !landOK && <RotateBack key="rotate-back"/>}</AnimatePresence>
     <AnimatePresence>{systemOpen && (systemApp === 'contact'
       ? <PhoneScreen key="phone" onClose={closeSystem} getRect={getPhoneRect}/>
       : systemApp === 'about'
-      ? <BookPages key="book" onClose={closeSystem} getRect={getBookRect}/>
+      ? <BookPages key="book" onClose={closeSystem} getRect={getBookRect} setSide={setBookSide}/>
       : systemApp === 'photos'
       ? <CameraView key="camera" onClose={closeSystem} getRect={getCameraRect}/>
       : systemApp === 'projects'
@@ -894,7 +1021,7 @@ export default function App() {
       : systemApp === 'music'
       ? <MusicPanel key="music" onClose={closeSystem}/>
       : systemApp === 'achievements'
-      ? <AchievementsView key="achievements" onClose={closeSystem}/>
+      ? <AchievementsView key="achievements" certId={certId} getRect={getCertRect} onNext={() => sceneRef.current?.nextCert()} onBack={() => sceneRef.current?.backToWall()}/>
       : systemApp === 'resume'
       ? <ResumeView key="resume" onClose={closeSystem} getRect={getResumeRect} setInsets={setResumeInsets}/>
       : <SpotCard key={systemApp} app={systemApp} onClose={closeSystem}/>)}</AnimatePresence>
