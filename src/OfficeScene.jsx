@@ -644,7 +644,7 @@ function createScene(canvas, handlers) {
   }, (xhr) => { if (xhr.total) handlers.onProgress?.(xhr.loaded / xhr.total, xhr.loaded, xhr.total) }, (error) => { console.error('Unable to load the home-office model.',error); loadError=true; handlers.onReady?.() })
 
   // Phone close-up: the camera glides down to look straight onto the phone lying on the desk.
-  let focus=null, speakerObj=null, pendantsHidden=false
+  let focus=null, speakerObj=null, pendantsHidden=false, musicLevel=0, musicSm=0, musicOn=false, musicDim=0
   const tmpM=new THREE.Matrix4(), tmpV=new THREE.Vector3(), tmpQ=new THREE.Quaternion(), tmpSize=new THREE.Vector2()
   // Close-ups: the camera glides down to look straight onto an object lying on a surface.
   const FOCUS = {
@@ -661,7 +661,7 @@ function createScene(canvas, handlers) {
     const portrait=aspect<1
     const toRoom=roomBounds.getCenter(new THREE.Vector3()).sub(target); toRoom.y=0; toRoom.normalize()
     // distance: the speaker (≈ .2 m tall incl. perspective) fills ≈ 50% of the height, or ≈ 62% of the width on a phone
-    const dist=portrait?Math.max(.2/(.4*2*t),.14/(.8*2*t*aspect)):.2/(.7*2*t)
+    const dist=portrait?Math.max(.2/(.3*2*t),.14/(.62*2*t*aspect)):.2/(.7*2*t)
     const pitch=.42 // looking down a little
     const back=toRoom.clone().multiplyScalar(Math.cos(pitch)*dist)
     const pos=target.clone().add(back); pos.y+=Math.sin(pitch)*dist
@@ -669,7 +669,7 @@ function createScene(canvas, handlers) {
     const quat=new THREE.Quaternion().setFromRotationMatrix(tmpM)
     const right=new THREE.Vector3(1,0,0).applyQuaternion(quat), up=new THREE.Vector3(0,1,0).applyQuaternion(quat)
     // move the camera so the speaker lands at x≈26% (laptop) or y≈25% from the top (phone)
-    if(portrait) pos.addScaledVector(up,-(.5-.24)*2*t*dist)
+    if(portrait) pos.addScaledVector(up,-(.5-.17)*2*t*dist)
     else pos.addScaledVector(right,(.5-.26)*2*t*aspect*dist)
     return {pos,quat,fov,id:'music'}
   }
@@ -689,8 +689,8 @@ function createScene(canvas, handlers) {
       // screen: swipe sideways along it (wallPan, starting at its left end). The two cues sit above.
       const right=new THREE.Vector3(1,0,0).transformDirection(wall.matrixWorld), wUp=new THREE.Vector3(0,1,0).transformDirection(wall.matrixWorld)
       const top=214, bottom=160, usable=(H-top-bottom)/H
-      let tt=t, dist=(h*.49)/(tt*usable)
-      if(dist>maxDist){dist=maxDist;tt=(h*.49)/(dist*usable)} // no room to back off: a wider lens instead
+      let tt=t, dist=(h*.4)/(tt*usable)
+      if(dist>maxDist){dist=maxDist;tt=(h*.4)/(dist*usable)} // no room to back off: a wider lens instead
       const visHalf=tt*aspect*dist
       wallPanMax=Math.max(0,w/2+.02-visHalf); wallPxPerM=W/(2*visHalf)
       if(wallPan==null)wallPan=-wallPanMax
@@ -990,10 +990,10 @@ function createScene(canvas, handlers) {
   // laptop: a hand cursor over the certificates that open
   const hoverCert=(event)=>{ if(pointer||event.pointerType!=='mouse'||!inAchievements())return; canvas.style.cursor=pickCert(event)?'pointer':'' }
   const pointerMove=(event)=>{
-    // phones, on the achievements wall: drag sideways to move along it (drag right → further right)
+    // phones, on the achievements wall: swipe sideways to move along it (swipe left → further right)
     if(pointer&&pointer.id===event.pointerId&&inAchievements()&&!certSel&&wallPanMax>0){
       const [dx]=toLocal(event.clientX-pointer.x,event.clientY-pointer.y); pointer.x=event.clientX; pointer.y=event.clientY
-      wallPan=THREE.MathUtils.clamp((wallPan??-wallPanMax)+dx/wallPxPerM,-wallPanMax,wallPanMax); return
+      wallPan=THREE.MathUtils.clamp((wallPan??-wallPanMax)-dx/wallPxPerM,-wallPanMax,wallPanMax); return // swipe left → further right
     }
     if(!pointer||pointer.id!==event.pointerId||state.system||state.allowLook===false)return; const [dx,dy]=toLocal(event.clientX-pointer.x,event.clientY-pointer.y); pointer.x=event.clientX;pointer.y=event.clientY;state.yaw-=dx*.003;state.pitch=THREE.MathUtils.clamp(state.pitch-dy*.002,-.75,.32) }
 
@@ -1088,9 +1088,13 @@ function createScene(canvas, handlers) {
       // the desk lamp sits right beside the phone; ease the exposure down so the wood still reads
       renderer.toneMappingExposure=.9-.28*(focus&&!['music','achievements','projects'].includes(focus.to.id)&&!String(focus.to.id).startsWith('cert')?(focus.phase==='in'?e:1-e):0)
     } else renderer.toneMappingExposure=.9
+    // a song playing on the speaker: the room dims a little
+    musicDim+=((musicOn?1:0)-musicDim)*Math.min(1,dt*2.5)
+    renderer.toneMappingExposure*=1-.16*musicDim
     // the ceiling pendants hang between the far end of the room and the certificate wall: hide their
     // fittings (not their light) while the wall close-up is on screen
-    const hidePend=!!(focus&&focus.to.id==='achievements'&&focus.to.turn)
+    // (any close-up on the certificates: the pendants hang in front of the wall and read as a black bar)
+    const hidePend=!!(focus&&(focus.to.id==='achievements'||String(focus.to.id).startsWith('cert')))
     if(hidePend!==pendantsHidden){pendantsHidden=hidePend;scene.traverse((o)=>{if(o.name==='linear-pendant')o.traverse((m)=>{if(m.isMesh)m.visible=!hidePend})})}
     // the speaker's top lights up while its song card is open
     if(!speakerObj)speakerObj=scene.getObjectByName('cabinet-speaker')
@@ -1098,8 +1102,10 @@ function createScene(canvas, handlers) {
     if(sg){
       const want=state.system&&state.hotspot?.id==='music'?1:0
       sg.level+=(want-sg.level)*Math.min(1,dt*3)
-      sg.onMat.opacity=sg.level; sg.idle.opacity=.55*(1-sg.level)
-      if(sg.level>.01)sg.on.rotation.z-=dt*.7
+      // while a song plays: the glow pulses with it and spins faster (the speaker itself stays put: the camera frames it)
+      musicSm+=(musicLevel-musicSm)*Math.min(1,dt*10)
+      sg.onMat.opacity=sg.level*(musicOn?.55+.45*Math.min(1,musicSm*1.8):1); sg.idle.opacity=.55*(1-sg.level)
+      if(sg.level>.01)sg.on.rotation.z-=dt*(.7+(musicOn?2.4*musicSm:0))
     }
     if(uiTime>.12){handlers.onPosition?.({x:state.x,z:state.z,minX:walkBounds?.min.x??-1,maxX:walkBounds?.max.x??1,minZ:walkBounds?.min.z??-1,maxZ:walkBounds?.max.z??1});uiTime=0}
     if(hold){
@@ -1164,6 +1170,8 @@ function createScene(canvas, handlers) {
       return {left:x0,top:y0,width:x1-x0,height:y1-y0,radius:(x1-x0)*spec.rect.r/spec.rect.w,rotated:!!focus.to.turn}
     },
     phoneScreenRect(){ return this.focusRect('contact') },
+    // the song card: how loud the preview is right now (0–1), and whether one is playing
+    setMusic({level=0,playing=false}={}){ musicLevel=level; musicOn=playing },
     // phones: show the left (-1) or right (1) page of the open book
     setBookSide(side){ if(side===bookSide)return; bookSide=side; if(state.system&&focus?.to.id==='about'&&sideways())refocus(focusView('about'),null,true) },
     // achievements: open / step through / leave the certificates

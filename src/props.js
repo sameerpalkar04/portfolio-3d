@@ -239,67 +239,107 @@ export function createPendant(length = 1, drop = .55) {
 
 // ---- Bonsai ------------------------------------------------------------------
 // Small juniper-style bonsai in a shallow glazed pot. Origin at the bottom centre.
+// A juniper bonsai in the classic style: a twisting trunk streaked with pale deadwood, several branches
+// reaching out to flat "cloud" pads of dark blue-green foliage (one cascading down on the right), in an
+// oval glazed pot with little feet on a slate stand. Origin at the bottom centre of the stand.
+function needleTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 128
+  const ctx = c.getContext('2d'); let s = 5; const rand = () => (s = (s * 16807) % 2147483647) / 2147483647
+  ctx.lineCap = 'round'
+  for (let i = 0; i < 70; i++) { // a sprig: fine needles fanning from the centre
+    const a = rand() * Math.PI * 2, len = 22 + rand() * 38, x0 = 64 + Math.cos(a) * 6, y0 = 64 + Math.sin(a) * 6
+    ctx.strokeStyle = `rgba(${200 + rand() * 55 | 0},${225 + rand() * 30 | 0},${200 + rand() * 55 | 0},1)`; ctx.lineWidth = 2 + rand() * 1.6
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(64 + Math.cos(a) * len, 64 + Math.sin(a) * len); ctx.stroke()
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace
+  return t
+}
+// a tube whose radius follows r(t); `twist` turns a deadwood stripe around it
+function bonsaiTube(curve, r, mat, seg = 36, rad = 10, ridge = .1) {
+  const g = new THREE.TubeGeometry(curve, seg, 1, rad, false)
+  const pos = g.attributes.position, fr = curve.computeFrenetFrames(seg, false), v = new THREE.Vector3()
+  for (let i = 0; i <= seg; i++) {
+    const t = i / seg, c = curve.getPointAt(t), rr = r(t)
+    for (let j = 0; j <= rad; j++) {
+      const a = j / rad * Math.PI * 2, k = 1 + ridge * Math.sin(a * 3 + t * 11)
+      v.copy(fr.normals[i]).multiplyScalar(-Math.cos(a)).addScaledVector(fr.binormals[i], Math.sin(a)).multiplyScalar(rr * k).add(c)
+      pos.setXYZ(i * (rad + 1) + j, v.x, v.y, v.z)
+    }
+  }
+  g.computeVertexNormals()
+  const m = new THREE.Mesh(g, mat); m.castShadow = true; m.receiveShadow = true
+  return m
+}
 export function createBonsai() {
   const tree = new THREE.Group(); tree.name = 'bonsai'
-  let seed = 17; const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647
-  // pot: shallow rounded rectangle, dark glaze, with little feet
-  const potMat = new THREE.MeshPhysicalMaterial({ color: '#6a4030', roughness: .35, clearcoat: .6, clearcoatRoughness: .25 })
-  const pot = new THREE.Mesh(new RoundedBoxGeometry(.22, .055, .15, 4, .012), potMat)
-  pot.position.y = .012 + .0275; tree.add(pot)
-  for (const [x, z] of [[-.085, -.05], [.085, -.05], [-.085, .05], [.085, .05]]) {
-    const foot = new THREE.Mesh(new THREE.BoxGeometry(.022, .012, .022), potMat); foot.position.set(x, .006, z); tree.add(foot)
+  let seed = 31; const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+  const V = (x, y, z) => new THREE.Vector3(x, y, z)
+  const add = (o) => { tree.add(o); return o }
+  // slate stand
+  const slate = new THREE.MeshStandardMaterial({ color: '#4a4d50', roughness: .85 })
+  add(new THREE.Mesh(new RoundedBoxGeometry(.27, .012, .17, 2, .004), slate)).position.y = .006
+  // oval pot: a shallow glazed dish with a rolled rim and four feet
+  const glaze = new THREE.MeshPhysicalMaterial({ color: '#6b4540', roughness: .45, clearcoat: .4, clearcoatRoughness: .4 })
+  const footY = .012, potH = .038, potY = footY + .008
+  for (const [x, z] of [[-.075, -.035], [.075, -.035], [-.075, .035], [.075, .035]]) {
+    const f = add(new THREE.Mesh(new THREE.CylinderGeometry(.011, .013, .008, 12), glaze)); f.position.set(x, footY + .004, z)
   }
-  const soilY = .012 + .057 // just above the pot rim so the soil shows
-  const soil = new THREE.Mesh(new THREE.BoxGeometry(.2, .004, .13), new THREE.MeshStandardMaterial({ color: '#3b2a1c', roughness: 1 }))
-  soil.position.y = soilY; tree.add(soil)
-  const mossMat = new THREE.MeshStandardMaterial({ color: '#5d7d34', roughness: 1 })
-  for (let i = 0; i < 9; i++) {
-    const m = new THREE.Mesh(new THREE.SphereGeometry(.012 + rand() * .012, 8, 6), mossMat)
-    m.scale.y = .3; m.position.set((rand() - .5) * .16, soilY + .002, (rand() - .5) * .09); tree.add(m)
+  const body = add(new THREE.Mesh(new THREE.CylinderGeometry(.118, .102, potH, 48), glaze)); body.scale.z = .58; body.position.y = potY + potH / 2
+  const rim = add(new THREE.Mesh(new THREE.TorusGeometry(.116, .0045, 8, 48), glaze)); rim.rotation.x = Math.PI / 2; rim.scale.y = .58; rim.position.y = potY + potH
+  const soilY = potY + potH + .002
+  const soil = add(new THREE.Mesh(new THREE.CircleGeometry(.112, 40), new THREE.MeshStandardMaterial({ color: '#3d3226', roughness: 1 })))
+  soil.rotation.x = -Math.PI / 2; soil.scale.y = .58; soil.position.y = soilY
+  // moss in patches
+  const moss = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1, flatShading: true }), 260)
+  const mm = new THREE.Matrix4(), mq = new THREE.Quaternion(), ms = new THREE.Vector3(), mp = new THREE.Vector3(), mc = new THREE.Color()
+  for (let i = 0; i < 260; i++) {
+    const a = rand() * Math.PI * 2, d = Math.sqrt(rand()) * .1, r = .0025 + rand() * .004
+    mp.set(Math.cos(a) * d, soilY + .001, Math.sin(a) * d * .55)
+    moss.setMatrixAt(i, mm.compose(mp, mq.setFromEuler(new THREE.Euler(rand(), rand() * 3, rand())), ms.set(r, r * .45, r)))
+    moss.setColorAt(i, mc.set(['#6f8f3a', '#82a046', '#5e7d32', '#9aae58'][i % 4]))
   }
-  // trunk: an S-curve, tapering as it rises
-  const barkMat = new THREE.MeshStandardMaterial({ color: '#5a4434', roughness: .9 })
-  const trunkPts = [[-.02, soilY, 0], [-.035, soilY + .05, .01], [.005, soilY + .1, -.005], [.035, soilY + .15, .008], [.01, soilY + .2, 0], [-.015, soilY + .235, -.005]]
-    .map(([x, y, z]) => new THREE.Vector3(x, y, z))
-  const trunkCurve = new THREE.CatmullRomCurve3(trunkPts)
-  const segs = 14
-  for (let i = 0; i < segs; i++) {
-    const a = trunkCurve.getPoint(i / segs), b = trunkCurve.getPoint((i + 1) / segs)
-    const r0 = .016 * (1 - i / segs * .7), r1 = .016 * (1 - (i + 1) / segs * .7)
-    const len = a.distanceTo(b)
-    const seg = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, len, 10), barkMat)
-    seg.position.copy(a).add(b).multiplyScalar(.5)
-    seg.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize()); tree.add(seg)
-    const joint = new THREE.Mesh(new THREE.SphereGeometry(r1, 10, 8), barkMat); joint.position.copy(b); tree.add(joint)
-  }
-  const flare = new THREE.Mesh(new THREE.CylinderGeometry(.016, .028, .02, 12), barkMat); flare.position.set(-.02, soilY + .008, 0); tree.add(flare)
-  // branches ending in foliage pads
+  add(moss)
+  // trunk: reddish bark twisting up in an S
+  const barkMat = new THREE.MeshStandardMaterial({ color: '#6a4637', roughness: .9 })
+  const trunk = new THREE.CatmullRomCurve3([V(.015, soilY - .004, 0), V(.028, soilY + .04, .005), V(-.008, soilY + .085, -.005), V(-.05, soilY + .115, .007), V(-.035, soilY + .16, 0), V(.008, soilY + .19, -.006), V(-.01, soilY + .235, 0)])
+  const rT = (t) => .02 * (1 - .55 * t) + .012 * Math.max(0, 1 - t * 5)
+  add(bonsaiTube(trunk, rT, barkMat, 48, 12, .14))
+  // foliage pads: flat clouds, wider than tall; the right one cascades below the crown
   const pads = [
-    { from: .35, to: [-.11, soilY + .1, .02], size: [.07, .03, .05] },
-    { from: .55, to: [.11, soilY + .15, -.01], size: [.075, .032, .055] },
-    { from: .75, to: [-.07, soilY + .2, -.02], size: [.06, .028, .05] },
-    { from: .95, to: [.01, soilY + .26, 0], size: [.075, .04, .06] },
-    { from: .65, to: [.04, soilY + .19, .06], size: [.05, .025, .04] },
+    { at: .98, c: V(-.005, soilY + .285, 0), r: [.07, .03, .05] },     // apex
+    { at: .78, c: V(-.115, soilY + .215, .01), r: [.06, .022, .045] },  // left
+    { at: .9, c: V(.085, soilY + .25, -.01), r: [.06, .024, .045] },    // right, upper
+    { at: .6, c: V(.16, soilY + .16, .015), r: [.055, .024, .04] },     // right, cascading low
+    { at: .72, c: V(.02, soilY + .225, -.065), r: [.045, .02, .035] },  // back
+    { at: .68, c: V(-.04, soilY + .19, .06), r: [.042, .018, .032] },   // front
   ]
-  const leafColors = ['#2f5a24', '#3b6b2a', '#467a30', '#2a4f20']
-  const blob = new THREE.IcosahedronGeometry(1, 1)
   for (const pad of pads) {
-    const start = trunkCurve.getPoint(pad.from), end = new THREE.Vector3(...pad.to)
-    const mid = start.clone().lerp(end, .5).add(new THREE.Vector3(0, .015, 0))
-    const branch = new THREE.Mesh(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(start, mid, end), 8, .0045, 6), barkMat)
-    tree.add(branch)
-    const count = 26
-    const leaves = new THREE.InstancedMesh(blob, new THREE.MeshStandardMaterial({ roughness: .85, flatShading: true }), count)
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), pos = new THREE.Vector3(), col = new THREE.Color()
-    for (let i = 0; i < count; i++) {
-      const u = rand() * Math.PI * 2, v = rand()
-      pos.set(Math.cos(u) * pad.size[0] * Math.sqrt(v), (rand() - .3) * pad.size[1], Math.sin(u) * pad.size[2] * Math.sqrt(v)).add(end)
-      const r = .011 + rand() * .01; sc.set(r, r * .7, r)
-      q.setFromEuler(new THREE.Euler(rand() * 3, rand() * 3, rand() * 3))
-      leaves.setMatrixAt(i, m.compose(pos, q, sc)); leaves.setColorAt(i, col.set(leafColors[i % leafColors.length]))
+    const from = trunk.getPointAt(pad.at), to = pad.c.clone().add(V(0, -pad.r[1] * .6, 0))
+    const mid = from.clone().lerp(to, .5).add(V(0, .018, 0))
+    add(bonsaiTube(new THREE.QuadraticBezierCurve3(from, mid, to), (t) => .0065 * (1 - .6 * t), barkMat, 12, 6, .08))
+    // a few twigs inside the pad
+    for (let k = 0; k < 3; k++) {
+      const tip = pad.c.clone().add(V((rand() - .5) * pad.r[0] * 1.4, -pad.r[1] * .2, (rand() - .5) * pad.r[2] * 1.4))
+      add(bonsaiTube(new THREE.QuadraticBezierCurve3(to, to.clone().lerp(tip, .5).add(V(0, .006, 0)), tip), (t) => .0028 * (1 - .7 * t), barkMat, 6, 5, 0))
     }
-    leaves.castShadow = true; tree.add(leaves)
   }
+  // needles: sprig cards over each pad, densest on top, a dark blue-green
+  const N = 2100
+  const sprigs = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshStandardMaterial({ map: needleTexture(), alphaTest: .45, side: THREE.DoubleSide, roughness: .8 }), N)
+  const greens = ['#7cb342', '#8bc34a', '#6fa83a', '#9ccc65', '#81b94a'] // light, fresh greens
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), n = new THREE.Vector3(), col = new THREE.Color(), zAxis = V(0, 0, 1)
+  for (let i = 0; i < N; i++) {
+    const pad = pads[i % pads.length]
+    const u = rand() * Math.PI * 2, w = Math.acos(1 - rand() * 1.45), d = .65 + rand() * .35
+    n.set(Math.sin(w) * Math.cos(u), Math.cos(w), Math.sin(w) * Math.sin(u))
+    p.set(n.x * pad.r[0] * d, n.y * pad.r[1] * d, n.z * pad.r[2] * d).add(pad.c)
+    q.setFromUnitVectors(zAxis, n.clone().add(V((rand() - .5) * 1.1, (rand() - .5) * .6 + .3, (rand() - .5) * 1.1)).normalize())
+    q.multiply(new THREE.Quaternion().setFromAxisAngle(zAxis, rand() * Math.PI * 2))
+    const s = .014 + rand() * .01
+    sprigs.setMatrixAt(i, m.compose(p, q, sc.set(s, s, s)))
+    sprigs.setColorAt(i, col.set(greens[Math.floor(rand() * greens.length)]).multiplyScalar(.7 + .4 * Math.max(0, n.y)))
+  }
+  sprigs.castShadow = true; add(sprigs)
   tree.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })
   return tree
 }

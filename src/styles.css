@@ -728,3 +728,115 @@ body.menu-open .book-cue{visibility:hidden}
 .book-pageno{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));left:calc(142px + env(safe-area-inset-left));right:calc(76px + env(safe-area-inset-right));height:52px;display:grid;place-items:center;background:#fff;color:#1d1f22;border:1px solid #dcdee2;border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.12),0 4px 12px rgba(0,0,0,.16);font:500 12px 'DM Sans',system-ui,sans-serif;box-sizing:border-box}
 body.menu-open .book-pageno{visibility:hidden}
 .look-cue.arrow-cue{pointer-events:none}
+/* book on a phone: the page number on the left, then ← →, then the menu button */
+.book-pageno{left:calc(14px + env(safe-area-inset-left));right:calc(204px + env(safe-area-inset-right))}
+.phone-overlay .book-nav.solo-nav.prev{left:auto;right:calc(140px + env(safe-area-inset-right))}
+.phone-overlay .book-nav.solo-nav.next{left:auto;right:calc(76px + env(safe-area-inset-right))}
+/* certificate details on a phone: scrolls without a visible scrollbar, like the song card */
+.cert-box-scroll{scrollbar-width:none;-ms-overflow-style:none}
+.cert-box-scroll::-webkit-scrollbar{display:none}
+/* phones: "Songs on repeat" on the same line as "On my speaker", at the right */
+@media (max-width:720px){
+  .music-card header{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .music-sub{margin-top:0;white-space:nowrap}
+}
+html[data-lock] .music-card header{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+html[data-lock] .music-sub{margin-top:0;white-space:nowrap}
+/* ---- Speaker card v3: a personal line, a now-playing strip, previews that play here ------------- */
+.music-tag{margin:12px 6px 0;font:italic 400 14px 'Iowan Old Style',Palatino,Georgia,serif;color:#6b7078}
+.np{display:grid;grid-template-columns:64px 1fr auto auto;align-items:center;gap:12px;margin:14px 0 6px;padding:12px;border-radius:14px;background:#f5f6f8}
+.np img{width:64px;height:64px;border-radius:10px;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.np-text{display:flex;flex-direction:column;min-width:0;gap:1px}
+.np-text small{font:600 10px 'DM Sans',system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#1a8f4c}
+.np-text b{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.np-text span{font-size:13px;color:#6b7078;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.np-bar{height:3px;margin-top:8px;border-radius:2px;background:#dfe2e6;overflow:hidden}
+.np-bar i{display:block;height:100%;background:#1a8f4c;transition:width .25s linear}
+.np-btn{width:42px;height:42px;border-radius:50%;border:1px solid #dcdee2;background:#fff;color:#1d1f22;display:grid;place-items:center;cursor:pointer;text-decoration:none}
+.np-btn.primary{width:46px;height:46px;background:#1d1f22;border-color:#1d1f22;color:#fff}
+.np-btn:hover{filter:brightness(.96)}
+/* rows: tap to play; the Spotify link keeps its pill */
+.music-row{display:grid;grid-template-columns:22px 48px 1fr auto;align-items:center;gap:14px;padding:8px 6px;border-radius:12px;cursor:pointer}
+.music-row:hover{background:#f4f5f7}
+.music-row.on{background:#eef7f1}
+.music-row.on .music-text b{color:#1a8f4c}
+.music-list a.music-go{display:inline-flex;grid-template-columns:none;align-items:center;gap:4px;padding:6px 10px;text-decoration:none}
+.eq{display:inline-flex;align-items:flex-end;gap:2px;height:14px;width:14px}
+.eq i{flex:1;background:#1a8f4c;border-radius:1px;height:calc(var(--l0,.4) * 100%)}
+.eq i:nth-child(2){height:calc(var(--l1,.6) * 100%)}
+.eq i:nth-child(3){height:calc(var(--l2,.3) * 100%)}
+@media (max-aspect-ratio:1/1){
+  .music-card{top:33%}
+  .music-tag{font-size:13px;margin-top:8px}
+  .np{grid-template-columns:52px 1fr auto auto;gap:10px;padding:10px;margin:10px 0 4px}
+  .np img{width:52px;height:52px}
+  .np-btn{width:38px;height:38px}.np-btn.primary{width:42px;height:42px}
+  .music-row{grid-template-columns:18px 42px 1fr auto;gap:10px;padding:7px 4px}
+  .music-list a.music-go{padding:5px 8px;font-size:11px}
+}
+.music-list a.music-go{color:#1a8f4c;background:#eaf6ef;font-weight:600;border-radius:99px}
+.music-tag{font:400 14px 'DM Sans',system-ui,sans-serif;font-style:normal;color:#6b7078}
+@media (max-aspect-ratio:1/1){.music-tag{font-size:13px}}
+/* ---- AI assistant button: a warm terracotta that pops against the sage, wood and white ---------- */
+.ai-wrap{position:relative;flex:none}
+.ai-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 16px 0 14px;border:0;border-radius:10px;cursor:pointer;color:#fff;
+  font:600 12px 'DM Sans',system-ui,sans-serif;letter-spacing:.02em;
+  background:linear-gradient(135deg,#f4a06b 0%,#e46f4c 55%,#d4573e 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 1px 2px rgba(0,0,0,.12),0 4px 12px rgba(212,87,62,.38);transition:transform .15s ease,box-shadow .2s ease,filter .2s}
+.bottom-bar .ai-btn{height:44px;padding:0 16px 0 14px;border-radius:10px;font-size:12px}
+.ai-btn:hover,.bottom-bar .ai-btn:hover{background:linear-gradient(135deg,#f6aa78 0%,#e7774f 55%,#d65e42 100%);transform:translateY(-1px);box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 2px 4px rgba(0,0,0,.12),0 8px 20px rgba(212,87,62,.45)}
+.ai-btn:active{transform:scale(.97)}
+/* a soft glow that breathes now and then, and the small spark twinkles */
+.ai-btn::after{content:'';position:absolute;inset:-3px;border-radius:13px;box-shadow:0 0 0 0 rgba(228,111,76,.5);animation:ai-ping 3.2s ease-out infinite;pointer-events:none}
+@keyframes ai-ping{0%,55%{box-shadow:0 0 0 0 rgba(228,111,76,.45)}85%,100%{box-shadow:0 0 0 9px rgba(228,111,76,0)}}
+.ai-spark .ai-spark-sm{transform-origin:18.5px 5.4px;animation:ai-twinkle 2.4s ease-in-out infinite}
+@keyframes ai-twinkle{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.6)}}
+@media (prefers-reduced-motion:reduce){.ai-btn::after,.ai-spark .ai-spark-sm{animation:none}}
+/* phone: a square fab beside the menu button (same size), the spark over a small "AI" */
+.ai-wrap.is-fab .ai-btn{width:52px;height:52px;padding:0;border-radius:14px;flex-direction:column;gap:1px}
+.ai-wrap.is-fab .ai-btn::after{border-radius:17px}
+.ai-tag{font:700 10px 'DM Sans',system-ui,sans-serif;letter-spacing:.08em;line-height:1}
+.touch-fabs .ai-wrap.is-fab{position:absolute;right:62px;bottom:0}
+body.menu-open .ai-wrap{visibility:hidden}
+/* "coming soon" note above the button */
+.ai-soon{position:absolute;right:0;bottom:calc(100% + 10px);width:max-content;max-width:240px;display:flex;flex-direction:column;gap:2px;padding:10px 14px;background:#1d1f22;color:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.25);text-align:left;z-index:5}
+.ai-soon b{font:600 13px 'DM Sans',system-ui,sans-serif}
+.ai-soon small{font:400 12px 'DM Sans',system-ui,sans-serif;color:#c9ccd1;white-space:normal}
+.ai-soon::after{content:'';position:absolute;right:20px;top:100%;border:6px solid transparent;border-top-color:#1d1f22}
+.ai-wrap.is-fab .ai-soon{right:-4px}
+/* phone close-ups: their bottom-right controls move left of the AI button */
+.rotate-hint{right:calc(138px + env(safe-area-inset-right))}
+.book-pageno{right:calc(266px + env(safe-area-inset-right))}
+.phone-overlay .book-nav.solo-nav.prev{right:calc(202px + env(safe-area-inset-right))}
+.phone-overlay .book-nav.solo-nav.next{right:calc(138px + env(safe-area-inset-right))}
+.bottom-bar .ai-btn{background:linear-gradient(135deg,#f4a06b 0%,#e46f4c 55%,#d4573e 100%);color:#fff;border:0;gap:8px}
+.bottom-bar .ai-btn:hover{background:linear-gradient(135deg,#f6aa78 0%,#e7774f 55%,#d65e42 100%)}
+/* AI button: one solid terracotta, icon only (square, like the menu button) */
+.ai-btn,.bottom-bar .ai-btn{background:#e2673f;width:44px;padding:0;gap:0}
+.ai-btn:hover,.bottom-bar .ai-btn:hover{background:#d75c35}
+.ai-wrap.is-fab .ai-btn{width:52px;height:52px;background:#e2673f}
+/* AI button v3: the face mark; laptop at the far right, level with the bar */
+.ai-dock{position:absolute;right:28px;bottom:22px;z-index:3;pointer-events:auto}
+.ai-btn,.bottom-bar .ai-btn{width:44px;height:44px}
+.ai-mark .ai-halo{opacity:.92}
+.ai-mark .ai-eye{transform-box:fill-box;transform-origin:center;animation:ai-blink 5s infinite}
+@keyframes ai-blink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.15)}}
+@media (prefers-reduced-motion:reduce){.ai-mark .ai-eye{animation:none}}
+/* the glow ring around the AI button: only on hover with a mouse (laptop); never on phones */
+.ai-btn::after{animation:none;box-shadow:none;opacity:0;transition:opacity .2s ease,box-shadow .25s ease}
+@media (hover:hover) and (pointer:fine){
+  .ai-btn:hover::after{opacity:1;box-shadow:0 0 0 4px rgba(226,103,63,.28),0 0 18px 4px rgba(226,103,63,.35)}
+}
+.ai-mark .ai-eye{animation:none}
+/* AI mark: on hover (laptop) the three buttons bounce like "typing…" dots */
+.ai-mark .ai-dot{transform-box:fill-box;transform-origin:center}
+@media (hover:hover) and (pointer:fine){
+  .ai-btn:hover .ai-dot{animation:ai-type 1s ease-in-out infinite}
+  .ai-btn:hover .ai-dot:nth-of-type(2){animation-delay:.15s}
+  .ai-btn:hover .ai-dot:nth-of-type(3){animation-delay:.3s}
+}
+@keyframes ai-type{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-1.6px)}}
+@media (prefers-reduced-motion:reduce){.ai-btn:hover .ai-dot{animation:none}}
+.ai-mark .ai-eye{animation:none}
+.ai-soon.ai-hint{padding:8px 12px;pointer-events:none}
+.ai-soon.ai-hint b{font-size:12.5px;white-space:nowrap}

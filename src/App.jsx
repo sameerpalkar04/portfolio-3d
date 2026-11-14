@@ -169,6 +169,41 @@ function HelpPanel() {
 }
 
 // All controls live in one plain bar along the bottom: time of day, instructions, shortcuts.
+// The AI assistant button: beside the bar on a laptop, beside the menu button on a phone. The assistant
+// itself isn't built yet, so for now it says so.
+// Nate's mark — Sameer's exact vector (AI_Vector.svg), background dropped, drawn in white (currentColor)
+const AiIcon = ({ size = 24 }) => <svg className="ai-mark" viewBox="71 65 620 620" width={size} height={size} fill="currentColor" aria-hidden="true">
+  <path d="M486.123 215.332C521.833 212.842 562.937 217.38 597.654 225.704C617.628 230.492 652.297 241.686 662.712 260.127C678.24 287.634 639.579 315.391 619.6 326.488L616.814 318.535C630.321 310.345 656.436 292.143 656.277 274.63C656.123 257.413 617.793 253.353 606.012 252.647C551.781 249.401 497.928 263.42 445.736 276.367C420.172 282.825 394.516 288.935 368.787 294.697C329.548 303.48 289.887 310.253 249.958 314.991C208.984 321.555 156.614 320.284 119.749 340.707C75.7211 365.099 133.31 385.289 153.921 390.457L154.373 399.507C136.599 395.606 116.788 389.734 102.776 377.825C84.6528 362.421 91.3789 340.619 105.618 325.716C123.271 307.24 147.093 295.269 170.394 285.507C208.065 270.242 248.218 259.431 287.752 249.945C352.009 234.526 420.055 218.247 486.123 215.332Z"/>
+  <path d="M444.762 88.4944C461.827 88.9444 470.007 100.363 478.843 113.252C485.382 122.79 491.181 132.836 496.992 142.829C507.033 160.09 516.824 177.492 526.37 195.031C524.968 194.35 523.547 193.703 522.114 193.092C510.077 187.93 491.977 185.311 478.616 184.353C402.697 178.912 321.243 197.876 251.26 225.781C233.278 233.278 208.357 244.305 194.051 257.094C199.661 231.964 213.197 180.974 223.527 158.813C227.581 149.888 232.813 141.546 239.083 134.011C267.365 100.427 305.424 95.9902 346.399 100.538C361.319 102.195 376.683 104.123 391.657 103.097C411.477 101.739 425.56 90.0827 444.762 88.4944Z"/>
+  <path d="M223.809 331.624L224.217 331.699C224.302 332.949 219.858 338.335 218.686 340.071C190.845 381.309 196.524 435.057 227.318 473.014C230.663 477.141 238.602 483.882 237.33 489.92C233.869 506.336 228.456 522.813 223.689 538.977C241.792 532.383 260.606 522.445 278.914 517.149C281.141 516.5 302.955 525.954 307.647 527.576C314.282 529.848 321.016 531.82 327.831 533.479C354.025 539.761 380.017 539.749 406.615 536.816C395.876 545.915 382.466 559.459 373.247 570.162C368.68 570.236 364.112 570.138 359.552 569.862C329.036 567.829 306.492 561.847 278.524 549.907L227.429 571.234C220.008 574.363 206.587 580.528 199.456 582.886C197.293 583.602 194.982 583.749 192.748 583.302C189.306 582.653 186.162 580.73 184.352 577.681C183.213 575.777 182.713 573.56 182.926 571.35C183.412 566.409 188.429 550.091 190.113 544.225L204.356 494.089C186.373 471.122 175.365 448.883 170.805 419.639C166.284 390.641 170.192 359.873 187.991 335.796C199.885 334.04 211.83 332.649 223.809 331.624Z"/>
+  <path d="M553.342 267.873C554.707 267.607 559.71 267.397 561.357 267.288C580.951 281.406 598.457 307.707 606.625 330.206C623.126 375.664 620.812 419.376 601.5 463.002C594.801 459.359 588.452 457.345 581.043 455.814C577.706 455.208 575.036 455.079 571.674 454.847C575.716 445.619 579.371 436.973 581.931 427.158C597.948 365.799 573.046 307.393 521.576 272.769C532.095 270.73 542.694 269.096 553.342 267.873Z"/>
+  <path d="M439.931 525.28C441.86 526.15 459.917 554.554 463.352 559.049C433.453 583.847 412.353 608.309 391.81 641.465C381.56 641.306 371.129 641.379 360.864 641.355L335.25 641.287C359.182 596.485 398.588 554.432 439.931 525.28Z"/>
+  <path fillRule="evenodd" d="M488.946 481.384C494.451 481.298 497.861 482.474 500.745 487.195C504.449 493.257 523.988 519.775 520.675 525.727C516.922 532.475 485.321 550.14 478.096 553.305C472.316 552.95 468.562 551.854 465.831 546.631C462.654 540.545 442.386 515.771 445.913 509.225C449.967 501.7 480.919 484.403 488.946 481.384Z M489.019 492.289C493.434 492.797 496.869 500.182 499.012 503.721C497.083 505.65 495.681 506.586 495.21 509.158C495.681 511.375 495.106 510.554 496.869 511.773C499.386 512.22 500.494 511.264 502.937 510.028C505.154 513.156 509.642 518.637 509.042 522.188C505.607 526.609 488.732 535.591 482.835 539.081C480.931 540.153 478.561 541.261 476.577 542.265C472.769 538.414 457.724 516.469 457.755 511.73C460.363 507.113 483.313 495.063 489.019 492.289Z"/>
+  <path d="M519.806 576.958C519.849 580.443 517.694 585.347 519.586 589.266C520.204 590.552 512.905 595.162 510.983 596.956C493.887 612.907 504.449 642.72 528.433 642.598C535.72 642.61 542.706 639.683 547.807 634.484C552.938 629.353 555.699 622.312 555.43 615.056C555.167 607.647 551.321 599.02 545.468 594.354C542.473 591.966 540.257 591.354 536.908 588.243C535.867 585.286 536.106 580.418 538.659 578.208C539.761 577.92 540.753 577.663 541.855 578.036C552.975 581.783 559.055 587.282 565.049 596.509C566.464 598.959 568.013 602.443 568.876 605.131C572.397 615.987 571.429 627.798 566.176 637.932C560.922 647.986 551.303 656.227 540.428 659.589C529.86 662.865 518.41 661.732 508.68 656.454C499.128 651.194 492.062 642.353 489.038 631.876C481.702 606.655 494.946 584.251 519.806 576.958Z"/>
+  <path d="M560.23 465.06C574.258 463.909 586.088 466.223 598.42 472.861C594.042 482.884 588.77 493.018 583.602 502.655C568.252 498.369 555.571 502 540.961 507.633C536.387 509.366 531.642 511.785 527.203 513.922C521.686 503.972 513.371 491.732 507.089 482.008C524.87 472.94 540.055 466.884 560.23 465.06Z"/>
+  <path d="M466.15 355.991C489.497 354.329 491.677 372.092 491.04 390.512C490.501 405.979 492.473 418.947 473.693 424.354C449.967 425.97 448.307 408.526 448.944 389.838C449.495 373.73 447.015 362.125 466.15 355.991Z"/>
+  <path d="M340.345 355.875C363.25 354.231 365.064 372.953 364.381 390.163C363.749 406.089 366.452 418.47 347.551 424.299C323.492 426.05 322.651 407.203 323.141 389.373C323.582 373.273 321.115 361.448 340.345 355.875Z"/>
+  <path d="M560.659 511.901C562.208 511.95 561.553 511.681 562.661 512.599C564.529 524.931 550.801 554.401 544.347 565.956C545.235 568.668 546.35 572.373 543.564 574.185C541.304 573.603 541.818 573.548 539.884 571.668C538.102 570.548 534.832 569.201 532.867 568.362C532.383 563.978 540.147 554.744 542.474 549.993C547.911 538.904 551.291 526.548 553.165 514.461L560.659 511.901Z"/>
+  <path d="M511.632 541.825C513.493 542.596 515.551 547.819 517.467 550.458C520.81 555.057 522.084 557.145 526.278 561.125C527.619 561.639 528.109 561.504 529.523 561.302C530.625 563.066 530.228 566.801 530.264 569.28C528.152 569.887 525.794 570.879 523.725 571.687C522.929 572.079 523.235 571.889 522.029 571.675C514.442 561.798 510.591 557.555 504.247 546.46L511.632 541.825Z"/>
+  <path d="M529.346 571.521C532.15 571.736 533.834 571.65 536.4 572.862C538.059 575.997 533.087 578.447 533.044 584.276C533.001 590.387 537.649 591.348 537.808 594.875L535.652 595.842C517.228 598.396 517.853 576.248 529.346 571.521Z"/>
+</svg>
+function AiButton({ compact }) {
+  const [soon, setSoon] = useState(false)
+  const [hover, setHover] = useState(false) // laptop: "Ask Nate" on hover
+  useEffect(() => { if (!soon) return undefined; const t = window.setTimeout(() => setSoon(false), 2400); return () => window.clearTimeout(t) }, [soon])
+  return <div className={`ai-wrap${compact ? ' is-fab' : ''}`}>
+    <button className="ai-btn" onClick={() => setSoon(true)} aria-label="Ask Nate, my AI assistant (coming soon)"
+      onPointerEnter={(e) => { if (e.pointerType === 'mouse') setHover(true) }} onPointerLeave={() => setHover(false)}>
+      <AiIcon size={compact ? 34 : 32}/>
+    </button>
+    <AnimatePresence>{soon && <motion.div key="soon" className="ai-soon" role="status" initial={{ opacity: 0, y: 6, scale: .96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 4 }} transition={{ duration: .22 }}>
+      <b>Nate</b><small>Coming soon: ask me anything about my work</small>
+    </motion.div>}
+    {hover && !soon && <motion.div key="hint" className="ai-soon ai-hint" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 3 }} transition={{ duration: .16 }}><b>Ask Nate</b></motion.div>}
+    </AnimatePresence>
+  </div>
+}
+
 function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interacting, onBack, locked }) {
   const [panel, setPanel] = useState(null)
   const ref = useRef(null)
@@ -195,6 +230,7 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interact
         ? <motion.button key="back" className="fab-action" onClick={onBack} initial={{ opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }}><Arrow dir="left"/> BACK TO ROOM</motion.button>
         : here && <motion.button key="interact" className="fab-action" onClick={onOpen} initial={{ opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }}>INTERACT <Arrow/></motion.button>}
     </AnimatePresence>
+    <AiButton compact/>
     <button className="fab-menu" onClick={() => setOpen(true)} aria-label="Open menu">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
     </button>
@@ -271,7 +307,9 @@ function ExploreCue({ onDismiss }) {
   return <motion.div className={`look-cue explore-cue${touch ? ' is-touch' : ''}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .4 }}>
     <span className="tour-step">Step 3 of 3</span>
     <b>Things to explore</b>
-    <ul className="explore-rows">{ALL_SPOTS.map((s) => <li key={s.id}><span className="cue-cam">{CUES[s.id]?.icon}</span><span className="ex-name">{s.object}</span><small>{s.opens}</small></li>)}</ul>
+    <ul className="explore-rows">{ALL_SPOTS.map((s) => <li key={s.id}><span className="cue-cam">{CUES[s.id]?.icon}</span><span className="ex-name">{s.object}</span><small>{s.opens}</small></li>)}
+      <li key="ai"><span className="cue-cam ex-ai"><AiIcon size={18}/></span><span className="ex-name">Ask Nate</span><small>AI assistant · soon</small></li>
+    </ul>
     <small className="explore-foot">{touch ? 'Walk up to one, or use the menu to go straight there' : 'Walk up to one, or use the shortcuts in the bar'}</small>
     <button className="tour-start" onClick={onDismiss}>Start exploring <Arrow dir="right" size={16}/></button>
   </motion.div>
@@ -647,7 +685,7 @@ function useBarSpot() {
     const tick = () => {
       const bar = !document.querySelector('.touch-fabs') && (document.querySelector('.hud-dock .bottom-bar') || document.querySelector('.hud-dock'))
       const d = bar && bar.getBoundingClientRect()
-      const next = !d ? null : { mode: viewW() - d.right >= 230 ? 'beside' : 'above', right: d.right, mid: d.top + d.height / 2, top: d.top }
+      const next = !d ? null : { mode: viewW() - d.right >= 300 ? 'beside' : 'above', right: d.right, mid: d.top + d.height / 2, top: d.top }
       setDock((p) => (!next ? null : p && p.mode === next.mode && Math.abs(p.right - next.right) + Math.abs(p.top - next.top) + Math.abs(p.mid - next.mid) < 1 ? p : next))
       raf = requestAnimationFrame(tick)
     }
@@ -706,7 +744,7 @@ function AchievementsView({ certId, getRect, onNext, onBack }) {
       {phone
         // phones: one box with two rows, like the cue at the desk corner
         ? <motion.div className="look-cue cam-cue desk-cue is-touch" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .8, duration: .35 }}>
-            <span className="dc-row on"><span className="cue-cam"><SwipeIcon/></span><span className="cue-text"><b>Swipe right to see the whole wall</b><small>Drag across to move along it</small></span></span>
+            <span className="dc-row on"><span className="cue-cam"><SwipeIcon/></span><span className="cue-text"><b>Swipe left to see the whole wall</b><small>Drag across to move along it</small></span></span>
             <span className="dc-row on"><span className="cue-cam">{CUES.achievements.icon}</span><span className="cue-text"><b>Tap a certificate to view it</b><small>See what each achievement was for</small></span></span>
           </motion.div>
         : <motion.div className="look-cue cam-cue achv-cue" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .8, duration: .35 }}>
@@ -752,16 +790,90 @@ const SONGS = [
   { title: 'Bin Tere', by: 'Vishal-Shekhar, Shafqat Amanat Ali, Sunidhi Chauhan', id: '3bZPdEskcnMdepwCaDSJRl', art: art('1992dd7b33baf5887ea4a1ec') },
   { title: 'The Disco Song', by: 'Vishal-Shekhar, Benny Dayal, Sunidhi Chauhan', id: '3UaP2PQwhA31keZXt7oPLA', art: art('ad40f4e70b2f2a2a6052d49d') },
 ]
-function MusicPanel({ onClose }) {
+const PlayIcon = () => <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>
+const PauseIcon = () => <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>
+const NextIcon = () => <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M5 6.2v11.6a1 1 0 0 0 1.55.83L15 13v4.8a1 1 0 0 0 2 0V6.2a1 1 0 0 0-2 0V11L6.55 5.37A1 1 0 0 0 5 6.2z"/></svg>
+const OutIcon = () => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg>
+// little equaliser bars beside the song that's playing (heights follow the music: --l0 … --l2 on the card)
+const Eq = () => <span className="eq" aria-hidden="true"><i/><i/><i/></span>
+
+// The speaker: the camera glides to it and a card lists songs I keep on repeat. Each one plays its
+// 30-second preview right here (api/preview.js); the speaker's top pulses with it and the room dims a little.
+function MusicPanel({ onClose, onMusic }) {
+  const audio = useRef(null), ctx = useRef(null), an = useRef(null), card = useRef(null)
+  const [cur, setCur] = useState(0)
+  const [playing, setPlaying] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [noPreview, setNoPreview] = useState({})
+  const [prog, setProg] = useState(0)
+  const curRef = useRef(0); curRef.current = cur
+  const playAt = (i) => {
+    const a = audio.current, song = SONGS[i]; if (!a) return
+    if (i === curRef.current && a.src && !a.ended && !noPreview[song.id]) { if (a.paused) a.play().catch(() => {}); else a.pause(); return }
+    setCur(i); setProg(0); setLoading(true)
+    a.src = `/api/preview?id=${song.id}`
+    // the level meter (and the speaker's pulse) reads the audio through Web Audio
+    if (!ctx.current) {
+      const C = window.AudioContext || window.webkitAudioContext
+      if (C) { try { const c = new C(), src = c.createMediaElementSource(a), x = c.createAnalyser(); x.fftSize = 64; src.connect(x); x.connect(c.destination); ctx.current = c; an.current = x } catch { /* plays without the meter */ } }
+    }
+    ctx.current?.resume?.()
+    a.play().catch(() => {})
+  }
+  const next = () => playAt((curRef.current + 1) % SONGS.length)
+  const playRef = useRef(playAt); playRef.current = playAt
+  useEffect(() => {
+    const a = new Audio(); a.preload = 'none'; audio.current = a
+    const on = (e, f) => a.addEventListener(e, f)
+    on('play', () => setPlaying(true)); on('pause', () => setPlaying(false)); on('playing', () => setLoading(false))
+    on('timeupdate', () => setProg(a.duration ? a.currentTime / a.duration : 0))
+    on('ended', () => playRef.current((curRef.current + 1) % SONGS.length))
+    on('error', () => { setLoading(false); setPlaying(false); setNoPreview((m) => ({ ...m, [SONGS[curRef.current].id]: true })) })
+    // levels → the equaliser bars and the speaker
+    let raf = 0, lv = 0
+    const data = new Uint8Array(32)
+    const tick = () => {
+      let target = 0, b = [0, 0, 0]
+      if (an.current && !a.paused) {
+        an.current.getByteFrequencyData(data)
+        b = [data[2], data[6], data[12]].map((v) => v / 255)
+        target = (b[0] + b[1] + b[2]) / 3
+      } else if (!a.paused) { const t = performance.now() / 260; b = [.5 + .4 * Math.sin(t), .5 + .4 * Math.sin(t * 1.3 + 1), .5 + .4 * Math.sin(t * .8 + 2)]; target = .5 }
+      lv += (target - lv) * .25
+      const el = card.current; if (el) b.forEach((v, k) => el.style.setProperty(`--l${k}`, Math.max(.15, v).toFixed(3)))
+      onMusic?.({ level: lv, playing: !a.paused })
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => { cancelAnimationFrame(raf); a.pause(); a.removeAttribute('src'); a.load(); ctx.current?.close?.(); onMusic?.({ level: 0, playing: false }) }
+  }, [onMusic])
+  const song = SONGS[cur], missing = noPreview[song.id]
+  const stop = (e) => e.stopPropagation()
   return <motion.div className="phone-overlay music-overlay" onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
-    <motion.article className="music-card" onClick={(e) => e.stopPropagation()} initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 10, opacity: 0 }} transition={{ delay: .75, duration: .4, ease: [.2, .8, .2, 1] }}>
+    <motion.article ref={card} className="music-card" onClick={stop} initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 10, opacity: 0 }} transition={{ delay: .75, duration: .4, ease: [.2, .8, .2, 1] }}>
       <header><h3>On my speaker</h3><span className="music-sub">Songs on repeat</span></header>
-      <ol className="music-list">{SONGS.map((s, i) => <li key={s.id}><a href={s.href || `https://open.spotify.com/track/${s.id}`} target="_blank" rel="noreferrer">
-        <span className="music-n">{i + 1}</span>
-        <img src={s.art} alt={`${s.title} cover art`} loading="lazy" width="48" height="48"/>
-        <span className="music-text"><b>{s.title}</b><small>{s.by}</small></span>
-        <span className="music-go">Spotify <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></span>
-      </a></li>)}</ol>
+      <p className="music-tag">The songs that keep me going.</p>
+      {/* now playing */}
+      <div className={`np${playing ? ' is-playing' : ''}`}>
+        <img src={song.art} alt="" width="64" height="64"/>
+        <div className="np-text">
+          <small>{missing ? 'No preview for this one' : loading ? 'Loading…' : playing ? 'Now playing' : 'Tap play to listen'}</small>
+          <b>{song.title}</b><span>{song.by}</span>
+          <div className="np-bar"><i style={{ width: `${prog * 100}%` }}/></div>
+        </div>
+        {missing
+          ? <a className="np-btn" href={`https://open.spotify.com/track/${song.id}`} target="_blank" rel="noreferrer" aria-label="Open in Spotify"><OutIcon/></a>
+          : <button className="np-btn primary" onClick={() => playAt(cur)} aria-label={playing ? 'Pause' : 'Play'}>{playing ? <PauseIcon/> : <PlayIcon/>}</button>}
+        <button className="np-btn" onClick={next} aria-label="Next song"><NextIcon/></button>
+      </div>
+      <ol className="music-list">{SONGS.map((s, i) => <li key={s.id}>
+        <div className={`music-row${i === cur ? ' on' : ''}`} role="button" tabIndex={0} onClick={() => playAt(i)} onKeyDown={(e) => { if (e.key === 'Enter') playAt(i) }} aria-label={`Play ${s.title}`}>
+          <span className="music-n">{i === cur && playing ? <Eq/> : i + 1}</span>
+          <img src={s.art} alt={`${s.title} cover art`} loading="lazy" width="48" height="48"/>
+          <span className="music-text"><b>{s.title}</b><small>{s.by}</small></span>
+          <a className="music-go" href={s.href || `https://open.spotify.com/track/${s.id}`} target="_blank" rel="noreferrer" onClick={stop}>Spotify <OutIcon/></a>
+        </div>
+      </li>)}</ol>
     </motion.article>
   </motion.div>
 }
@@ -795,7 +907,7 @@ function ResumeView({ onClose, getRect, setInsets }) {
       // the bar and should cover the résumé, not move it (as in the book and the other close-ups)
       const bar = !document.querySelector('.touch-fabs') && (document.querySelector('.hud-dock .bottom-bar') || document.querySelector('.hud-dock'))
       const d = bar && bar.getBoundingClientRect()
-      const next = !d ? null : viewW() - d.right >= 230 ? { mode: 'beside', right: d.right, mid: d.top + d.height / 2, top: d.top } : { mode: 'above', right: d.right, mid: d.top + d.height / 2, top: d.top }
+      const next = !d ? null : viewW() - d.right >= 300 ? { mode: 'beside', right: d.right, mid: d.top + d.height / 2, top: d.top } : { mode: 'above', right: d.right, mid: d.top + d.height / 2, top: d.top }
       setDock((p) => (!next ? null : p && p.mode === next.mode && Math.abs(p.right - next.right) + Math.abs(p.top - next.top) + Math.abs(p.mid - next.mid) < 1 ? p : next))
       raf = requestAnimationFrame(tick)
     }
@@ -827,7 +939,7 @@ function ResumeView({ onClose, getRect, setInsets }) {
       if (p.length >= 2 && s0.d) {
         const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y), mid = { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 }
         const ns = Math.min(4, Math.max(1, s0.s * d / s0.d)), cx = (s0.mid.x - s0.x) / s0.s, cy = (s0.mid.y - s0.y) / s0.s
-        c.s = ns; c.x = mid.x - cx * ns; c.y = mid.y - cy * ns; moved.current = true; applyZoom()
+        c.s = ns; c.x = mid.x - cx * ns; c.y = mid.y - cy * ns; moved.current = true; applyZoom(); setPinched(true)
       } else if (p.length === 1 && c.s > 1) {
         const dx = p[0].x - s0.px, dy = p[0].y - s0.py
         if (Math.abs(dx) + Math.abs(dy) > 4) moved.current = true
@@ -846,6 +958,7 @@ function ResumeView({ onClose, getRect, setInsets }) {
     onClickCapture: (e) => { if (moved.current) { e.preventDefault(); e.stopPropagation() } }, // a drag isn't a tap on a link
   }
   const touch = isTouch()
+  const [pinched, setPinched] = useState(false) // the pinch cue goes once they've pinched
   // keep the sheet clear of the bar (and of the buttons when they sit above it)
   useEffect(() => {
     setInsets(dock ? { bottom: viewH() - dock.top + (dock.mode === 'above' ? 44 + 22 : 14), full: dock.mode === 'above' } : {})
@@ -869,10 +982,10 @@ function ResumeView({ onClose, getRect, setInsets }) {
         {/* phones: Google Drive's viewer, since some (Android) have no built-in PDF viewer and would just download it */}
         <a className="resume-btn" href={touch ? RESUME_VIEW : RESUME_URL} target="_blank" rel="noreferrer"><OpenIcon/>Open in new tab</a>
       </motion.div>
-      {touch && <motion.div className="look-cue cam-cue is-touch resume-cue" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .3, duration: .35 }}>
+      <AnimatePresence>{touch && !pinched && <motion.div key="pinch" className="look-cue cam-cue is-touch resume-cue" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ delay: .3, duration: .35 }}>
         <span className="cue-cam"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.9-4.9M10.5 8v5M8 10.5h5"/></svg></span>
         <span className="cue-text"><b>Pinch to zoom or open it in a new tab</b><small>If the text is too small to read</small></span>
-      </motion.div>}
+      </motion.div>}</AnimatePresence>
     </>}
   </motion.div>
 }
@@ -992,6 +1105,7 @@ export default function App() {
   const closeSystem = () => sceneRef.current?.closeSystem()
   const getPhoneRect = useCallback(() => sceneRef.current?.phoneScreenRect() ?? null, [])
   const getCameraRect = useCallback(() => sceneRef.current?.cameraScreenRect() ?? null, [])
+  const setMusic = useCallback((m) => sceneRef.current?.setMusic?.(m), [])
   const getCertRect = useCallback(() => sceneRef.current?.certRect?.() ?? null, [])
   const getComputerRect = useCallback(() => sceneRef.current?.computerScreenRect?.() ?? null, [])
   const setBookSide = useCallback((side) => sceneRef.current?.setBookSide?.(side), [])
@@ -1019,7 +1133,7 @@ export default function App() {
       : systemApp === 'projects'
       ? <ComputerView key="system" onClose={closeSystem} getRect={getComputerRect}/>
       : systemApp === 'music'
-      ? <MusicPanel key="music" onClose={closeSystem}/>
+      ? <MusicPanel key="music" onClose={closeSystem} onMusic={setMusic}/>
       : systemApp === 'achievements'
       ? <AchievementsView key="achievements" certId={certId} getRect={getCertRect} onNext={() => sceneRef.current?.nextCert()} onBack={() => sceneRef.current?.backToWall()}/>
       : systemApp === 'resume'
@@ -1028,6 +1142,8 @@ export default function App() {
     {!loading && <div className={`office-hud${systemOpen ? ' is-interacting' : ''}`}>
       {introPhase !== 'hidden' && !systemOpen && <NameTag phase={introPhase}/>}
       {introPhase === 'corner' && <>
+        {/* laptop: the AI assistant button sits at the far right, level with the bar (phones: beside the menu button) */}
+        {!isTouch() && <div className="ai-dock"><AiButton/></div>}
         <BottomBar hour={hour} auto={manualHour === null} onHour={setManualHour} onAuto={() => { setManualHour(null); setClockHour(systemHour()) }} hotspot={hotspot}
           onGo={(id) => { if (systemOpen) closeSystem(); sceneRef.current?.goTo(id) }} onOpen={() => sceneRef.current?.openSpot()}
           interacting={systemOpen} onBack={closeSystem} locked={tourStep !== 'done'}/>
