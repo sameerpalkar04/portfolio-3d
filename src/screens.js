@@ -2,7 +2,8 @@ import * as THREE from 'three'
 
 // Free-to-use Unsplash photos (Unsplash License), loaded straight from Unsplash's CDN.
 export const BEACH_PHOTO_URL = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=900&h=1200&fit=crop&crop=entropy&q=80&fm=jpg'
-const WALLPAPER_URL = 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1600&h=900&fit=crop&q=80&fm=jpg'
+const WALLPAPER_URL = '/desktop/sonoma.jpg'
+const AVATAR_URL = '/about/sameer-sketch.png?v=3'
 
 const rr = (ctx, x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath() }
 
@@ -26,43 +27,34 @@ export function createDesktopTexture() {
   const ctx = canvas.getContext('2d')
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace; texture.flipY = false; texture.anisotropy = 8
-  let wallpaper = null
+  let wallpaper = null, avatar = null
 
   const draw = () => {
     if (wallpaper) ctx.drawImage(wallpaper, 0, 0, W, H); else paintFallbackWallpaper(ctx, W, H)
-    // Menu bar
-    ctx.fillStyle = 'rgba(245,245,247,.72)'; ctx.fillRect(0, 0, W, 30)
-    ctx.fillStyle = '#1d1d1f'; ctx.font = '600 17px -apple-system, "Helvetica Neue", Arial, sans-serif'; ctx.textBaseline = 'middle'
-    ctx.beginPath(); ctx.arc(26, 15, 7, 0, Math.PI * 2); ctx.fill()
-    let x = 50
-    ctx.fillText('Finder', x, 16); x += 76
-    ctx.font = '16px -apple-system, "Helvetica Neue", Arial, sans-serif'
-    for (const item of ['File', 'Edit', 'View', 'Go', 'Window', 'Help']) { ctx.fillText(item, x, 16); x += ctx.measureText(item).width + 26 }
-    const now = new Date()
-    const clock = now.toLocaleDateString([], { weekday: 'short' }) + '  ' + now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-    ctx.textAlign = 'right'; ctx.fillText(clock, W - 22, 16)
-    ctx.font = '15px -apple-system, "Helvetica Neue", Arial, sans-serif'; ctx.fillText('◉   ◔   ▮▮▮', W - 22 - ctx.measureText(clock).width - 28, 16); ctx.textAlign = 'left'
-    // Dock
-    const tiles = [['#2b8cff', '#0a5bd8'], ['#7b5cff', '#3d2bd0'], ['#9aa3ad', '#5f6973'], ['#38b6ff', '#0a7be0'], ['#5ac46a', '#2c9a3e'], ['#f5f5f5', '#d8d8d8'], ['#ff5f57', '#d9342b'], ['#ffd34d', '#f0a500'], ['#ffffff', '#e9e9ea'], ['#ff9f2e', '#f06a00'], ['#34c759', '#1f9c3f'], ['#fc5c7d', '#c9184a'], ['#a259ff', '#6a2bd9'], ['#1e90ff', '#0050c8'], ['#8e8e93', '#5a5a5f']]
-    const size = 58, gap = 12, pad = 12, dockW = tiles.length * (size + gap) - gap + pad * 2, dockH = size + pad * 2
-    const dx = (W - dockW) / 2, dy = H - dockH - 10
-    ctx.fillStyle = 'rgba(255,255,255,.28)'; rr(ctx, dx, dy, dockW, dockH, 20); ctx.fill()
-    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1.5; ctx.stroke()
-    tiles.forEach(([a, b], i) => {
-      const tx = dx + pad + i * (size + gap), ty = dy + pad
-      const g = ctx.createLinearGradient(0, ty, 0, ty + size); g.addColorStop(0, a); g.addColorStop(1, b)
-      ctx.fillStyle = g; rr(ctx, tx, ty, size, size, 14); ctx.fill()
-      // simple glyphs so the tiles read as apps
-      ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 4
-      const cx = tx + size / 2, cy = ty + size / 2
-      switch (i % 5) {
-        case 0: ctx.beginPath(); ctx.arc(cx, cy, 14, 0, Math.PI * 2); ctx.stroke(); break
-        case 1: ctx.fillRect(cx - 14, cy - 3, 28, 6); ctx.fillRect(cx - 3, cy - 14, 6, 28); break
-        case 2: rr(ctx, cx - 15, cy - 11, 30, 22, 4); ctx.stroke(); break
-        case 3: ctx.beginPath(); ctx.moveTo(cx - 12, cy + 12); ctx.lineTo(cx, cy - 14); ctx.lineTo(cx + 12, cy + 12); ctx.closePath(); ctx.fill(); break
-        default: for (let k = -1; k <= 1; k++) ctx.fillRect(cx - 14, cy + k * 9 - 2, 28, 4)
-      }
-    })
+    // the lock screen (as on a Mac at rest): date and big time up top, one user, Sameer, at the bottom
+    ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center'
+    const font = (wt, px) => { ctx.font = `${wt} ${px}px -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif` }
+    const t = new Date()
+    ctx.save(); ctx.shadowColor = 'rgba(40,20,60,.18)'; ctx.shadowBlur = 20
+    ctx.fillStyle = 'rgba(255,240,250,.86)'; font(600, 34); ctx.fillText(t.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }), W / 2, 140)
+    font(700, 196); ctx.fillText(t.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M$/i, ''), W / 2, 318)
+    ctx.restore()
+    // status icons, top right
+    ctx.fillStyle = 'rgba(255,255,255,.95)'; font(600, 15); ctx.textAlign = 'right'; ctx.fillText('U.S.', W - 120, 30)
+    ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 1.6; rr(ctx, W - 92, 19, 28, 13, 4); ctx.stroke(); ctx.fillRect(W - 89, 22, 18, 7)
+    ctx.beginPath(); ctx.arc(W - 38, 34, 3, 0, Math.PI * 2); ctx.fill()
+    for (const r of [8, 13]) { ctx.beginPath(); ctx.arc(W - 38, 34, r, Math.PI * 1.25, Math.PI * 1.75); ctx.stroke() }
+    // the user
+    const ax = W / 2, ay = 760
+    ctx.save(); ctx.beginPath(); ctx.arc(ax, ay, 42, 0, Math.PI * 2); ctx.fillStyle = '#d9d4cc'; ctx.fill(); ctx.clip()
+    if (avatar) { const s = Math.max(84 / avatar.width, 84 / avatar.height) * 1.15; ctx.drawImage(avatar, ax - avatar.width * s / 2, ay - 42 - 4, avatar.width * s, avatar.height * s) }
+    ctx.restore()
+    ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ax, ay, 42, 0, Math.PI * 2); ctx.stroke()
+    ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; font(600, 19); ctx.fillText('Sameer', ax, ay + 72)
+    ctx.fillStyle = 'rgba(255,255,255,.28)'; rr(ctx, ax - 92, ay + 86, 184, 30, 15); ctx.fill()
+    ctx.fillStyle = 'rgba(255,255,255,.8)'; font(400, 14); ctx.fillText('Enter Password', ax, ay + 106)
+    ctx.textAlign = 'left'
+
     texture.needsUpdate = true
   }
 
@@ -70,7 +62,8 @@ export function createDesktopTexture() {
   const img = new Image(); img.crossOrigin = 'anonymous'
   img.onload = () => { wallpaper = img; draw() }
   img.src = WALLPAPER_URL
-  const timer = window.setInterval(draw, 60000) // keep the menu-bar clock current
+  const aimg = new Image(); aimg.onload = () => { avatar = aimg; draw() }; aimg.src = AVATAR_URL
+  const timer = window.setInterval(draw, 15000) // keep the lock-screen clock current
   texture.userData.dispose = () => window.clearInterval(timer)
   return texture
 }

@@ -5,6 +5,7 @@ import OfficeScene from './OfficeScene'
 import Loader from './Loader'
 import { viewW, viewH, fracAlong, phoneLandscape, setPortraitLock } from './orientation'
 import { ACHIEVEMENTS } from './achievements'
+import { DesktopOS } from './MacOS'
 
 // Songs on the speaker: add your picks here as { title, artist, link? }.
 const songs = []
@@ -187,20 +188,47 @@ const AiIcon = ({ size = 24 }) => <svg className="ai-mark" viewBox="71 65 620 62
   <path d="M511.632 541.825C513.493 542.596 515.551 547.819 517.467 550.458C520.81 555.057 522.084 557.145 526.278 561.125C527.619 561.639 528.109 561.504 529.523 561.302C530.625 563.066 530.228 566.801 530.264 569.28C528.152 569.887 525.794 570.879 523.725 571.687C522.929 572.079 523.235 571.889 522.029 571.675C514.442 561.798 510.591 557.555 504.247 546.46L511.632 541.825Z"/>
   <path d="M529.346 571.521C532.15 571.736 533.834 571.65 536.4 572.862C538.059 575.997 533.087 578.447 533.044 584.276C533.001 590.387 537.649 591.348 537.808 594.875L535.652 595.842C517.228 598.396 517.853 576.248 529.346 571.521Z"/>
 </svg>
+// Nate's chat panel (UI only for now): opens above his button on the right, styled like the room's cues.
+const NATE_ASKS = () => [
+  { title: 'Projects', hint: 'What I’ve built and how', icon: SVG(<><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18"/></>) },
+  { title: 'Experience', hint: 'Where I’ve worked and studied', icon: SVG(<><path d="M4 21V9l8-6 8 6v12"/><path d="M9 21v-6h6v6"/></>) },
+  { title: 'Skills & tools', hint: 'My tech stack, end to end', icon: SVG(<path d="M8 6 2 12l6 6M16 6l6 6-6 6"/>) },
+  { title: 'Hire Sameer', hint: 'Availability and how to reach me', icon: SVG(<><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></>) },
+]
+function NatePanel({ onClose, compact }) {
+  const [text, setText] = useState('')
+  useEffect(() => { const k = (e) => { if (e.key === 'Escape') onClose() }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k) }, [onClose])
+  return <motion.section className={`nate-panel${compact ? ' is-touch' : ''}`} role="dialog" aria-label="Nate, Sameer’s assistant"
+    initial={{ opacity: 0, y: 14, scale: .96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: .97 }} transition={{ duration: .26, ease: [.2, .8, .2, 1] }}>
+    <header className="nate-head">
+      <span className="nate-avatar"><AiIcon size={26}/></span>
+      <span className="nate-id"><b>Nate</b><small><i/>Online · Sameer’s assistant</small></span>
+      <button className="nate-close" onClick={onClose} aria-label="Close Nate"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </header>
+    <div className="nate-body">
+      <h3>Hey there!<br/>What would you like to know about <em>Sameer</em>?</h3>
+      <small className="nate-label">Things you can ask</small>
+      <ul className="nate-asks">{NATE_ASKS().map((q) => <li key={q.title}><button type="button">
+        <span className="cue-cam">{q.icon}</span><span className="cue-text"><b>{q.title}</b><small>{q.hint}</small></span><Arrow size={14}/>
+      </button></li>)}</ul>
+    </div>
+    <form className="nate-input" onSubmit={(e) => e.preventDefault()}>
+      <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask anything about Sameer…" aria-label="Ask Nate"/>
+      <button type="submit" disabled={!text.trim()} aria-label="Send"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+    </form>
+  </motion.section>
+}
 function AiButton({ compact }) {
-  const [soon, setSoon] = useState(false)
-  const [hover, setHover] = useState(false) // laptop: "Ask Nate" on hover
-  useEffect(() => { if (!soon) return undefined; const t = window.setTimeout(() => setSoon(false), 2400); return () => window.clearTimeout(t) }, [soon])
-  return <div className={`ai-wrap${compact ? ' is-fab' : ''}`}>
-    <button className="ai-btn" onClick={() => setSoon(true)} aria-label="Ask Nate, my AI assistant (coming soon)"
-      onPointerEnter={(e) => { if (e.pointerType === 'mouse') setHover(true) }} onPointerLeave={() => setHover(false)}>
+  const [open, setOpen] = useState(false)
+  const [hover, setHover] = useState(false) // laptop only: "Ask Nate" on hover
+  const touch = isTouch()
+  return <div className={`ai-wrap${compact ? ' is-fab' : ''}${open ? ' is-open' : ''}`}>
+    <AnimatePresence>{open && <NatePanel key="nate" compact={compact} onClose={() => setOpen(false)}/>}</AnimatePresence>
+    <button className="ai-btn" onClick={() => { setOpen((o) => !o); setHover(false) }} aria-label={open ? 'Close Nate' : 'Ask Nate, my AI assistant'} aria-expanded={open}
+      onPointerEnter={(e) => { if (!touch && e.pointerType === 'mouse') setHover(true) }} onPointerLeave={() => setHover(false)}>
       <AiIcon size={compact ? 34 : 32}/>
     </button>
-    <AnimatePresence>{soon && <motion.div key="soon" className="ai-soon" role="status" initial={{ opacity: 0, y: 6, scale: .96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 4 }} transition={{ duration: .22 }}>
-      <b>Nate</b><small>Coming soon: ask me anything about my work</small>
-    </motion.div>}
-    {hover && !soon && <motion.div key="hint" className="ai-soon ai-hint" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 3 }} transition={{ duration: .16 }}><b>Ask Nate</b></motion.div>}
-    </AnimatePresence>
+    <AnimatePresence>{hover && !open && !touch && <motion.div key="hint" className="ai-soon ai-hint" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 3 }} transition={{ duration: .16 }}><b>Ask Nate</b></motion.div>}</AnimatePresence>
   </div>
 }
 
@@ -635,17 +663,166 @@ function BookPages({ onClose, getRect, setSide }) {
   </motion.div>
 }
 
-// The iMac: a desktop with one window, my projects. Everything else lives around the room.
-function PortfolioSystem({ onClose }) {
+// The iMac: a macOS-style desktop (Sonoma wallpaper) with live widgets: a photo of Rio & Bruno,
+// Bengaluru weather, world clocks, today's calendar, a note, reminders and shortcuts, plus the dock.
+// Laid out on a 1180-px-wide stage and scaled to whatever size the screen is.
+const STAGE_W = 1180
+const WX = { ico: (d, s = 14) => <svg viewBox="0 0 24 24" width={s} height={s} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg> }
+const AppleLogo = ({ s = 14 }) => <svg viewBox="0 0 24 24" width={s} height={s} fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.2 1-4 2.4-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8 1.5 0 1.9.8 3.2.8 1.3 0 2.1-1.2 2.9-2.4.9-1.4 1.3-2.7 1.3-2.8 0 0-2.4-1-2.4-3.9zM14 5.5c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1.1.1 2.1-.6 2.8-1.4z"/></svg>
+// weather glyphs (open-meteo weather codes)
+const wxKind = (code, night) => code == null ? 'sun' : code === 0 ? (night ? 'moon' : 'sun') : code <= 2 ? (night ? 'moonc' : 'part') : code <= 3 || code === 45 || code === 48 ? 'cloud' : code >= 95 ? 'storm' : 'rain'
+const WxIcon = ({ kind, s = 16 }) => {
+  const sun = <><circle cx="12" cy="12" r="4.2" fill="#ffd54a" stroke="none"/>{[0, 45, 90, 135, 180, 225, 270, 315].map((a) => <path key={a} d="M12 2.8v2.4" stroke="#ffd54a" strokeWidth="1.8" strokeLinecap="round" transform={`rotate(${a} 12 12)`}/>)}</>
+  const cloud = (x = 0, y = 0, c = '#fff') => <path d="M7.5 18.5h9.2a3.8 3.8 0 0 0 .4-7.6 5.2 5.2 0 0 0-10-1A4.3 4.3 0 0 0 7.5 18.5z" fill={c} transform={`translate(${x} ${y})`}/>
+  return <svg viewBox="0 0 24 24" width={s} height={s} aria-hidden="true">
+    {kind === 'sun' && sun}
+    {kind === 'moon' && <path d="M15.5 3.5a8.5 8.5 0 1 0 5 13.6A7 7 0 0 1 15.5 3.5z" fill="#f4f0d8"/>}
+    {kind === 'part' && <><g transform="translate(-3 -3) scale(.85)">{sun}</g>{cloud(1.5, 1.5)}</>}
+    {kind === 'moonc' && <><path d="M11 2.5a6 6 0 1 0 3.6 9.6A5 5 0 0 1 11 2.5z" fill="#f4f0d8"/>{cloud(1.5, 1.5)}</>}
+    {kind === 'cloud' && cloud()}
+    {kind === 'rain' && <>{cloud(0, -3)}{[8, 12, 16].map((x) => <path key={x} d={`M${x} 18l-1.2 3`} stroke="#9fd0ff" strokeWidth="1.8" strokeLinecap="round"/>)}</>}
+    {kind === 'storm' && <>{cloud(0, -3, '#dfe6ee')}<path d="M12.5 15l-2.5 4h2.5l-1.5 3.5" stroke="#ffd54a" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round"/></>}
+  </svg>
+}
+const WX_LABEL = { sun: 'Sunny', moon: 'Clear', part: 'Partly Cloudy', moonc: 'Partly Cloudy', cloud: 'Cloudy', rain: 'Showers', storm: 'Thunderstorms' }
+function useBengaluruWeather() {
+  const [w, setW] = useState(null)
+  useEffect(() => {
+    let dead = false
+    fetch('https://api.open-meteo.com/v1/forecast?latitude=12.97&longitude=77.59&current=temperature_2m,weather_code,is_day&hourly=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min&timezone=Asia%2FKolkata&forecast_days=2')
+      .then((r) => r.json()).then((d) => {
+        if (dead || !d.current) return
+        const nowIdx = d.hourly.time.findIndex((t) => t >= d.current.time.slice(0, 13))
+        const hours = Array.from({ length: 6 }, (_, k) => nowIdx + 1 + k).filter((i) => d.hourly.time[i]).map((i) => ({
+          t: new Date(d.hourly.time[i]).toLocaleTimeString('en-US', { hour: 'numeric' }).replace(' ', ''), temp: Math.round(d.hourly.temperature_2m[i]), kind: wxKind(d.hourly.weather_code[i], !d.hourly.is_day[i]) }))
+        setW({ temp: Math.round(d.current.temperature_2m), kind: wxKind(d.current.weather_code, !d.current.is_day), night: !d.current.is_day, hi: Math.round(d.daily.temperature_2m_max[0]), lo: Math.round(d.daily.temperature_2m_min[0]), hours })
+      }).catch(() => {})
+    return () => { dead = true }
+  }, [])
+  return w
+}
+const CLOCKS = [['Bengaluru', 'Asia/Kolkata'], ['London', 'Europe/London'], ['New York', 'America/New_York'], ['Tokyo', 'Asia/Tokyo']]
+function zoneParts(now, tz) {
+  const f = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: 'numeric', minute: 'numeric', second: 'numeric', day: 'numeric', hourCycle: 'h23' }).formatToParts(now)
+  const g = (t) => +f.find((p) => p.type === t).value
+  return { h: g('hour'), m: g('minute'), s: g('second'), d: g('day') }
+}
+function AnalogClock({ h, m, s, night }) {
+  const hand = (deg, len, w, c) => <line x1="20" y1="20" x2={20 + len * Math.sin(deg * Math.PI / 180)} y2={20 - len * Math.cos(deg * Math.PI / 180)} stroke={c} strokeWidth={w} strokeLinecap="round"/>
+  return <svg viewBox="0 0 40 40" className="wd-clock-face" aria-hidden="true">
+    <circle cx="20" cy="20" r="19" fill={night ? '#1c1c1e' : '#fff'}/>
+    {Array.from({ length: 12 }, (_, i) => <text key={i} x={20 + 14.6 * Math.sin(i * Math.PI / 6)} y={20 - 14.6 * Math.cos(i * Math.PI / 6) + 1.9} fontSize="5.2" textAnchor="middle" fill={night ? '#fff' : '#111'} fontWeight="600">{i || 12}</text>)}
+    {hand((h % 12 + m / 60) * 30, 8.5, 2.2, night ? '#fff' : '#111')}
+    {hand((m + s / 60) * 6, 13, 1.5, night ? '#fff' : '#111')}
+    {hand(s * 6, 14, .7, '#f19a37')}
+    <circle cx="20" cy="20" r="1.4" fill="#f19a37"/>
+  </svg>
+}
+const REMINDERS = ['Walk Rio & Bruno', 'Push portfolio update']
+const SHORTCUTS = [
+  { label: 'Play my song picks', bg: '#f6b73c', icon: WX.ico(<><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></>) },
+  { label: 'Turn on desk lamp', bg: '#f29a4a', icon: WX.ico(<><path d="M9 21h6M12 17v4M8 3l8 4-3 6-8-4z"/></>) },
+  { label: 'Take a break', bg: '#3cc7d6', icon: WX.ico(<><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></>) },
+  { label: 'Pet Rio & Bruno', bg: '#ee6060', icon: WX.ico(<><ellipse cx="12" cy="16" rx="4" ry="3.2"/><circle cx="6.5" cy="11" r="1.6"/><circle cx="9.8" cy="7.4" r="1.6"/><circle cx="14.2" cy="7.4" r="1.6"/><circle cx="17.5" cy="11" r="1.6"/></>) },
+]
+const DOCK = [['#1e90ff', '#0a5bd8', 'finder'], ['#8e8e93', '#5a5a5f', 'apps'], ['#2b9bff', '#0a6be0', 'safari'], ['#34c759', '#1f9a3e', 'msg'], ['#3a8bff', '#1159d8', 'mail'], ['#ff5f57', '#ff2d55', 'photos'], ['#34c759', '#25a244', 'facetime'], ['#ffffff', '#e8e8e8', 'cal'], ['#f5d06a', '#e9b23a', 'notes'], ['#ff375f', '#e0244a', 'music'], ['#1c1c1e', '#000000', 'term'], ['#0a84ff', '#0060d0', 'code'], ['#8e8e93', '#636366', 'settings']]
+const DockGlyph = ({ k }) => {
+  const W = { stroke: '#fff', strokeWidth: 2, fill: 'none', strokeLinecap: 'round', strokeLinejoin: 'round' }
+  return <svg viewBox="0 0 24 24" width="62%" height="62%" aria-hidden="true">{{
+    finder: <><path d="M12 3v18" {...W}/><circle cx="8" cy="10" r="1" fill="#fff"/><circle cx="16" cy="10" r="1" fill="#fff"/><path d="M7.5 15.5q4.5 3 9 0" {...W}/></>,
+    apps: <>{[6, 12, 18].map((x) => [6, 12, 18].map((y) => <circle key={x + '' + y} cx={x} cy={y} r="1.8" fill="#fff"/>))}</>,
+    safari: <><circle cx="12" cy="12" r="8.5" {...W}/><path d="M15.5 8.5 13 13l-4.5 2.5L11 11z" fill="#ff453a"/></>,
+    msg: <path d="M12 4.5c4.7 0 8.5 3 8.5 6.8s-3.8 6.8-8.5 6.8c-1 0-2-.1-2.9-.4L5 19.5l1.2-3.4C4.5 14.9 3.5 13.2 3.5 11.3 3.5 7.5 7.3 4.5 12 4.5z" fill="#fff"/>,
+    mail: <><rect x="3.5" y="6" width="17" height="12" rx="2" {...W}/><path d="m4 7 8 6 8-6" {...W}/></>,
+    photos: <>{[0, 60, 120, 180, 240, 300].map((a, i) => <ellipse key={a} cx="12" cy="7.5" rx="2.6" ry="4.5" fill={['#ffd60a', '#ff9f0a', '#ff375f', '#bf5af2', '#0a84ff', '#30d158'][i]} opacity=".9" transform={`rotate(${a} 12 12)`}/>)}</>,
+    facetime: <><rect x="3.5" y="7.5" width="11" height="9" rx="2" fill="#fff"/><path d="M15.5 11 20.5 8v8l-5-3z" fill="#fff"/></>,
+    cal: <><text x="12" y="8" fontSize="5" textAnchor="middle" fill="#ff3b30" fontWeight="700">NOV</text><text x="12" y="19" fontSize="10" textAnchor="middle" fill="#1c1c1e" fontWeight="600">{new Date().getDate()}</text></>,
+    notes: <>{[9, 13, 17].map((y) => <path key={y} d={`M6 ${y}h12`} stroke="#7a5b12" strokeWidth="1.4"/>)}</>,
+    music: <><path d="M9.5 17V6.5l9-2V15" {...W}/><circle cx="7.3" cy="17" r="2.3" fill="#fff"/><circle cx="16.3" cy="15" r="2.3" fill="#fff"/></>,
+    term: <><path d="m6 8 4 4-4 4M12 16h6" stroke="#30d158" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></>,
+    code: <path d="m9 7-5 5 5 5M15 7l5 5-5 5" {...W}/>,
+    settings: <><circle cx="12" cy="12" r="3" {...W}/><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3M6 6l2.1 2.1M15.9 15.9 18 18M6 18l2.1-2.1M15.9 8.1 18 6" {...W}/></>,
+  }[k]}</svg>
+}
+// The lock screen the iMac rests on (the 3D screen shows the same): date and time up top, one user at the bottom.
+// On Interact, once the camera has settled, the password fills in and it opens onto the desktop.
+function LockScreen({ now, typed }) {
+  return <motion.div className="mac-lock" initial={{ opacity: 1 }} exit={{ opacity: 0, filter: 'blur(6px)', scale: 1.04 }} transition={{ duration: .55, ease: [.4, 0, .2, 1] }}>
+    <div className="lock-status"><span>U.S.</span>
+      <svg viewBox="0 0 26 12" width="22" height="11" fill="none" stroke="currentColor" aria-hidden="true"><rect x=".5" y=".5" width="22" height="11" rx="3"/><rect x="2.5" y="2.5" width="15" height="7" rx="1.5" fill="currentColor" stroke="none"/><path d="M24.5 4v4" strokeWidth="1.5" strokeLinecap="round"/></svg>
+      {WX.ico(<><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.6 16a5 5 0 0 1 6.8 0"/><circle cx="12" cy="19.2" r=".9" fill="currentColor"/></>, 15)}
+    </div>
+    <div className="lock-clock"><small>{now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</small>
+      <strong>{now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M$/i, '')}</strong></div>
+    <div className="lock-user">
+      <span className="lock-avatar"><img src="/about/sameer-sketch.png?v=3" alt="" draggable="false"/></span>
+      <b>Sameer</b>
+      <span className={`lock-pass${typed ? ' typing' : ''}`}>{typed ? Array.from({ length: typed }, (_, i) => <i key={i}/>) : 'Enter Password'}</span>
+    </div>
+  </motion.div>
+}
+function PortfolioSystem({ stageH = 660 }) {
   const [now, setNow] = useState(new Date())
-  useEffect(() => { const timer = window.setInterval(() => setNow(new Date()), 30000); return () => window.clearInterval(timer) }, [])
-  const selected = apps.find((app) => app.id === 'projects')
-  return <motion.div className="system-screen" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-    <div className="mac-menu"><span className="apple-mark">●</span><b>Finder</b><span>File</span><span>Edit</span><span>View</span><span>Go</span><span>Window</span><span>Help</span><span className="menu-time">⌁ &nbsp; Wi‑Fi &nbsp; ▰ &nbsp; {now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span></div>
-    <div className="desktop-welcome"><span>WELCOME TO MY DIGITAL WORKSPACE</span><h2>Good to have you here.</h2><p>Here’s what I’ve been building.</p></div>
-    <motion.section className="app-window single" initial={{ opacity: 0, y: 12, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: .22 }}>
-      <header className="app-titlebar"><TrafficLights onClose={onClose}/><span>{selected.title}</span><span className="title-spacer"/></header><div className="app-body"><article className="app-copy"><span className="section-eyebrow">SAMEER PALKAR · PROJECTS</span><h3>{selected.title}</h3>{selected.body}</article></div>
-    </motion.section>
+  // lock → typing the password → desktop
+  const [typed, setTyped] = useState(0), [home, setHome] = useState(false)
+  useEffect(() => {
+    const ts = []
+    for (let i = 1; i <= 8; i++) ts.push(window.setTimeout(() => setTyped(i), 650 + i * 70))
+    ts.push(window.setTimeout(() => setHome(true), 1450))
+    return () => ts.forEach(window.clearTimeout)
+  }, [])
+  useEffect(() => { const t = window.setInterval(() => setNow(new Date()), 1000); return () => window.clearInterval(t) }, [])
+  const wx = useBengaluruWeather()
+  const [done, setDone] = useState({})
+  const here = zoneParts(now, 'Asia/Kolkata')
+  const dayName = now.toLocaleDateString('en-GB', { weekday: 'long' }).toUpperCase()
+  const menuDate = now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) + '  ' + now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  const night = wx ? wx.night : (here.h < 6 || here.h >= 18)
+  return <motion.div className={`system-screen mac-desktop${home ? ' is-home' : ''}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+    <AnimatePresence>{!home && <LockScreen key="lock" now={now} typed={typed}/>}</AnimatePresence>
+    <div className="mac-menu">
+      <span className="apple-mark"><AppleLogo s={14}/></span><b>Finder</b>{['File', 'Edit', 'View', 'Go', 'Window', 'Help'].map((m) => <span key={m}>{m}</span>)}
+      <span className="menu-right">
+        <svg viewBox="0 0 26 12" width="22" height="11" fill="none" stroke="currentColor" aria-hidden="true"><rect x=".5" y=".5" width="22" height="11" rx="3"/><rect x="2.5" y="2.5" width="15" height="7" rx="1.5" fill="currentColor" stroke="none"/><path d="M24.5 4v4" strokeWidth="1.5" strokeLinecap="round"/></svg>
+        {WX.ico(<><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.6 16a5 5 0 0 1 6.8 0"/><circle cx="12" cy="19.2" r=".9" fill="currentColor"/></>, 15)}
+        {WX.ico(<><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/></>, 14)}
+        {WX.ico(<><rect x="3" y="5" width="18" height="5.5" rx="2.75"/><rect x="3" y="13.5" width="18" height="5.5" rx="2.75"/><circle cx="7.5" cy="7.75" r="1.6" fill="currentColor"/><circle cx="16.5" cy="16.25" r="1.6" fill="currentColor"/></>, 14)}
+        <span>{menuDate}</span>
+      </span>
+    </div>
+    <div className="desk-widgets">
+      <figure className="wd wd-photo"><img src="/desktop/rio-bruno.jpg" alt="Rio and Bruno" draggable="false"/><figcaption>Rio &amp; Bruno</figcaption></figure>
+      <section className={`wd wd-weather${night ? ' night' : ''}`}>
+        <div className="wdw-top"><div><b>Bengaluru {WX.ico(<path d="m5 12 14-7-5 14-2-5z" fill="currentColor"/>, 9)}</b><strong>{wx ? wx.temp : 24}°</strong></div>
+          <div className="wdw-now"><WxIcon kind={wx ? wx.kind : 'part'} s={18}/><span>{WX_LABEL[wx ? wx.kind : 'part']}</span><span>H:{wx ? wx.hi : 28}° L:{wx ? wx.lo : 19}°</span></div></div>
+        <div className="wdw-hours">{(wx ? wx.hours : [['7PM', 23, 'moonc'], ['8PM', 22, 'moonc'], ['9PM', 22, 'cloud'], ['10PM', 21, 'cloud'], ['11PM', 21, 'moonc'], ['12AM', 20, 'moon']].map(([t, temp, kind]) => ({ t, temp, kind }))).map((h) =>
+          <span key={h.t}><small>{h.t}</small><WxIcon kind={h.kind} s={15}/><b>{h.temp}°</b></span>)}</div>
+      </section>
+      <section className="wd wd-reminders">
+        <header><b>Reminders</b><strong>{REMINDERS.filter((_, i) => !done[i]).length}</strong></header>
+        <ul>{REMINDERS.map((r, i) => <li key={r} className={done[i] ? 'done' : ''} onClick={() => setDone((d) => ({ ...d, [i]: !d[i] }))}><i/>{r}</li>)}</ul>
+      </section>
+      <section className="wd wd-shortcuts">{SHORTCUTS.map((sc) => <span key={sc.label} style={{ background: sc.bg }}>{sc.icon}<b>{sc.label}</b></span>)}</section>
+      <section className="wd wd-clocks">{CLOCKS.map(([city, tz]) => {
+        const z = zoneParts(now, tz), diff = Math.round(((z.h + z.m / 60) - (here.h + here.m / 60) + (z.d !== here.d ? (z.d > here.d || (here.d > 27 && z.d === 1) ? 24 : -24) : 0)) * 2) / 2
+        return <div key={city}><AnalogClock {...z} night={z.h < 6 || z.h >= 18}/><b>{city}</b><small>{z.d === here.d ? 'Today' : (diff > 0 ? 'Tomorrow' : 'Yesterday')}</small><small>{diff === 0 ? '+0HRS' : `${diff > 0 ? '+' : ''}${diff}HRS`}</small></div>
+      })}</section>
+      <section className="wd wd-calendar">
+        <small>{dayName}</small><strong>{now.getDate()}</strong>
+        <p className="ev" style={{ '--c': '#ff9f0a' }}><b>Walk Rio &amp; Bruno</b><span>7:00–7:30PM</span></p>
+        <p className="ev" style={{ '--c': '#bf5af2' }}><b>Ship portfolio</b><span>9:00–10:00PM</span></p>
+        <em>1 more event</em>
+      </section>
+      <section className="wd wd-notes">
+        <header>{WX.ico(<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor"/>, 12)}<b>Notes</b></header>
+        <b>Portfolio ideas</b><span>Add a pet corner 🐾</span><small>{now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</small>
+      </section>
+    </div>
+    {home && <DesktopOS stageH={stageH}/>}
+    <div className="mac-dock">{DOCK.map(([a, b, k], i) => <span key={k} className={`dock-app${['finder', 'notes'].includes(k) ? ' live' : ''}`} style={{ background: `linear-gradient(${a},${b})` }} onClick={() => window.dispatchEvent(new CustomEvent('mac-dock', { detail: k }))}><DockGlyph k={k}/>{i === 0 && <i className="dock-dot"/>}</span>)}
+      <em/><span className="dock-app" style={{ background: 'linear-gradient(#7cc6ff,#3a9bf0)' }}>{WX.ico(<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="#fff" stroke="none"/>, 26)}</span>
+      <span className="dock-app trash">{WX.ico(<><path d="M5 7h14l-1.2 13H6.2z" fill="#e8eaee" stroke="#9aa0a8"/><path d="M4 7h16M9 4h6" stroke="#9aa0a8"/></>, 28)}</span>
+    </div>
   </motion.div>
 }
 
@@ -669,7 +846,7 @@ function ComputerView({ onClose, getRect }) {
           ? { left: rect.left + rect.width / 2 - long / 2, top: rect.top + rect.height / 2 - short / 2, width: long, height: short, rotate: 90 }
           : { left: rect.left, top: rect.top, width: long, height: short }}
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .4 }}>
-        <div className="mac-frame" style={{ width: DW, height: DH, transform: `scale(${scale})` }}><PortfolioSystem onClose={onClose}/></div>
+        <div className="mac-frame" style={{ width: STAGE_W, height: DH * STAGE_W / DW, transform: `scale(${scale * DW / STAGE_W})` }}><PortfolioSystem onClose={onClose} stageH={DH * STAGE_W / DW}/></div>
       </motion.div>
       {rect.rotated && <div className="rotate-hint"><RotateIcon/>Rotate your phone for a bigger view</div>}
     </>}
@@ -1167,7 +1344,7 @@ export default function App() {
         {/* laptop: the AI assistant button sits at the far right, level with the bar (phones: beside the menu button) */}
         {!isTouch() && <div className="ai-dock"><AiButton/></div>}
         <BottomBar hour={hour} auto={manualHour === null} onHour={setManualHour} onAuto={() => { setManualHour(null); setClockHour(systemHour()) }} hotspot={hotspot}
-          onGo={(id) => { if (systemOpen) closeSystem(); sceneRef.current?.goTo(id) }} onOpen={() => sceneRef.current?.openSpot()}
+          onGo={(id) => { if (systemOpen) sceneRef.current?.switchTo(id); else sceneRef.current?.goTo(id) }} onOpen={() => sceneRef.current?.openSpot()}
           interacting={systemOpen} onBack={closeSystem} locked={tourStep !== 'done'}/>
         {isTouch() && !systemOpen && <MobileControls onKey={onKey}/>}
       </>}

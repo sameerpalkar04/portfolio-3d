@@ -521,11 +521,11 @@ function createScene(canvas, handlers) {
         petSpot = seats[0].p.clone().add(seats[1].p).multiplyScalar(.5).add(new THREE.Vector3(0, .22, 0))
         // the sculpted dog loads on its own (≈320 KB); both dogs share its shape, painted differently
         const dogLoader = new GLTFLoader(); dogLoader.setMeshoptDecoder(MeshoptDecoder)
-        dogLoader.load('/models/shih-tzu.glb?v=3', (gltf) => {
+        dogLoader.load('/models/shih-tzu.glb?v=5', (gltf) => {
           let src = null; gltf.scene.traverse((o) => { if (o.isMesh && !src) src = o })
           if (!src) return
           for (const s of seats) {
-            const d = createShihTzu(src, { coat: s.coat, height: s.height }); d.name = s.name
+            const d = createShihTzu(src, { coat: s.coat, height: s.height, frost: null }); d.name = s.name
             d.position.copy(s.p); d.rotation.y = face + side * s.turn
             d.userData.base = { y: s.p.y, ry: d.rotation.y, h: s.height }
             petGroup.add(d)
@@ -1024,8 +1024,10 @@ function createScene(canvas, handlers) {
         const t=Math.max(0,(petT-.3)/1.1-i*.15)
         h.rotation.y=turn*look; h.rotation.x=-up*look
         h.rotation.z=t<1?Math.sin(t*Math.PI*4)*(1-t)*.16:0
+        // the tongue comes out (and turns pink) while they're happy, then tucks back in
+        const tg=d.userData.tongue; if(tg){ const k=THREE.MathUtils.smoothstep(look,0,1); tg.bone.scale.set(.8+.2*k,.4+.6*k,.2+.8*k); tg.mat.color.lerpColors(tg.rest,tg.out,Math.min(1,k*1.4)); tg.mat.roughness=.8-.45*k; tg.mat.clearcoat=.5*k }
       })
-      if(petT>3){petT=-1;petGroup.children.forEach((d)=>{const h=d.userData.head;if(h)h.rotation.set(0,0,0)})}
+      if(petT>3){petT=-1;petGroup.children.forEach((d)=>{const h=d.userData.head;if(h)h.rotation.set(0,0,0);const tg=d.userData.tongue;if(tg){tg.bone.scale.set(.8,.4,.2);tg.mat.color.copy(tg.rest)}})}
     }
     for(let i=hearts.length-1;i>=0;i--){
       const h=hearts[i],u=h.userData; u.t+=dt
@@ -1054,12 +1056,23 @@ function createScene(canvas, handlers) {
     }
     handlers.onSystem(true,state.hotspot.app)
   }
-  const exitSystem=()=>{
+  // switching straight to another spot from the bar: the file goes back on the shelf first, then the
+  // camera pulls out, then it walks to the new spot (one after another, not all at once)
+  let pendingGo=null, pendingOut=false
+  // Walk to one of the explorable spots and face it.
+  const goTo=(id)=>{
+    const spot=hotspots.find((h)=>h.id===id); if(!spot||state.system||state.allowWalk===false||state.allowOpen===false)return // not during the walkthrough
+    const view=spot.view, yaw=Math.atan2(-(spot.pos.x-view.x),-(spot.pos.z-view.z))
+    const eyeY=floorY+EYE_HEIGHT, pitch=THREE.MathUtils.clamp(Math.atan2(spot.pos.y-eyeY,Math.hypot(spot.pos.x-view.x,spot.pos.z-view.z)),-.75,.5)
+    const dYaw=Math.atan2(Math.sin(yaw-state.yaw),Math.cos(yaw-state.yaw))
+    travel={t:0,duration:Math.min(1.8,.7+Math.hypot(view.x-state.x,view.z-state.z)*.35),from:{x:state.x,z:state.z,yaw:state.yaw,pitch:state.pitch},to:{x:view.x,z:view.z,pitch},dYaw}
+  }
+  const exitSystem=(sequential=false)=>{
     if(!state.system)return
     state.system=false
     if(certSel){certSel=null;handlers.onCert?.(null)}
     canvas.style.cursor=''
-    if(focus)focus={...focus,phase:'out',t:0,from:{pos:camera.position.clone(),quat:camera.quaternion.clone(),fov:camera.fov}}
+    if(focus){ if(sequential&&folder)pendingOut=true; else focus={...focus,phase:'out',t:0,from:{pos:camera.position.clone(),quat:camera.quaternion.clone(),fov:camera.fov}} }
     if(folder)folder.dir=-1
     if(hold)hold={...hold,phase:'out',t:0,from:{pos:hold.obj.position.clone(),quat:hold.obj.quaternion.clone(),fov:camera.fov}}
     handlers.onSystem(false)
@@ -1258,6 +1271,8 @@ function createScene(canvas, handlers) {
       f.obj.userData.open(s3)
       if(f.dir<0&&f.u<=0){scene.remove(f.obj);f.obj.userData.dispose();f.box.visible=true;folder=null}
     }
+    if(pendingOut&&!folder){ pendingOut=false; if(focus)focus={...focus,phase:'out',t:0,from:{pos:camera.position.clone(),quat:camera.quaternion.clone(),fov:camera.fov}} }
+    if(pendingGo&&!folder&&!focus&&!hold&&!pendingOut&&!state.system){ const id=pendingGo; pendingGo=null; goTo(id) }
     // phones resize the page without always telling the observer (address bar, rotation)
     const size=renderer.getSize(tmpSize); if(Math.abs(size.x-canvas.clientWidth)>1||Math.abs(size.y-canvas.clientHeight)>1)resize()
         renderer.render(scene,camera);frame=requestAnimationFrame(tick)
@@ -1265,14 +1280,9 @@ function createScene(canvas, handlers) {
   frame=requestAnimationFrame(tick)
   return {
     setTimeOfDay(hour){lightTarget=lightAt(hour)},
-    // Walk to one of the explorable spots and face it.
-    goTo(id){
-      const spot=hotspots.find((h)=>h.id===id); if(!spot||state.system||state.allowWalk===false||state.allowOpen===false)return // not during the walkthrough
-      const view=spot.view, yaw=Math.atan2(-(spot.pos.x-view.x),-(spot.pos.z-view.z))
-      const eyeY=floorY+EYE_HEIGHT, pitch=THREE.MathUtils.clamp(Math.atan2(spot.pos.y-eyeY,Math.hypot(spot.pos.x-view.x,spot.pos.z-view.z)),-.75,.5)
-      const dYaw=Math.atan2(Math.sin(yaw-state.yaw),Math.cos(yaw-state.yaw))
-      travel={t:0,duration:Math.min(1.8,.7+Math.hypot(view.x-state.x,view.z-state.z)*.35),from:{x:state.x,z:state.z,yaw:state.yaw,pitch:state.pitch},to:{x:view.x,z:view.z,pitch},dYaw}
-    },
+    goTo(id){ goTo(id) },
+    // from inside a close-up: close it (file back on the shelf, camera out) and only then walk to `id`
+    switchTo(id){ if(!state.system){goTo(id);return} pendingGo=id; exitSystem(true) },
     openSpot(){ if(state.allowOpen!==false)enterSystem() },
     // first-visit walkthrough: which controls are live yet
     setControls({walk=true,look=true,open=true}={}){ state.allowWalk=walk; state.allowLook=look; state.allowOpen=open; if(!walk)keys.clear() },

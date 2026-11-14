@@ -869,11 +869,12 @@ export function createFileFolder({ color = '#2f4a6b', thickness = .065, height =
 // 10 bandana (6 is now the rim round each eye; the eyes themselves are glossy spheres added here). Each dog paints those regions from its own palette. Model units are mm, standing, facing +Z,
 // origin at the floor centre.
 export const DOG_COATS = {
-  white: ['#ece6db', '#e6ded0', '#f3efe8', '#d2c6b4', '#efeae1', '#e9e2d5', '#d8cec0', '#141111', '#e8818c', '#cdbfae', '#3a3d42'],
-  bruno: ['#5b3d2a', '#3b2a20', '#211813', '#30221a', '#6b4a32', '#56392a', '#1c1411', '#141111', '#e8818c', '#1a120f', '#26282c'],
+  // [body, head, muzzle, ears, legs, tail, eye rims, nose, tongue, lips/mouth, bandana] — from photos of Rio and Bruno
+  white: ['#f1ebe1', '#eadbc4', '#e6e0d6', '#c79c68', '#f3eee6', '#efe5d4', '#3a2c26', '#141111', '#e8818c', '#1c1615', '#3a3d42'],
+  bruno: ['#8a6546', '#5f4737', '#2c2420', '#5b4435', '#a27b58', '#98734f', '#1c1411', '#141111', '#e8818c', '#1d1512', '#26282c'],
 }
 const GLOSSY = new Set([6, 7, 8])
-export function createShihTzu(srcMesh, { coat = DOG_COATS.white, height = .27 } = {}) {
+export function createShihTzu(srcMesh, { coat = DOG_COATS.white, height = .27, frost = null } = {}) {
   // plain float geometry in model space (the file's positions/normals are quantized)
   srcMesh.updateWorldMatrix(true, false)
   const src = srcMesh.geometry, n = src.attributes.position.count, M = srcMesh.matrixWorld, NM = new THREE.Matrix3().getNormalMatrix(M)
@@ -888,17 +889,51 @@ export function createShihTzu(srcMesh, { coat = DOG_COATS.white, height = .27 } 
     const j = GLOSSY.has(r) || r === 10 ? 1 : .94 + .06 * Math.sin(px * .9 + py * .37) * Math.sin(pz * .73 - py * .21)
     c.copy(pal[r]).multiplyScalar(j); col.set([c.r, c.g, c.b], i * 3)
   }
-  // fur first, then the glossy bits (eyes, nose, tongue) as a second group
-  const idx = src.index.array, fur = [], gloss = []
-  for (let f = 0; f < idx.length; f += 3) (GLOSSY.has(region[idx[f]]) && GLOSSY.has(region[idx[f + 1]]) ? gloss : fur).push(idx[f], idx[f + 1], idx[f + 2])
+  // the mouth: only a thin, soft black lip line right along the edge of the (tucked-away) tongue; the
+  // rest of the mouth area is muzzle fur, so the mouth reads as closed
+  const tongueAt = []; for (let i = 0; i < n; i++) if (region[i] === 8) tongueAt.push(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2])
+  // like the photos: the mouth sits in a shadowy grey beard; black right at the lips, greying out into the fur
+  let tongueMidY = 0; for (let k = 1; k < tongueAt.length; k += 3) tongueMidY += tongueAt[k]; tongueMidY /= Math.max(1, tongueAt.length / 3)
+  const lip = pal[9], muzzleC = pal[2], beard = new THREE.Color(pal[2]).lerp(pal[9], .55)
+  for (let i = 0; i < n; i++) {
+    if (region[i] !== 9 && region[i] !== 2) continue
+    let d = Infinity; const x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2]
+    for (let k = 0; k < tongueAt.length; k += 3) { const dx = x - tongueAt[k], dy = y - tongueAt[k + 1], dz = z - tongueAt[k + 2]; const q = dx * dx + dy * dy + dz * dz; if (q < d) d = q }
+    d = Math.sqrt(d)
+    // the lower lip gets a wider black band than the upper one, so it reads clearly
+    const lower = region[i] === 9 && y < tongueMidY
+    const black = 1 - THREE.MathUtils.smoothstep(d, lower ? 1.95 : 1.1, lower ? 2.2 : 2.6), grey = 1 - THREE.MathUtils.smoothstep(d, 1.2, lower ? 2.6 : region[i] === 9 ? 5.5 : 4)
+    const strand = .75 + .25 * Math.sin(x * 2.3 + Math.sin(y * .9) * 2.5) // a little streaking, like hair
+    c.copy(muzzleC).lerp(beard, grey * strand).lerp(lip, black * .95); col.set([c.r, c.g, c.b], i * 3)
+  }
+  // grey/white strands through the top of the head (Bruno has these)
+  if (frost) {
+    const fc = new THREE.Color(frost)
+    for (let i = 0; i < n; i++) {
+      if (region[i] !== 1 && region[i] !== 3) continue
+      const x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2]
+      const top = THREE.MathUtils.smoothstep(y, 88, 104) * (region[i] === 3 ? .5 : 1)
+      const streak = THREE.MathUtils.smoothstep(Math.sin(x * 1.1 + Math.sin(z * .35) * 2.2) + Math.sin(x * 2.7 - z * .5) * .5, .35, 1.1)
+      const k = top * streak * .7; if (k <= 0) continue
+      c.setRGB(col[i * 3], col[i * 3 + 1], col[i * 3 + 2]).lerp(fc, k); col.set([c.r, c.g, c.b], i * 3)
+    }
+  }
+  // fur first, then the glossy bits (eye rims, nose), then the tongue on its own (it pokes out when petted)
+  const idx = src.index.array, fur = [], gloss = [], tongue = []
+  for (let f = 0; f < idx.length; f += 3) {
+    const r0 = region[idx[f]], r1 = region[idx[f + 1]]
+    ;(r0 === 8 && r1 === 8 ? tongue : GLOSSY.has(r0) && GLOSSY.has(r1) ? gloss : fur).push(idx[f], idx[f + 1], idx[f + 2])
+  }
   const g = new THREE.BufferGeometry()
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3))
-  g.setIndex(new (n > 65535 ? THREE.Uint32BufferAttribute : THREE.Uint16BufferAttribute)([...fur, ...gloss], 1))
-  g.addGroup(0, fur.length, 0); g.addGroup(fur.length, gloss.length, 1)
+  g.setIndex(new (n > 65535 ? THREE.Uint32BufferAttribute : THREE.Uint16BufferAttribute)([...fur, ...gloss, ...tongue], 1))
+  g.addGroup(0, fur.length, 0); g.addGroup(fur.length, gloss.length, 1); g.addGroup(fur.length + gloss.length, tongue.length, 2)
   g.computeBoundingBox()
   const mats = [
     new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .82, metalness: 0, side: THREE.DoubleSide }),
     new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: .18, clearcoat: 1, clearcoatRoughness: .08 }),
+    // resting: the tongue is tucked away, showing as glossy black lips; petting turns it pink as it comes out
+    new THREE.MeshPhysicalMaterial({ color: coat[9], roughness: .8, clearcoat: 0, clearcoatRoughness: .25 }),
   ]
   // a two-bone rig so only the head turns: everything of the head (and the ears hanging off it) follows a
   // head bone pivoting at the neck, blended over the neck so nothing tears
@@ -908,14 +943,18 @@ export function createShihTzu(srcMesh, { coat = DOG_COATS.white, height = .27 } 
     const y = pos[i * 3 + 1], z = pos[i * 3 + 2], r = region[i]
     let w = 0
     // a long, soft blend from the chest up so lifting the head never opens a gap under the chin
-    if (r !== 4 && r !== 5) w = THREE.MathUtils.smoothstep(y, 52, 88) * THREE.MathUtils.smoothstep(z, -16, 8)
-    if (r === 3) w = Math.max(w, THREE.MathUtils.smoothstep(y, 46, 80) * THREE.MathUtils.smoothstep(z, -10, 10)) // ear tips lag, like floppy ears
+    // one weight formula for every region, so the seams between regions (ears, bandana, face) never split
+    w = THREE.MathUtils.smoothstep(y, 52, 88) * THREE.MathUtils.smoothstep(z, -16, 8)
     si[i * 4] = 0; si[i * 4 + 1] = 1; sw[i * 4] = 1 - w; sw[i * 4 + 1] = w
+    if (r === 8) { si[i * 4] = 2; si[i * 4 + 1] = 0; sw[i * 4] = 1; sw[i * 4 + 1] = 0 } // the tongue rides its own bone
   }
   g.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4)); g.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4))
   const mesh = new THREE.SkinnedMesh(g, mats); mesh.castShadow = true; mesh.receiveShadow = true
   const root = new THREE.Bone(), head = new THREE.Bone(); head.position.copy(PIVOT); head.rotation.order = 'YXZ'; root.add(head)
-  mesh.add(root); mesh.bind(new THREE.Skeleton([root, head]))
+  // the tongue's bone sits at its root inside the mouth; scaling it tucks the tongue in or lets it out
+  const tongueBone = new THREE.Bone(); tongueBone.position.set(0, 82, 58).sub(PIVOT); head.add(tongueBone)
+  mesh.add(root); mesh.bind(new THREE.Skeleton([root, head, tongueBone]))
+  tongueBone.scale.set(.8, .4, .2)
   // big, all-dark eyes filling the socket, each with a little catchlight (they ride on the head bone)
   const eyeGeo = new THREE.SphereGeometry(4.1, 32, 20), eyeMat = new THREE.MeshPhysicalMaterial({ color: '#070504', roughness: .06, clearcoat: 1, clearcoatRoughness: .02 })
   const glint = new THREE.Mesh(new THREE.SphereGeometry(.75, 12, 8), new THREE.MeshBasicMaterial({ color: '#ffffff' }))
@@ -927,6 +966,7 @@ export function createShihTzu(srcMesh, { coat = DOG_COATS.white, height = .27 } 
   const b = g.boundingBox; mesh.position.y = -b.min.y
   dog.scale.setScalar(height / (b.max.y - b.min.y))
   dog.userData.head = head
+  dog.userData.tongue = { bone: tongueBone, mat: mats[2], rest: new THREE.Color(coat[9]), out: new THREE.Color('#e8818c') }
   return dog
 }
 
