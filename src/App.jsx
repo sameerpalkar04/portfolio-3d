@@ -381,7 +381,8 @@ function PhoneScreen({ onClose, getRect }) {
       </motion.div>
       <div className="phone-notes">
         {CONTACTS.map((c, i) => <motion.a key={c.app} className="phone-note" href={c.href} target={c.href.startsWith('http') ? '_blank' : undefined} rel="noreferrer"
-          initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .55 + i * .12, duration: .45, ease: [.2, .8, .2, 1] }}>
+          initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .55 + i * .12, duration: .45, ease: [.2, .8, .2, 1] }}
+          whileHover={{ y: -1, transition: { duration: .15 } }} whileTap={{ scale: .98, transition: { duration: .1 } }}>
           <span className="note-icon" style={{ background: c.tile }}>{c.icon}</span>
           <span className="note-text"><span className="note-head"><b>{c.app}</b><small>{i === 0 ? 'now' : `${i * 3}m ago`}</small></span><strong>{c.title}</strong><span>{c.body}</span></span>
         </motion.a>)}
@@ -699,9 +700,14 @@ function useBarSpot() {
 // the place badge: gold for 1st, silver for 2nd, bronze for 3rd
 const placeTone = (place) => (/^1/.test(place) ? 'gold' : /^2/.test(place) ? 'silver' : /^3/.test(place) ? 'bronze' : 'gold')
 const MedalIcon = () => <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 3h8l-2.5 6h-3z"/><circle cx="12" cy="15" r="5.5"/><path d="m12 12.3.9 1.8 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2-1.45-1.4 2-.3z" fill="currentColor" stroke="none"/></svg>
-function CertDetails({ a }) {
+function CertDetails({ a, cue }) {
   return <>
-    <span className={`cert-place ${placeTone(a.place)}`}><MedalIcon/>{a.place}</span>
+    <div className="cert-head">
+      <span className={`cert-place ${placeTone(a.place)}`}><MedalIcon/>{a.place}</span>
+      {/* phones: a nudge that there's more to read below, gone once they slide */}
+      <AnimatePresence>{cue && <motion.span key="cue" className="cert-scroll-cue" initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ delay: .5, duration: .3 }}>
+        <Arrow dir="up" size={13}/>Slide up to read more</motion.span>}</AnimatePresence>
+    </div>
     <h3>{a.title}</h3>
     <p className="cert-meta">{a.event} · {a.date}</p>
     <p className="cert-summary">{a.summary}</p>
@@ -711,6 +717,21 @@ function CertDetails({ a }) {
       {a.project && <a className="resume-btn primary" href={a.project} target="_blank" rel="noreferrer"><CodeIcon/>View project</a>}
     </div>
   </>
+}
+
+// phone details box: the text scrolls inside; the slide cue shows while there's more below and nothing has been scrolled
+function CertScroll({ a }) {
+  const ref = useRef(null)
+  const [cue, setCue] = useState(false)
+  useEffect(() => {
+    const el = ref.current; if (!el) return
+    const check = () => setCue((c) => c === 'done' ? c : el.scrollHeight - el.clientHeight > 8)
+    check(); const t = setTimeout(check, 400)
+    return () => clearTimeout(t)
+  }, [a])
+  return <div className="cert-box-scroll" ref={ref} onScroll={(e) => { if (e.currentTarget.scrollTop > 6) setCue('done') }}>
+    <CertDetails a={a} cue={cue === true}/>
+  </div>
 }
 
 // a hand swiping right
@@ -758,7 +779,7 @@ function AchievementsView({ certId, getRect, onNext, onBack }) {
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .3 }}>
           {/* fixed in place, equal gaps above and below; its text scrolls inside it */}
           <article className="cert-box fixed" style={{ top: rect.frameBottom + 16, bottom: viewH() - (btnTop ?? viewH() - 130) + 16 }}>
-            <div className="cert-box-scroll"><CertDetails a={shown}/></div>
+            <CertScroll a={shown}/>
           </article>
         </motion.div>
       // laptop: the certificate on the left, this card on the right

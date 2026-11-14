@@ -840,3 +840,28 @@ body.menu-open .ai-wrap{visibility:hidden}
 .ai-mark .ai-eye{animation:none}
 .ai-soon.ai-hint{padding:8px 12px;pointer-events:none}
 .ai-soon.ai-hint b{font-size:12.5px;white-space:nowrap}
+/* certificate details: the place badge with (phones) a slide cue beside it */
+.cert-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.cert-scroll-cue{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:999px;background:#f2f3f5;border:1px solid #e3e5e8;color:#4a4e55;font:500 11.5px 'DM Sans',system-ui,sans-serif;white-space:nowrap}
+.cert-scroll-cue .arrow-icon{animation:certNudge 1.4s ease-in-out infinite}
+@keyframes certNudge{0%,100%{translate:0 1px}50%{translate:0 -2px}}
+@media (prefers-reduced-motion:reduce){.cert-scroll-cue .arrow-icon{animation:none}}
+/* phones: a touch smaller so the box doesn't feel crowded */
+.cert-box.fixed .cert-place{font-size:13.5px;padding:6px 12px 6px 9px}
+.cert-box.fixed h3{font-size:21px;margin-top:10px}
+.cert-box.fixed .cert-meta{font-size:12px;margin-top:4px}
+.cert-box.fixed .cert-summary{font-size:13.5px;line-height:1.55;margin-top:12px}
+.cert-box.fixed .cert-points{font-size:13px;line-height:1.5;gap:6px;margin-top:10px}
+.cert-box.fixed .cert-box-scroll{padding:16px 16px 18px}
+/* camera on phones: the rotate cue sits between the photo arrows and the Nate/menu buttons, wrapping if it must */
+.stack-nav ~ .rotate-hint{left:calc(14px + 56px + 8px + env(safe-area-inset-left));right:calc(138px + env(safe-area-inset-right));max-width:none;width:auto;white-space:normal;line-height:1.3;font-size:11.5px;padding:0 12px}
+.stack-nav ~ .rotate-hint svg{flex-shrink:0}
+/* phone details box: text left-aligned, the two buttons centred */
+.cert-box.fixed .cert-box-scroll{text-align:left;align-items:stretch}
+.cert-box.fixed .cert-links{justify-content:center;align-self:stretch}
+/* phones: every rotate cue stays on screen — from the left edge to the Nate/menu buttons, wrapping if it must */
+.rotate-hint{left:calc(14px + env(safe-area-inset-left));right:calc(138px + env(safe-area-inset-right));width:auto;max-width:none;white-space:normal;line-height:1.3}
+.rotate-hint svg{flex-shrink:0}
+/* the notifications slide in with framer-motion, which sets transform every frame: a CSS transition on
+   transform made each of those steps lag 150ms behind and wobble. Hover/press now go through framer too. */
+.phone-note,.phone-note:hover,.phone-note:active{transition:background .15s;transform:none}
