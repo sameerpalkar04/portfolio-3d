@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'
 import { createExteriorMaterial, WINDOW_UV } from './exteriorShader'
 import { buildCollisionGrid, createWalkTester } from './collision'
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
 import { toLocal, isLocked } from './orientation'
 import { ACHIEVEMENTS } from './achievements'
-import { PHONE, BOOK, CAMERA_SCREEN, createOpenBook, createDigitalCamera, createTableLamp, createGlobe, createCertificateWall, createPolaroid, createModelAirplane, createPhone, createFloorPlant, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight, createFileFolder, FOLDER } from './props'
+import { PHONE, BOOK, CAMERA_SCREEN, createOpenBook, createDigitalCamera, createTableLamp, createGlobe, createCertificateWall, createPolaroid, createModelAirplane, createPhone, createFloorPlant, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight, createFileFolder, createShihTzu, DOG_COATS, createDogBowl, createPlushDuck, FOLDER } from './props'
 import { createDesktopTexture, BEACH_PHOTO_URL } from './screens'
 
 const MODEL_URL = '/models/home-office.glb'
@@ -157,6 +158,8 @@ function createScene(canvas, handlers) {
   let grid = null, computer = null
   // Explorable spots (computer, phone, files, books, speaker) and an optional walk-to tween.
   let hotspots = [], travel = null
+  // Rio and Bruno on the window seat: where to stand to pet them, and the hearts they send up
+  let petSpot = null, petGroup = null, petT = -1; const hearts = []
   const state = { x: 0, z: 0, yaw: -Math.PI/2, pitch: 0, nearby: false, system: false, hotspot: null }
 
   const { isFree, nearestFree } = createWalkTester(() => grid, () => walkBounds)
@@ -487,6 +490,49 @@ function createScene(canvas, handlers) {
       bonsai.position.set(vc.x, vb.min.y, vc.z); bonsai.rotation.y = Math.PI / 2 + .3
       scene.add(bonsai)
     }
+    // Two shih tzus on the window-seat cushion (white, and Bruno in dark brown), away from the pillows,
+    // facing into the room.
+    {
+      let cushion = null; const pillows = []
+      model.traverse((o) => { if (!o.isMesh) return; const n = (o.material?.name || '').toLowerCase(); if (n === 'cushion') cushion = o; else if (n === 'pillow 1' || n === 'pillow 2') pillows.push(o) })
+      if (cushion) {
+        const cb = new THREE.Box3().setFromObject(cushion), cc = cb.getCenter(new THREE.Vector3()), mid = roomBounds.getCenter(new THREE.Vector3())
+        const alongX = cb.max.x - cb.min.x > cb.max.z - cb.min.z
+        const inward = alongX ? new THREE.Vector3(0, 0, Math.sign(mid.z - cc.z)) : new THREE.Vector3(Math.sign(mid.x - cc.x), 0, 0)
+        const along = new THREE.Vector3(inward.z, 0, -inward.x), half = (alongX ? cb.max.x - cb.min.x : cb.max.z - cb.min.z) / 2
+        // the pillows' side of the seat; the dogs go on the other half
+        let side = 1
+        if (pillows.length) { const pc = new THREE.Box3(); pillows.forEach((o) => pc.expandByObject(o)); side = -Math.sign(pc.getCenter(new THREE.Vector3()).sub(cc).dot(along)) || 1 }
+        const depth = (alongX ? cb.max.z - cb.min.z : cb.max.x - cb.min.x)
+        // drop each dog onto the cushion's top surface there
+        const seatY = (x, z) => { const hit = new THREE.Raycaster(new THREE.Vector3(x, cb.max.y + .5, z), new THREE.Vector3(0, -1, 0), 0, 1).intersectObject(cushion, true)[0]; return hit ? hit.point.y : cb.max.y }
+        const face = Math.atan2(inward.x, inward.z)
+        // where each dog sits (known now, so the petting spot exists before the model arrives)
+        const seats = [
+          { name: 'Rio', at: .34, back: .03, turn: -.32, coat: DOG_COATS.white, height: .4 },
+          { name: 'Bruno', at: .78, back: -.05, turn: -.58, coat: DOG_COATS.bruno, height: .43 },
+        ].map((d) => { const p = cc.clone().addScaledVector(along, side * d.at * half).addScaledVector(inward, d.back * depth); p.y = seatY(p.x, p.z) - .003; return { ...d, p } })
+        petGroup = new THREE.Group(); petGroup.name = 'pets'; scene.add(petGroup)
+        // their plush duck on the cushion in front of them
+        {
+          const duck = createPlushDuck(), dp = seats[0].p.clone().add(seats[1].p).multiplyScalar(.5).addScaledVector(inward, depth * .34).addScaledVector(along, side * .02 * half)
+          duck.position.set(dp.x, seatY(dp.x, dp.z) - .004, dp.z); duck.rotation.y = face - side * .25; duck.scale.setScalar(1.15); scene.add(duck)
+        }
+        petSpot = seats[0].p.clone().add(seats[1].p).multiplyScalar(.5).add(new THREE.Vector3(0, .22, 0))
+        // the sculpted dog loads on its own (≈320 KB); both dogs share its shape, painted differently
+        const dogLoader = new GLTFLoader(); dogLoader.setMeshoptDecoder(MeshoptDecoder)
+        dogLoader.load('/models/shih-tzu.glb?v=3', (gltf) => {
+          let src = null; gltf.scene.traverse((o) => { if (o.isMesh && !src) src = o })
+          if (!src) return
+          for (const s of seats) {
+            const d = createShihTzu(src, { coat: s.coat, height: s.height }); d.name = s.name
+            d.position.copy(s.p); d.rotation.y = face + side * s.turn
+            d.userData.base = { y: s.p.y, ry: d.rotation.y, h: s.height }
+            petGroup.add(d)
+          }
+        })
+      }
+    }
     // Replace the vase of white roses with a potted pothos on a wooden tray.
     if (roses && cabinet) {
       const rb = new THREE.Box3().setFromObject(roses), cb = new THREE.Box3().setFromObject(cabinet)
@@ -587,6 +633,30 @@ function createScene(canvas, handlers) {
         nightLights.push({ light: halo, max: .5 })
       }
     }
+    // Rio and Bruno's food bowls: on the floor in the corner at the window end of the desk, against that
+    // end wall, one behind the other — the first just peeking out from under the desk, so both show
+    if (imac) {
+      const ib = new THREE.Box3().setFromObject(imac), ic = ib.getCenter(new THREE.Vector3()), mid = roomBounds.getCenter(new THREE.Vector3())
+      const toWall = new THREE.Vector3(Math.sign(ic.x - mid.x), 0, 0), win = find('Window')
+      const toWin = win ? Math.sign(new THREE.Box3().setFromObject(win).getCenter(new THREE.Vector3()).z - ic.z) || 1 : 1
+      const fy = floorY + .036 // the oak floor overlay
+      const hitAlong = (from, dir) => new THREE.Raycaster(from, dir, 0, 4).intersectObject(model, true).find((h) => h.object.visible)
+      // the side wall behind the desk, and the end wall the desk runs into
+      const wallX = toWall.x > 0 ? roomBounds.max.x : roomBounds.min.x // the room's inner wall face
+      const endHit = hitAlong(new THREE.Vector3(wallX - toWall.x * .25, fy + .12, ic.z), new THREE.Vector3(0, 0, toWin))
+      const endZ = endHit ? endHit.point.z : ic.z + toWin * 1.2
+      // the desk's front edge there: step out from the wall until a ray from above reaches the floor
+      let frontX = wallX - toWall.x * .6
+      for (let d = .1; d < 1.2; d += .02) {
+        const x = wallX - toWall.x * d, h = new THREE.Raycaster(new THREE.Vector3(x, fy + 1.3, ic.z + toWin * .45), new THREE.Vector3(0, -1, 0), 0, 2).intersectObject(model, true).find((o) => o.object.visible)
+        if (h && h.point.y < fy + .2) { frontX = x; break }
+      }
+      const z = endZ - toWin * .115
+      ;[[0, 3], [1, 7]].forEach(([i, seed]) => {
+        const bowl = createDogBowl({ seed }); bowl.position.set(frontX - toWall.x * (i * .215 - .06), fy, z); bowl.rotation.y = i * 1.3 + .4
+        scene.add(bowl)
+      })
+    }
     // Explorable spots: what each object opens, and where to stand to use it.
     {
       const centerX=(walkBounds.min.x+walkBounds.max.x)/2
@@ -610,6 +680,7 @@ function createScene(canvas, handlers) {
         { id:'photos', app:'photos', label:'Camera', pos:cameraSpot ? cameraSpot.clone().add(new THREE.Vector3(0,.04,0)) : null, obj:scene.getObjectByName('desk-camera'), reach:.14 },
         { id:'about', app:'about', label:'Books', pos:at(scene.getObjectByName('open-book')) || at(find('Line023')), obj:scene.getObjectByName('open-book'), reach:.2 },
         { id:'music', app:'music', label:'Speaker', pos:at(scene.getObjectByName('cabinet-speaker')), obj:scene.getObjectByName('cabinet-speaker'), reach:.14 },
+        { id:'pets', app:'pets', label:'Rio & Bruno', pos:petSpot, obj:petGroup, reach:.4 },
       ]
       hotspots=spots.filter((h)=>h.pos).map((h)=>{
         // stand in the walkway about an arm's length back from the object, facing it
@@ -914,7 +985,60 @@ function createScene(canvas, handlers) {
     folder.maxD=folder.out.clone().sub(camera.position).dot(fwd)-.12-obj.userData.depth
     folder.far=pickFar(folder,canvas.clientWidth<=720?3.2:2.5,folder.maxD)
   }
+  // petting Rio and Bruno: no close-up, they just hop and send up hearts
+  let heartTex=null
+  const heartTexture=()=>{
+    if(heartTex)return heartTex
+    const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d')
+    x.fillStyle='#ff4d6d';x.shadowColor='rgba(0,0,0,.18)';x.shadowBlur=6;x.beginPath()
+    x.moveTo(64,108);x.bezierCurveTo(10,72,14,26,44,24);x.bezierCurveTo(56,23,62,32,64,40);x.bezierCurveTo(66,32,72,23,84,24);x.bezierCurveTo(114,26,118,72,64,108);x.fill()
+    x.shadowColor='transparent';x.fillStyle='rgba(255,255,255,.55)';x.beginPath();x.ellipse(44,44,9,6,-.6,0,Math.PI*2);x.fill()
+    heartTex=new THREE.CanvasTexture(c);heartTex.colorSpace=THREE.SRGBColorSpace;return heartTex
+  }
+  const petDogs=()=>{
+    if(!petGroup)return
+    petT=0
+    for(const d of petGroup.children){
+      const b=d.userData.base; if(!b)continue
+      for(let i=0;i<6;i++){
+        const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:heartTexture(),transparent:true,depthWrite:false,opacity:0}))
+        const a=Math.random()*Math.PI*2, r=.03+Math.random()*.06
+        sp.position.set(d.position.x+Math.cos(a)*r,b.y+b.h*.95+Math.random()*.04,d.position.z+Math.sin(a)*r)
+        sp.userData={t:-i*.12-Math.random()*.08,life:1.5+Math.random()*.5,vx:(Math.random()-.5)*.05,vz:(Math.random()-.5)*.05,s:.045+Math.random()*.03,ph:Math.random()*6}
+        sp.scale.setScalar(.001);sp.renderOrder=20;scene.add(sp);hearts.push(sp)
+      }
+    }
+  }
+  const tickPets=(dt)=>{
+    // only their heads move: they turn to you and look up to your eye level, with a happy little head tilt,
+    // then settle again (the bodies stay put on the cushion)
+    if(petT>=0&&petGroup){
+      petT+=dt
+      const look=THREE.MathUtils.smoothstep(petT,0,.45)*(1-THREE.MathUtils.smoothstep(petT,2.3,2.9))
+      petGroup.children.forEach((d,i)=>{
+        const b=d.userData.base, h=d.userData.head; if(!b||!h)return
+        const hp=h.getWorldPosition(new THREE.Vector3())
+        const dx=camera.position.x-hp.x, dz=camera.position.z-hp.z
+        let turn=Math.atan2(dx,dz)-b.ry; turn=THREE.MathUtils.clamp(Math.atan2(Math.sin(turn),Math.cos(turn)),-.6,.6)
+        const up=THREE.MathUtils.clamp(Math.atan2(camera.position.y-hp.y,Math.hypot(dx,dz)),0,.24)
+        const t=Math.max(0,(petT-.3)/1.1-i*.15)
+        h.rotation.y=turn*look; h.rotation.x=-up*look
+        h.rotation.z=t<1?Math.sin(t*Math.PI*4)*(1-t)*.16:0
+      })
+      if(petT>3){petT=-1;petGroup.children.forEach((d)=>{const h=d.userData.head;if(h)h.rotation.set(0,0,0)})}
+    }
+    for(let i=hearts.length-1;i>=0;i--){
+      const h=hearts[i],u=h.userData; u.t+=dt
+      if(u.t<0)continue
+      const f=u.t/u.life
+      if(f>=1){scene.remove(h);h.material.dispose();hearts.splice(i,1);continue}
+      h.position.y+=dt*.16; h.position.x+=(u.vx+Math.sin(u.t*5+u.ph)*.03)*dt; h.position.z+=u.vz*dt
+      h.scale.setScalar(u.s*Math.min(1,f*5))
+      h.material.opacity=f<.15?f/.15:1-Math.max(0,(f-.55)/.45)
+    }
+  }
   const enterSystem=()=>{
+    if(state.hotspot?.id==='pets'&&!state.system){petDogs();return}
     if(!state.hotspot||state.system)return
     state.system=true; keys.clear(); travel=null
     if(state.hotspot.id==='photos'){
@@ -1008,6 +1132,7 @@ function createScene(canvas, handlers) {
   const walkDirection=new THREE.Vector3()
   const tick=(now)=>{
     const dt=Math.min((now-last)/1000,.04);last=now;uiTime+=dt
+    tickPets(dt)
     light.night=THREE.MathUtils.damp(light.night,lightTarget.night,2.2,dt); light.warm=THREE.MathUtils.damp(light.warm,lightTarget.warm,2.2,dt)
     progress=light.night
     night=progress*progress*(3-2*progress)

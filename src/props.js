@@ -861,3 +861,154 @@ export function createFileFolder({ color = '#2f4a6b', thickness = .065, height =
   }
   return g
 }
+
+// ── Shih tzus ───────────────────────────────────────────────────────────────────────────────────
+// The sculpted shih tzu (public/models/shih-tzu.glb: decimated from the 3D-print STL to 70k triangles,
+// bows removed, meshopt-compressed). It carries no colours, only a region id per vertex in the red
+// channel (×16): 0 body, 1 head, 2 muzzle, 3 ears, 4 legs, 5 tail, 6 eyes, 7 nose, 8 tongue, 9 mouth,
+// 10 bandana (6 is now the rim round each eye; the eyes themselves are glossy spheres added here). Each dog paints those regions from its own palette. Model units are mm, standing, facing +Z,
+// origin at the floor centre.
+export const DOG_COATS = {
+  white: ['#ece6db', '#e6ded0', '#f3efe8', '#d2c6b4', '#efeae1', '#e9e2d5', '#d8cec0', '#141111', '#e8818c', '#cdbfae', '#3a3d42'],
+  bruno: ['#5b3d2a', '#3b2a20', '#211813', '#30221a', '#6b4a32', '#56392a', '#1c1411', '#141111', '#e8818c', '#1a120f', '#26282c'],
+}
+const GLOSSY = new Set([6, 7, 8])
+export function createShihTzu(srcMesh, { coat = DOG_COATS.white, height = .27 } = {}) {
+  // plain float geometry in model space (the file's positions/normals are quantized)
+  srcMesh.updateWorldMatrix(true, false)
+  const src = srcMesh.geometry, n = src.attributes.position.count, M = srcMesh.matrixWorld, NM = new THREE.Matrix3().getNormalMatrix(M)
+  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3), region = new Uint8Array(n)
+  const v = new THREE.Vector3(), c = new THREE.Color(), pal = coat.map((h) => new THREE.Color(h))
+  for (let i = 0; i < n; i++) {
+    v.fromBufferAttribute(src.attributes.position, i).applyMatrix4(M); pos.set([v.x, v.y, v.z], i * 3)
+    v.fromBufferAttribute(src.attributes.normal, i).applyMatrix3(NM).normalize(); nor.set([v.x, v.y, v.z], i * 3)
+    const r = Math.min(10, Math.round(src.attributes.color.getX(i) * 255 / 16)); region[i] = r
+    // a little variation through the coat so it doesn't read as plastic
+    const px = pos[i * 3], py = pos[i * 3 + 1], pz = pos[i * 3 + 2]
+    const j = GLOSSY.has(r) || r === 10 ? 1 : .94 + .06 * Math.sin(px * .9 + py * .37) * Math.sin(pz * .73 - py * .21)
+    c.copy(pal[r]).multiplyScalar(j); col.set([c.r, c.g, c.b], i * 3)
+  }
+  // fur first, then the glossy bits (eyes, nose, tongue) as a second group
+  const idx = src.index.array, fur = [], gloss = []
+  for (let f = 0; f < idx.length; f += 3) (GLOSSY.has(region[idx[f]]) && GLOSSY.has(region[idx[f + 1]]) ? gloss : fur).push(idx[f], idx[f + 1], idx[f + 2])
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3))
+  g.setIndex(new (n > 65535 ? THREE.Uint32BufferAttribute : THREE.Uint16BufferAttribute)([...fur, ...gloss], 1))
+  g.addGroup(0, fur.length, 0); g.addGroup(fur.length, gloss.length, 1)
+  g.computeBoundingBox()
+  const mats = [
+    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .82, metalness: 0, side: THREE.DoubleSide }),
+    new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: .18, clearcoat: 1, clearcoatRoughness: .08 }),
+  ]
+  // a two-bone rig so only the head turns: everything of the head (and the ears hanging off it) follows a
+  // head bone pivoting at the neck, blended over the neck so nothing tears
+  const PIVOT = new THREE.Vector3(0, 70, 16)
+  const si = new Uint16Array(n * 4), sw = new Float32Array(n * 4)
+  for (let i = 0; i < n; i++) {
+    const y = pos[i * 3 + 1], z = pos[i * 3 + 2], r = region[i]
+    let w = 0
+    // a long, soft blend from the chest up so lifting the head never opens a gap under the chin
+    if (r !== 4 && r !== 5) w = THREE.MathUtils.smoothstep(y, 52, 88) * THREE.MathUtils.smoothstep(z, -16, 8)
+    if (r === 3) w = Math.max(w, THREE.MathUtils.smoothstep(y, 46, 80) * THREE.MathUtils.smoothstep(z, -10, 10)) // ear tips lag, like floppy ears
+    si[i * 4] = 0; si[i * 4 + 1] = 1; sw[i * 4] = 1 - w; sw[i * 4 + 1] = w
+  }
+  g.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4)); g.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4))
+  const mesh = new THREE.SkinnedMesh(g, mats); mesh.castShadow = true; mesh.receiveShadow = true
+  const root = new THREE.Bone(), head = new THREE.Bone(); head.position.copy(PIVOT); head.rotation.order = 'YXZ'; root.add(head)
+  mesh.add(root); mesh.bind(new THREE.Skeleton([root, head]))
+  // big, all-dark eyes filling the socket, each with a little catchlight (they ride on the head bone)
+  const eyeGeo = new THREE.SphereGeometry(4.1, 32, 20), eyeMat = new THREE.MeshPhysicalMaterial({ color: '#070504', roughness: .06, clearcoat: 1, clearcoatRoughness: .02 })
+  const glint = new THREE.Mesh(new THREE.SphereGeometry(.75, 12, 8), new THREE.MeshBasicMaterial({ color: '#ffffff' }))
+  for (const x of [-14.7, 14.3]) {
+    const e = new THREE.Mesh(eyeGeo, eyeMat); e.position.set(x, 96.2, 48.8).sub(PIVOT); head.add(e)
+    const gl = glint.clone(); gl.position.set(x + Math.sign(x) * 1.3, 98, 48.8 + 3.75).sub(PIVOT); head.add(gl)
+  }
+  const dog = new THREE.Group(); dog.name = 'shih-tzu'; dog.add(mesh)
+  const b = g.boundingBox; mesh.position.y = -b.min.y
+  dog.scale.setScalar(height / (b.max.y - b.min.y))
+  dog.userData.head = head
+  return dog
+}
+
+// ── Dog bowl ────────────────────────────────────────────────────────────────────────────────────
+// A sky-blue melamine bowl (paw prints and bone outlines round the side) heaped with bone biscuits.
+// Origin at the floor centre; about 19 cm across.
+function bowlDecal() {
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 128
+  const x = c.getContext('2d'); x.fillStyle = '#5cc6e4'; x.fillRect(0, 0, 1024, 128)
+  const paw = (cx, cy, s) => {
+    x.fillStyle = '#141414'; x.beginPath(); x.ellipse(cx, cy + 8 * s, 15 * s, 12 * s, 0, 0, Math.PI * 2); x.fill()
+    for (const [dx, dy, r] of [[-15, -8, 5.5], [-6, -17, 6], [6, -17, 6], [15, -8, 5.5]]) { x.beginPath(); x.ellipse(cx + dx * s, cy + dy * s, r * s, r * 1.25 * s, 0, 0, Math.PI * 2); x.fill() }
+  }
+  const bone = (cx, cy, s) => {
+    x.save(); x.translate(cx, cy); x.rotate(-.5); x.strokeStyle = '#141414'; x.lineWidth = 3.2; x.fillStyle = '#5cc6e4'
+    x.beginPath(); x.roundRect(-20 * s, -5 * s, 40 * s, 10 * s, 3); x.fill(); x.stroke()
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) { x.beginPath(); x.arc(sx * 21 * s, sy * 6 * s, 7 * s, 0, Math.PI * 2); x.fill(); x.stroke() }
+    x.beginPath(); x.rect(-18 * s, -3.4 * s, 36 * s, 6.8 * s); x.fill(); x.restore()
+  }
+  for (let i = 0; i < 8; i++) (i % 2 ? bone : paw)(64 + i * 128, 66, 1.35)
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping
+  return t
+}
+let bowlTex = null
+export function createDogBowl({ seed = 1 } = {}) {
+  bowlTex ||= bowlDecal()
+  const g = new THREE.Group(); g.name = 'dog-bowl'
+  const R = .095, r = .08, H = .062
+  const blue = new THREE.MeshPhysicalMaterial({ color: '#5cc6e4', roughness: .32, clearcoat: .6, clearcoatRoughness: .25 })
+  const outer = new THREE.Mesh(new THREE.CylinderGeometry(R, r, H, 64, 1, true), new THREE.MeshPhysicalMaterial({ map: bowlTex, roughness: .32, clearcoat: .6, clearcoatRoughness: .25 }))
+  outer.position.y = H / 2; g.add(outer)
+  const inner = new THREE.Mesh(new THREE.CylinderGeometry(R - .008, r - .016, H - .006, 48, 1, true), new THREE.MeshPhysicalMaterial({ color: '#5cc6e4', roughness: .3, clearcoat: .6, side: THREE.BackSide }))
+  inner.position.y = H / 2 + .003; g.add(inner)
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(R - .004, .0045, 10, 64), blue); rim.rotation.x = Math.PI / 2; rim.position.y = H; g.add(rim)
+  const base = new THREE.Mesh(new THREE.CircleGeometry(r, 48), blue); base.rotation.x = Math.PI / 2; base.position.y = .001; g.add(base)
+  // the biscuits: a capsule with two knobs at each end, heaped into a dome above the rim
+  const biscuit = new THREE.MeshStandardMaterial({ color: '#c98b4a', roughness: .85 })
+  const parts = [new THREE.CapsuleGeometry(.0058, .028, 4, 10).rotateZ(Math.PI / 2)]
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) parts.push(new THREE.SphereGeometry(.0072, 10, 8).translate(sx * .0175, 0, sz * .0058))
+  const boneGeo = mergeGeos(parts); boneGeo.scale(1, .75, 1)
+  let s = seed * 7919; const rand = () => (s = (s * 16807) % 2147483647) / 2147483647
+  const N = 72, im = new THREE.InstancedMesh(boneGeo, biscuit, N), m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), sc = new THREE.Vector3(), col = new THREE.Color()
+  for (let i = 0; i < N; i++) {
+    const a = rand() * Math.PI * 2, d = Math.sqrt(rand()) * (R - .02)
+    const top = H + .002 + .03 * (1 - (d / R) ** 2)
+    p.set(Math.cos(a) * d, top - rand() * .03, Math.sin(a) * d)
+    e.set((rand() - .5) * .9, rand() * Math.PI * 2, (rand() - .5) * .9); q.setFromEuler(e)
+    const k = .9 + rand() * .25; im.setMatrixAt(i, m.compose(p, q, sc.set(k, k, k)))
+    im.setColorAt(i, col.set('#ffffff').multiplyScalar(.85 + rand() * .25))
+  }
+  im.castShadow = true; im.receiveShadow = true; g.add(im)
+  g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })
+  return g
+}
+// merge plain non-indexed copies of a few geometries (position + normal only)
+function mergeGeos(list) {
+  const flat = list.map((g) => g.index ? g.toNonIndexed() : g)
+  const n = flat.reduce((a, g) => a + g.attributes.position.count, 0), pos = new Float32Array(n * 3), nor = new Float32Array(n * 3)
+  let o = 0; for (const g of flat) { pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3); o += g.attributes.position.count }
+  const out = new THREE.BufferGeometry(); out.setAttribute('position', new THREE.BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.BufferAttribute(nor, 3))
+  return out
+}
+
+// ── Plush duck ──────────────────────────────────────────────────────────────────────────────────
+// A soft yellow squeaky duck: round body, round head, orange bill, little wings and tail. Origin at the
+// bottom centre, facing +Z, about 13 cm tall.
+export function createPlushDuck() {
+  const g = new THREE.Group(); g.name = 'plush-duck'
+  const plush = new THREE.MeshStandardMaterial({ color: '#f6cf2c', roughness: 1 })
+  const bill = new THREE.MeshStandardMaterial({ color: '#f08a24', roughness: .95 })
+  const eye = new THREE.MeshStandardMaterial({ color: '#111111', roughness: .4 })
+  const add = (geo, mat, [x, y, z], [sx, sy, sz] = [1, 1, 1], rot = [0, 0, 0]) => {
+    const o = new THREE.Mesh(geo, mat); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.rotation.set(...rot); o.castShadow = o.receiveShadow = true; g.add(o); return o
+  }
+  const ball = new THREE.SphereGeometry(1, 32, 24)
+  add(ball, plush, [0, .045, -.005], [.058, .045, .066])                 // body
+  add(ball, plush, [0, .1, .02], [.04, .038, .038])                       // head
+  add(ball, plush, [0, .07, -.07], [.02, .022, .02], [-.7, 0, 0])         // tail tuft
+  add(ball, plush, [.052, .05, -.01], [.014, .028, .042], [0, 0, -.25])   // wings
+  add(ball, plush, [-.052, .05, -.01], [.014, .028, .042], [0, 0, .25])
+  add(ball, bill, [0, .094, .058], [.022, .009, .02])                    // bill
+  add(ball, eye, [.019, .108, .05], [.0055, .0065, .004])
+  add(ball, eye, [-.019, .108, .05], [.0055, .0065, .004])
+  return g
+}

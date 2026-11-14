@@ -122,7 +122,7 @@ export const SPOTS = [
   { id: 'contact', object: 'Phone', opens: 'Contact' },
 ]
 // Explorable but without a shortcut in the bar (the bar keeps to the professional things).
-const ALL_SPOTS = [...SPOTS, { id: 'music', object: 'Speaker', opens: 'Song picks' }, { id: 'photos', object: 'Camera', opens: 'Through my lens' }]
+const ALL_SPOTS = [...SPOTS, { id: 'music', object: 'Speaker', opens: 'Song picks' }, { id: 'photos', object: 'Camera', opens: 'Through my lens' }, { id: 'pets', object: 'Rio & Bruno', opens: 'Pet them' }]
 
 // A slider built from plain elements so dragging works the same with a mouse, a finger or a pen
 // (the native range input fights with touch scrolling on phones). Arrow keys also work.
@@ -253,7 +253,7 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interact
           ? <button className="bar-open is-close" onClick={() => { setPanel(null); setOpen(false) }} aria-label="Close menu"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg> CLOSE</button>
           : interacting
           ? <button className="bar-open is-back" onClick={onBack} title="Back to the room"><Arrow dir="left"/> BACK TO ROOM</button>
-          : <button className="bar-open" onClick={onOpen} disabled={!here} title={here ? `Open ${here.opens.toLowerCase()}` : locked ? 'Finish the walkthrough first' : 'Walk up to something first'}>INTERACT <Arrow/></button>}
+          : <button className="bar-open" onClick={onOpen} disabled={!here} title={here ? (here.id === 'pets' ? 'Pet Rio & Bruno' : `Open ${here.opens.toLowerCase()}`) : locked ? 'Finish the walkthrough first' : 'Walk up to something first'}>INTERACT <Arrow/></button>}
       </div>
     </nav>
   </motion.div>
@@ -270,6 +270,7 @@ const CUES = {
   music: { name: 'the speaker', does: 'hear my song picks', icon: SVG(<><rect x="6" y="3" width="12" height="18" rx="3"/><circle cx="12" cy="14" r="3"/><circle cx="12" cy="7.5" r="1"/></>) },
   achievements: { name: 'my achievements', tap: 'the certificates', does: 'view my achievements', icon: SVG(<><circle cx="12" cy="9" r="5"/><path d="M9 13.5 7.5 21l4.5-2.5 4.5 2.5L15 13.5"/></>) },
   contact: { name: 'the phone', does: 'get in touch', icon: SVG(<><rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M11 18.5h2"/></>) },
+  pets: { name: 'Rio & Bruno', tap: 'the dogs', does: 'pet them', icon: SVG(<><ellipse cx="12" cy="16" rx="4.2" ry="3.4"/><circle cx="6.2" cy="10.6" r="1.7"/><circle cx="9.6" cy="6.8" r="1.7"/><circle cx="14.4" cy="6.8" r="1.7"/><circle cx="17.8" cy="10.6" r="1.7"/></>) },
   photos: { name: 'the camera', does: 'see through my lens', icon: SVG(<><path d="M4 8h3l1.6-2.2h6.8L17 8h3v11H4z"/><circle cx="12" cy="13.3" r="3.4"/></>) },
 }
 // Near the desk corner the computer and the certificates above it share a spot. Both are listed, styled
