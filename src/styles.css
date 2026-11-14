@@ -1089,3 +1089,106 @@ body.menu-open .ai-wrap{visibility:hidden}
 .nate-panel.is-touch{position:fixed;left:12px;right:12px;width:auto;bottom:calc(84px + env(safe-area-inset-bottom));max-height:calc(100dvh - 120px)}
 .nate-panel.is-touch .nate-input input{font-size:16px}
 .ai-wrap.is-open{z-index:30}
+/* walkthrough: Nate (and the phone menu) are faded and off until step 3 of 3 is done */
+.ai-wrap.is-locked .ai-btn,.fab-menu.is-locked{cursor:not-allowed;pointer-events:none;transform:none}
+/* solid lighter shades (like the bar's disabled INTERACT), not see-through */
+.ai-wrap.is-locked .ai-btn,.bottom-bar .ai-wrap.is-locked .ai-btn,.ai-wrap.is-fab.is-locked .ai-btn{background:#f4d6ca;color:#fff}
+.fab-menu.is-locked{background:#cfe0d8;border-color:#cfe0d8;color:#fff}
+.ai-wrap.is-locked .ai-btn::after{display:none}
+/* phones: no cues while Nate is open */
+@media (pointer:coarse){body.nate-open .look-cue,body.nate-open .rotate-hint,body.nate-open .tour-card,body.nate-open .explore-card{display:none!important}}
+/* disabled during the walkthrough: no shadow or glow either */
+.ai-wrap.is-locked .ai-btn,.bottom-bar .ai-wrap.is-locked .ai-btn,.ai-wrap.is-fab.is-locked .ai-btn,.fab-menu.is-locked{box-shadow:none!important;filter:none!important}
+.ai-wrap.is-locked .ai-btn::after,.ai-wrap.is-locked .ai-btn::before{display:none!important;box-shadow:none!important;animation:none!important}
+/* Nate panel v2: title by the logo, one-line prompt, small suggestion chips */
+.nate-title{font:600 20px 'DM Sans',system-ui,sans-serif;letter-spacing:-.01em}
+.nate-head{padding:16px 16px 4px}
+.nate-panel::before{height:150px}
+.nate-body h3{margin:10px 2px 14px;font-size:20px}
+.nate-chips{display:flex;flex-wrap:wrap;gap:8px;padding-bottom:4px}
+.nate-chips button{padding:8px 13px;border:1px solid #e3e5e8;border-radius:999px;background:#fff;font:500 13px 'DM Sans',system-ui,sans-serif;color:#33363b;cursor:pointer;text-align:left;transition:background .15s,border-color .15s,color .15s}
+.nate-close{transition:background .15s,border-color .15s,color .15s}
+@media (hover:hover) and (pointer:fine){
+  .nate-chips button:hover{background:#e2673f;border-color:#e2673f;color:#fff}
+  .nate-close:hover{background:#e2673f;border-color:#e2673f;color:#fff}
+}
+.nate-chips button:active{background:#e2673f;border-color:#e2673f;color:#fff}
+.nate-panel.is-touch .nate-chips button{font-size:14px;padding:9px 14px}
+.nate-id .nate-title{line-height:1.15}
+.nate-id small{font-size:12.5px;color:#6b7078}
+.nate-id small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nate-panel.is-touch .nate-id small{font-size:12px}
+.nt-city{display:inline-flex;overflow:hidden;min-width:9ch}
+.nt-city span{display:inline-block}
+/* camera photos: whole picture on a blurred fill, caption along the bottom */
+.cam-shot{position:absolute;inset:0}
+.cam-screen img.cam-blur{object-fit:cover;filter:blur(18px) brightness(.6);transform:scale(1.15)}
+.cam-screen img.cam-photo{object-fit:cover}
+.cam-caption{position:absolute;left:0;right:0;bottom:0;padding:7cqw 3.5cqw 2.6cqw;display:flex;flex-direction:column;gap:.6cqw;background:linear-gradient(transparent,rgba(0,0,0,.72));color:#fff;text-align:left;pointer-events:none}
+.cam-caption b{font:600 4cqw/1.2 'DM Sans',system-ui,sans-serif;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.cam-caption small{font:500 2.8cqw 'JetBrains Mono',monospace;letter-spacing:.04em;color:#ffffffbb;text-transform:uppercase}
+/* phones: the same subtle blur as the laptop card, under the details box (not over the framed certificate) */
+.cert-scrim-phone{position:fixed;left:0;right:0;bottom:0;pointer-events:none;background:rgba(240,235,226,.3);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);-webkit-mask-image:linear-gradient(180deg,transparent,#000 28px);mask-image:linear-gradient(180deg,transparent,#000 28px)}
+/* phones: a bigger invisible hit area round the three dots */
+.mac-desktop.is-touch .mac-win .lights::before{content:'';position:absolute;inset:-14px -12px}
+/* ── project reader (Markdown) ── */
+.win-reader .mac-win-bar{background:#f6f6f7;border-bottom:1px solid #e5e5ea}
+.reader{flex:1;min-width:0;overflow-y:auto;background:#fff;padding-top:46px;scrollbar-width:thin}
+.reader-doc{max-width:720px;margin:0 auto;padding:26px 32px 40px;color:#1d1f22;font:400 14px/1.6 'DM Sans',system-ui,sans-serif}
+.reader-doc h1{font:700 26px/1.2 'DM Sans',system-ui,sans-serif;letter-spacing:-.02em;margin:0 0 10px}
+.reader-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.reader-tags span{font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;background:#fdeee8;color:#c4532f}
+.reader-links{display:flex;flex-wrap:wrap;gap:8px;padding-bottom:18px;margin-bottom:6px;border-bottom:1px solid #ececf0}
+.rd-btn{display:inline-flex;align-items:center;gap:7px;padding:8px 13px;border-radius:9px;border:1px solid #dcdee2;background:#fff;color:#1d1f22;font:600 12.5px 'DM Sans',system-ui,sans-serif;text-decoration:none;transition:background .15s,border-color .15s,color .15s}
+.rd-btn.primary{background:#1d1f22;border-color:#1d1f22;color:#fff}
+@media (hover:hover) and (pointer:fine){.rd-btn:hover{background:#e2673f;border-color:#e2673f;color:#fff}}
+.rd-btn.off{opacity:.45;pointer-events:none}
+.md h2{font:700 18px 'DM Sans',system-ui,sans-serif;margin:24px 0 8px;letter-spacing:-.01em}
+.md h3{font:700 15px 'DM Sans',system-ui,sans-serif;margin:18px 0 6px}
+.md p{margin:0 0 10px;color:#33363b}
+.md ul,.md ol{margin:0 0 10px;padding-left:20px;color:#33363b}
+.md li{margin:3px 0}.md li::marker{color:#e2673f}
+.md code{font:500 12px 'JetBrains Mono',ui-monospace,monospace;background:#f2f2f5;border-radius:4px;padding:1px 5px}
+.md pre{background:#1d1f22;color:#e8e8ea;border-radius:10px;padding:12px 14px;overflow-x:auto;margin:0 0 12px}
+.md pre code{background:none;padding:0;color:inherit;font-size:12px;line-height:1.55}
+.md-table{overflow-x:auto;margin:0 0 12px;border:1px solid #ececf0;border-radius:10px}
+.md table{border-collapse:collapse;width:100%;font-size:12.5px}
+.md th,.md td{text-align:left;padding:7px 10px;border-bottom:1px solid #ececf0;white-space:nowrap}
+.md th{background:#f7f7f9;font-weight:600}
+.md tr:last-child td{border-bottom:0}
+.md td:first-child{font-weight:600;color:#1d1f22}
+/* phones: the window fills the screen, so set the text bigger */
+.mac-desktop.is-touch .reader{padding-top:64px}
+.mac-desktop.is-touch .reader-doc{font-size:18px;max-width:none;padding:30px 40px 50px}
+.mac-desktop.is-touch .reader-doc h1{font-size:34px}
+.mac-desktop.is-touch .reader-tags span{font-size:15px}
+.mac-desktop.is-touch .rd-btn{font-size:16px;padding:11px 16px}
+.mac-desktop.is-touch .md h2{font-size:24px}.mac-desktop.is-touch .md h3{font-size:20px}
+.mac-desktop.is-touch .md table{font-size:16px}.mac-desktop.is-touch .md code,.mac-desktop.is-touch .md pre code{font-size:15px}
+/* Finder icon (grid) view */
+.finder-tools .ft-right button.on{background:#e8e8ec;color:#1d1d1f}
+.finder-grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));align-content:start;gap:6px;padding:18px 16px}
+.fcell{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 6px;border:0;background:none;border-radius:10px;font:inherit;color:#1d1d1f;cursor:default;-webkit-tap-highlight-color:transparent}
+.fcell-ico{height:64px;display:grid;place-items:center}
+.fcell-ico svg{display:block}
+.fcell-name{font-size:12px;line-height:1.3;text-align:center;word-break:break-word;padding:1px 6px;border-radius:5px;max-width:100%}
+.fcell.sel .fcell-ico{background:rgba(0,0,0,.07);border-radius:8px}
+.fcell.sel .fcell-name{background:#0a62e0;color:#fff}
+.mac-desktop.is-touch .finder-grid{grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;padding:28px 22px}
+.mac-desktop.is-touch .fcell{padding:14px 8px}
+.mac-desktop.is-touch .fcell-ico{height:104px;transform:scale(1.55)}
+.mac-desktop.is-touch .fcell-name{font-size:19px}
+.mac-desktop.is-touch .fcell.sel .fcell-name{background:none;color:inherit}
+.mac-desktop.is-touch .fcell.sel .fcell-ico{background:none}
+.reader-summary{margin:4px 0 6px;font-size:15px;line-height:1.55;color:#33363b}
+.reader-points{margin:0 0 14px;padding-left:20px;color:#33363b}.reader-points li::marker{color:#e2673f}
+.reader-tools{margin:0 0 16px}
+.reader-tools small{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8e8e93;margin-bottom:8px}
+.mac-desktop.is-touch .reader-summary{font-size:20px}
+.mac-desktop.is-touch .reader-tools small{font-size:14px}
+/* full-screen project reader: square corners, sits above the dock */
+.mac-win.win-reader{border-radius:0;z-index:610!important;box-shadow:none;left:0!important;top:28px!important;width:100%!important;height:auto!important;bottom:0}
+.mac-win.win-reader > *{border-radius:0!important}
+.mac-desktop.is-touch .reader-doc{max-width:980px;margin:0 auto}
+.reader-label{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8e8e93;margin-bottom:8px}
+.mac-desktop.is-touch .reader-label{font-size:14px}

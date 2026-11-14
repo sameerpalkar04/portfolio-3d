@@ -605,6 +605,16 @@ function createScene(canvas, handlers) {
         }
       }
     }
+    // The desk chair: tucked a little further in under the desk so there's room to walk round it
+    {
+      const parts = ['bottom frame', 'leggy', 'metal frame', 'leather'].map(find).filter(Boolean), imacNode = find('Apple iMac 27 - display')
+      if (parts.length && imacNode) {
+        const cb = new THREE.Box3(); parts.forEach((o) => cb.expandByObject(o))
+        const dir = Math.sign(imacNode.getWorldPosition(new THREE.Vector3()).x - cb.getCenter(new THREE.Vector3()).x) || 1
+        const shift = new THREE.Vector3(dir * .2, 0, 0), w = new THREE.Vector3()
+        for (const o of parts) { o.getWorldPosition(w).add(shift); o.parent.updateWorldMatrix(true, false); o.position.copy(o.parent.worldToLocal(w)); o.updateMatrixWorld(true) }
+      }
+    }
     grid = buildCollisionGrid(meshColliders, roomBounds, floorY)
     const imac = find('Apple iMac 27 - display')
     if (imac) { const p = imac.getWorldPosition(new THREE.Vector3()); computer = { x: p.x, z: p.z } }

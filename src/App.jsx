@@ -60,6 +60,7 @@ function TrafficLights({ onClose }) { return <div className="traffic-lights" ari
 
 
 // Name intro: pops up large in the middle, then settles into the bottom-left corner.
+const CITIES = ['bengaluru', 'gurugram']
 function NameTag({ phase }) {
   // The name is drawn at its big size (so it stays sharp) and scaled down into the corner.
   // A hidden copy at corner size holds the layout. The move to the corner is one eased transform.
@@ -71,15 +72,22 @@ function NameTag({ phase }) {
       const wrap = holder.parentElement
       const left = wrap.offsetLeft + holder.offsetLeft, top = wrap.offsetTop + holder.offsetTop
       const W = big.offsetWidth, H = big.offsetHeight
-      const k = holder.offsetWidth / W
+      // scale from the two font sizes, not the measured widths: widths measured while the web font was
+      // still loading (one copy in the fallback font, one in Manrope) gave a wrong, too-small scale
+      const k = parseFloat(getComputedStyle(holder).fontSize) / parseFloat(getComputedStyle(big).fontSize)
       setGeo({ k, x: viewW() / 2 - W / 2 - left, y: viewH() / 2 - H / 2 - top })
     }
     measure()
     document.fonts?.ready.then(measure) // the web font changes the width once it loads
+    document.fonts?.load?.("800 18px Manrope").then(measure).catch(() => {})
+    const ro = new ResizeObserver(measure); if (holderRef.current) ro.observe(holderRef.current)
     window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
+    return () => { ro.disconnect(); window.removeEventListener('resize', measure) }
   }, [])
   const inCenter = phase === 'center'
+  // where I'm based: Bengaluru and Gurugram take turns every 10 seconds
+  const [city, setCity] = useState(0)
+  useEffect(() => { const t = window.setInterval(() => setCity((c) => (c + 1) % CITIES.length), 10000); return () => window.clearInterval(t) }, [])
   const fontSize = Math.min(128, Math.max(46, viewW() * .09))
   return <>
     <AnimatePresence>
@@ -91,7 +99,7 @@ function NameTag({ phase }) {
         initial={geo ? { x: geo.x, y: geo.y, scale: 1, opacity: 0 } : { opacity: 0 }}
         animate={!geo ? { opacity: 0 } : inCenter ? { x: geo.x, y: geo.y, scale: 1, opacity: 1 } : { x: 0, y: 0, scale: geo.k, opacity: 1 }}
         transition={inCenter ? { opacity: { duration: .6 }, default: { duration: 0 } } : { duration: 1.15, ease: [.65, 0, .35, 1] }}>Sameer Palkar</motion.h1>
-      <motion.p initial={{ opacity: 0, y: 4 }} animate={inCenter ? { opacity: 0, y: 4 } : { opacity: 1, y: 0 }} transition={{ delay: inCenter ? 0 : 1.1, duration: .45 }}>software engineer · bengaluru</motion.p>
+      <motion.p initial={{ opacity: 0, y: 4 }} animate={inCenter ? { opacity: 0, y: 4 } : { opacity: 1, y: 0 }} transition={{ delay: inCenter ? 0 : 1.1, duration: .45 }}>software engineer · <span className="nt-city"><AnimatePresence mode="wait" initial={false}><motion.span key={CITIES[city]} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} transition={{ duration: .35 }}>{CITIES[city]}</motion.span></AnimatePresence></span></motion.p>
     </div>
   </>
 }
@@ -189,12 +197,7 @@ const AiIcon = ({ size = 24 }) => <svg className="ai-mark" viewBox="71 65 620 62
   <path d="M529.346 571.521C532.15 571.736 533.834 571.65 536.4 572.862C538.059 575.997 533.087 578.447 533.044 584.276C533.001 590.387 537.649 591.348 537.808 594.875L535.652 595.842C517.228 598.396 517.853 576.248 529.346 571.521Z"/>
 </svg>
 // Nate's chat panel (UI only for now): opens above his button on the right, styled like the room's cues.
-const NATE_ASKS = () => [
-  { title: 'Projects', hint: 'What I’ve built and how', icon: SVG(<><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18"/></>) },
-  { title: 'Experience', hint: 'Where I’ve worked and studied', icon: SVG(<><path d="M4 21V9l8-6 8 6v12"/><path d="M9 21v-6h6v6"/></>) },
-  { title: 'Skills & tools', hint: 'My tech stack, end to end', icon: SVG(<path d="M8 6 2 12l6 6M16 6l6 6-6 6"/>) },
-  { title: 'Hire Sameer', hint: 'Availability and how to reach me', icon: SVG(<><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></>) },
-]
+const NATE_ASKS = ['What projects has he built?', 'What’s his tech stack?', 'Where has he worked and studied?']
 function NatePanel({ onClose, compact }) {
   const [text, setText] = useState('')
   useEffect(() => { const k = (e) => { if (e.key === 'Escape') onClose() }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k) }, [onClose])
@@ -202,15 +205,12 @@ function NatePanel({ onClose, compact }) {
     initial={{ opacity: 0, y: 14, scale: .96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: .97 }} transition={{ duration: .26, ease: [.2, .8, .2, 1] }}>
     <header className="nate-head">
       <span className="nate-avatar"><AiIcon size={26}/></span>
-      <span className="nate-id"><b>Nate</b><small><i/>Online · Sameer’s assistant</small></span>
+      <span className="nate-id"><b className="nate-title">Meet Nate</b><small>Yeah, the one from the Uncharted games.</small></span>
       <button className="nate-close" onClick={onClose} aria-label="Close Nate"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </header>
     <div className="nate-body">
-      <h3>Hey there!<br/>What would you like to know about <em>Sameer</em>?</h3>
-      <small className="nate-label">Things you can ask</small>
-      <ul className="nate-asks">{NATE_ASKS().map((q) => <li key={q.title}><button type="button">
-        <span className="cue-cam">{q.icon}</span><span className="cue-text"><b>{q.title}</b><small>{q.hint}</small></span><Arrow size={14}/>
-      </button></li>)}</ul>
+      <h3>Ask anything about <em>Sameer</em>!</h3>
+      <div className="nate-chips">{NATE_ASKS.map((q) => <button key={q} type="button">{q}</button>)}</div>
     </div>
     <form className="nate-input" onSubmit={(e) => e.preventDefault()}>
       <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask anything about Sameer…" aria-label="Ask Nate"/>
@@ -218,14 +218,17 @@ function NatePanel({ onClose, compact }) {
     </form>
   </motion.section>
 }
-function AiButton({ compact }) {
+function AiButton({ compact, locked }) {
   const [open, setOpen] = useState(false)
+  useEffect(() => { if (locked) setOpen(false) }, [locked])
+  // phones: the room's cues step aside while Nate is open
+  useEffect(() => { document.body.classList.toggle('nate-open', open); return () => document.body.classList.remove('nate-open') }, [open])
   const [hover, setHover] = useState(false) // laptop only: "Ask Nate" on hover
   const touch = isTouch()
-  return <div className={`ai-wrap${compact ? ' is-fab' : ''}${open ? ' is-open' : ''}`}>
+  return <div className={`ai-wrap${compact ? ' is-fab' : ''}${open ? ' is-open' : ''}${locked ? ' is-locked' : ''}`}>
     <AnimatePresence>{open && <NatePanel key="nate" compact={compact} onClose={() => setOpen(false)}/>}</AnimatePresence>
-    <button className="ai-btn" onClick={() => { setOpen((o) => !o); setHover(false) }} aria-label={open ? 'Close Nate' : 'Ask Nate, my AI assistant'} aria-expanded={open}
-      onPointerEnter={(e) => { if (!touch && e.pointerType === 'mouse') setHover(true) }} onPointerLeave={() => setHover(false)}>
+    <button className="ai-btn" disabled={locked} title={locked ? 'Finish the walkthrough first' : undefined} onClick={() => { if (locked) return; setOpen((o) => !o); setHover(false) }} aria-label={open ? 'Close Nate' : 'Ask Nate, my AI assistant'} aria-expanded={open}
+      onPointerEnter={(e) => { if (!touch && !locked && e.pointerType === 'mouse') setHover(true) }} onPointerLeave={() => setHover(false)}>
       <AiIcon size={compact ? 34 : 32}/>
     </button>
     <AnimatePresence>{hover && !open && !touch && <motion.div key="hint" className="ai-soon ai-hint" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 3 }} transition={{ duration: .16 }}><b>Ask Nate</b></motion.div>}</AnimatePresence>
@@ -258,8 +261,8 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interact
         ? <motion.button key="back" className="fab-action" onClick={onBack} initial={{ opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }}><Arrow dir="left"/> BACK TO ROOM</motion.button>
         : here && <motion.button key="interact" className="fab-action" onClick={onOpen} initial={{ opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }}>INTERACT <Arrow/></motion.button>}
     </AnimatePresence>
-    <AiButton compact/>
-    <button className="fab-menu" onClick={() => setOpen(true)} aria-label="Open menu">
+    <AiButton compact locked={locked}/>
+    <button className={`fab-menu${locked ? ' is-locked' : ''}`} disabled={locked} onClick={() => setOpen(true)} aria-label={locked ? 'Menu (available after the walkthrough)' : 'Open menu'}>
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
     </button>
   </motion.div>
@@ -955,6 +958,8 @@ function AchievementsView({ certId, getRect, onNext, onBack }) {
       // phone: the framed certificate on the wall up top (the room stays in view), its details below
       ? <motion.div key={shown.id} className="cert-sheet" onClick={(e) => { if (e.target === e.currentTarget) onBack() }}
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .3 }}>
+          {/* a soft blur over the room below the certificate (the frame itself stays sharp) */}
+          <i className="cert-scrim-phone" aria-hidden="true" style={{ top: rect.frameBottom + 4 }}/>
           {/* fixed in place, equal gaps above and below; its text scrolls inside it */}
           <article className="cert-box fixed" style={{ top: rect.frameBottom + 16, bottom: viewH() - (btnTop ?? viewH() - 130) + 16 }}>
             <CertScroll a={shown}/>
@@ -1191,6 +1196,26 @@ function ResumeView({ onClose, getRect, setInsets }) {
 
 // Photos dropped into src/photos show up on the camera's screen, in name order.
 const PHOTOS = Object.entries(import.meta.glob('./photos/*.{jpg,jpeg,png,webp,JPG,JPEG,PNG}', { eager: true, query: '?url', import: 'default' })).sort(([a], [b]) => a.localeCompare(b)).map(([, url]) => url)
+// Captions, keyed by the file name (without the number): [caption, group, where to centre the crop, mirror it?]. Grouped as travel, convocation, Oracle, college.
+const PHOTO_CAPTIONS = {
+  'travel-balloon': ['A hot air balloon drifting over the hills', 'Travel · May 2024', '50% 60%', true],
+  'travel-peaks': ['Last light on the snow peaks', 'Travel · June 2024', '50% 38%'],
+  'travel-beach-sunset': ['A sky on fire over an empty beach', 'Travel · June 2025', '50% 48%'],
+  'travel-beach-footprints': ['Footprints all the way to the cliffs', 'Travel · December 2025', '50% 55%'],
+  'convocation-degree': ['Degree in hand: B.Tech, done', 'Convocation · August 2026', '50% 30%'],
+  'convocation-stage': ['On stage at VIT’s 41st Annual Convocation', 'Convocation · August 2026'],
+  'oracle-office': ['First days at Oracle', 'Oracle · August 2026', '50% 48%'],
+  'oracle-volunteering': ['Painting walls with Oracle Volunteering', 'Oracle · September 2026'],
+  'college-kurtas': ['Kurta day with the gang', 'College · January 2023', '50% 38%'],
+  'college-outreach': ['Volunteering at a school for special kids', 'College · September 2023'],
+  'college-friends': ['gitblameher: my DevJams and Yantra hack team', 'College · September 2024'],
+  'college-team': ['ISTE board of 2024–25', 'College · March 2025'],
+  'college-crew': ['The college crew', 'College · October 2025'],
+  'college-riviera': ['With Ritviz at Riviera 2026', 'College · March 2026', '50% 47%'],
+  'college-award': ['Riviera 2026 OC thanksgiving', 'College · March 2026'],
+  'college-farewell': ['Farewell, Class of 2026', 'College · 2026'],
+}
+const PHOTO_INFO = Object.keys(import.meta.glob('./photos/*.{jpg,jpeg,png,webp,JPG,JPEG,PNG}')).sort((a, b) => a.localeCompare(b)).map((f) => PHOTO_CAPTIONS[f.replace(/^.*\/\d+-|\.\w+$/g, '')] || null)
 
 // The camera, picked up: photos appear on its rear screen, with buttons to step through them.
 function CameraView({ onClose, getRect }) {
@@ -1217,7 +1242,11 @@ function CameraView({ onClose, getRect }) {
           ? { left: rect.left + rect.width / 2 - rect.height / 2, top: rect.top + rect.height / 2 - rect.width / 2, width: rect.height, height: rect.width, rotate: 90 }
           : { left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .4 }}>
-        {n ? <AnimatePresence initial={false} mode="popLayout"><motion.img key={i} src={PHOTOS[i]} alt="" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .25 }}/></AnimatePresence>
+        {n ? <AnimatePresence initial={false} mode="popLayout"><motion.div key={i} className="cam-shot" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .25 }}>
+            {/* every shot fills the viewfinder; portrait ones are cropped around their subject */}
+            <img className="cam-photo" src={PHOTOS[i]} alt={PHOTO_INFO[i]?.[0] || ''} style={{ objectPosition: PHOTO_INFO[i]?.[2] || '50% 50%', transform: PHOTO_INFO[i]?.[3] ? 'scaleX(-1)' : undefined }}/>
+            {PHOTO_INFO[i] && <span className="cam-caption"><b>{PHOTO_INFO[i][0]}</b><small>{PHOTO_INFO[i][1]}</small></span>}
+          </motion.div></AnimatePresence>
           : <div className="cam-empty"><b>No photos yet</b><span>more coming soon</span></div>}
         <span className="cam-hud">{n ? `${i + 1} / ${n}` : '0 / 0'}</span>
       </motion.div>
@@ -1342,7 +1371,7 @@ export default function App() {
       {introPhase !== 'hidden' && !systemOpen && <NameTag phase={introPhase}/>}
       {introPhase === 'corner' && <>
         {/* laptop: the AI assistant button sits at the far right, level with the bar (phones: beside the menu button) */}
-        {!isTouch() && <div className="ai-dock"><AiButton/></div>}
+        {!isTouch() && <div className="ai-dock"><AiButton locked={tourStep !== 'done'}/></div>}
         <BottomBar hour={hour} auto={manualHour === null} onHour={setManualHour} onAuto={() => { setManualHour(null); setClockHour(systemHour()) }} hotspot={hotspot}
           onGo={(id) => { if (systemOpen) sceneRef.current?.switchTo(id); else sceneRef.current?.goTo(id) }} onOpen={() => sceneRef.current?.openSpot()}
           interacting={systemOpen} onBack={closeSystem} locked={tourStep !== 'done'}/>
