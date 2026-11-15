@@ -84,7 +84,7 @@ export default function Loader({ progress, loaded, total, ready, onEnter }) {
 
   const pct = Math.max(0, Math.min(100, Math.round(shown * 100)))
   const status = done ? 'ready'
-    : total ? `fetching home-office.glb · ${mb(loaded)} / ${mb(total)} MB`
+    : total ? `fetching office.glb · ${mb(loaded)} / ${mb(total)} MB`
     : progress >= 1 ? 'setting up the scene' : 'connecting'
 
   return <motion.div className={`loader${done ? ' is-done' : ''}`}

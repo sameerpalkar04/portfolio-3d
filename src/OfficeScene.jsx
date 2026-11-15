@@ -160,7 +160,8 @@ function createScene(canvas, handlers) {
   let hotspots = [], travel = null
   // Rio and Bruno on the window seat: where to stand to pet them, and the hearts they send up
   let petSpot = null, petGroup = null, petT = -1; const hearts = []
-  const state = { x: 0, z: 0, yaw: -Math.PI/2, pitch: 0, nearby: false, system: false, hotspot: null }
+  // controls start locked; the app unlocks them once the walkthrough's first cue is showing
+  const state = { x: 0, z: 0, yaw: -Math.PI/2, pitch: 0, nearby: false, system: false, hotspot: null, allowWalk: false, allowLook: false, allowOpen: false }
 
   const { isFree, nearestFree } = createWalkTester(() => grid, () => walkBounds)
 

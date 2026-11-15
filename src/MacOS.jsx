@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { SKILL_ICONS, SKILL_GROUPS } from './skillIcons'
 import { PROJECTS } from './projects'
+import { ProjectVisual } from './projectVisuals'
 
 const touch = () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
 const ico = (d, s = 14, sw = 1.8) => <svg viewBox="0 0 24 24" width={s} height={s} fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>
@@ -28,6 +29,18 @@ export const MdIcon = ({ size = 64 }) => <svg viewBox="0 0 52 64" width={size * 
   {[26, 32].map((y) => <path key={y} d={`M10 ${y}h30`} stroke="#d1d1d6" strokeWidth="2" strokeLinecap="round"/>)}
   <rect x="8" y="42" width="26" height="13" rx="3" fill="#e2673f"/><text x="21" y="51.6" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="#fff" fontFamily="-apple-system,Helvetica,Arial">MD</text>
 </svg>
+// The Projects app icon: a squircle of four tiles in the projects' own colours
+export const ProjectsAppIcon = ({ size = 64 }) => <svg viewBox="0 0 64 64" width={size} height={size} aria-hidden="true">
+  <defs><clipPath id="pai"><rect x="4" y="4" width="56" height="56" rx="14"/></clipPath><linearGradient id="paig" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#fff" stopOpacity=".28"/><stop offset=".5" stopColor="#fff" stopOpacity="0"/></linearGradient></defs>
+  <g clipPath="url(#pai)">
+    <rect x="4" y="4" width="28" height="28" fill="#1f5a46"/><rect x="32" y="4" width="28" height="28" fill="#c8432f"/>
+    <rect x="4" y="32" width="28" height="28" fill="#5b4bb7"/><rect x="32" y="32" width="28" height="28" fill="#24283b"/>
+    <rect x="15" y="15" width="34" height="34" rx="8" fill="#fffdf7"/>
+    <path d="M25 27l-5 5 5 5M39 27l5 5-5 5M34.5 24l-5 16" stroke="#1d1f22" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+    <rect x="4" y="4" width="56" height="56" fill="url(#paig)"/>
+  </g>
+  <rect x="4.5" y="4.5" width="55" height="55" rx="13.5" fill="none" stroke="rgba(0,0,0,.15)"/>
+</svg>
 export const NoteIcon = ({ size = 64 }) => <svg viewBox="0 0 52 64" width={size * 52 / 64} height={size} aria-hidden="true">
   <rect x="2" y="2" width="48" height="60" rx="5" fill="#fff" stroke="#d9d9de"/>
   <path d="M2 7a5 5 0 0 1 5-5h38a5 5 0 0 1 5 5v8H2z" fill="#f6c84c"/>
@@ -45,7 +58,7 @@ const OCI = {
   link: 'https://catalog-education.oracle.com/ords/certview/sharebadge?id=7824262FBF3F3E095BB71DF852E083CA468D553B477E117F84ECCD06AE90EE76',
 }
 const DESKTOP = [
-  { id: 'projects', name: 'Projects', kind: 'Folder', date: 'Today, 6:00 PM', icon: (s) => <FolderIcon tone="blue" glyph={codeGlyph} size={s}/> },
+  { id: 'projects', name: 'Projects', kind: 'Application', app: 'projects', date: 'Today, 6:00 PM', icon: (s) => <ProjectsAppIcon size={s}/> },
   { id: 'certs', name: 'Certifications', kind: 'Note', date: 'Today, 5:58 PM', icon: (s) => <NoteIcon size={s}/> },
   { id: 'skills', name: 'Skills', kind: 'Note', date: 'Today, 5:55 PM', icon: (s) => <NoteIcon size={s}/> },
 ]
@@ -79,7 +92,7 @@ function Win({ w, onFocus, onClose, title, children, className = '', toolbar }) 
     const up = () => { drag.current = null; window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up) }
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up)
   }
-  return <motion.section className={`mac-win ${className}`} style={{ left: w.x, top: w.y, width: w.w, height: w.h, zIndex: w.z }} onPointerDown={onFocus}
+  return <motion.section className={`mac-win ${className}`} style={{ left: w.x, top: w.y, width: w.w, height: w.h, zIndex: className.includes('win-full') ? 600 + w.z : w.z }} onPointerDown={onFocus}
     initial={{ opacity: 0, scale: .94, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: .94 }} transition={{ duration: .22, ease: [.2, .8, .2, 1] }}>
     <header className="mac-win-bar" onPointerDown={down}>
       {/* phones: the three dots are tiny, so a tap anywhere on them closes the window */}
@@ -100,7 +113,7 @@ function Finder({ place, onPlace, onOpen, onBack, onFwd }) {
   const P = PLACES[place] || PLACES.desktop
   const [view, setView] = useState('grid')
   // one row model for both views: the list (details) and the grid (big icons, easy to tap)
-  const rows = P.apps ? [['Finder', 'finder'], ['Notes', 'notes']].map(([n, a]) => ({ key: a, name: n, date: '—', size: '—', kind: 'Application', go: () => onOpen({ app: a }), small: () => <AppGlyph app={a}/>, big: () => <AppGlyph app={a} s={64}/> }))
+  const rows = P.apps ? [['Finder', 'finder'], ['Notes', 'notes'], ['Projects', 'projects']].map(([n, a]) => ({ key: a, name: n, date: '—', size: '—', kind: 'Application', go: () => onOpen({ app: a }), small: () => <AppGlyph app={a}/>, big: () => <AppGlyph app={a} s={64}/> }))
     : P.items.map((it) => ({ key: it.id, name: it.name, date: it.date, size: it.size || '--', kind: it.kind, folder: it.kind === 'Folder', go: () => onOpen(it), small: () => it.icon(it.kind === 'Folder' ? 18 : 16), big: () => it.icon(64) }))
   return <div className="finder">
     <aside className="finder-side">
@@ -117,7 +130,9 @@ function Finder({ place, onPlace, onOpen, onBack, onFwd }) {
           <button className={view === 'grid' ? 'on' : ''} onClick={() => setView('grid')} aria-label="Icon view">{ico(<><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>, 15)}</button>
           {ico(<><path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 13v7h14v-7"/></>, 15)}{ico(<><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/></>, 15)}</span>
       </div>
-      {view === 'grid' ? <div className="finder-grid">
+      {view === 'grid' && P.covers ? <div className="finder-covers">
+        {P.items.map((it) => <ProjectCover key={it.id} p={it.project} sel={sel === it.id} onSel={() => { setSel(it.id); if (touch()) onOpen(it) }} onOpen={() => onOpen(it)}/>)}
+      </div> : view === 'grid' ? <div className="finder-grid">
         {rows.length ? rows.map((r) => <button key={r.key} className={`fcell${sel === r.key ? ' sel' : ''}`} onClick={() => { setSel(r.key); if (touch()) r.go() }} onDoubleClick={r.go}>
           <span className="fcell-ico">{r.big()}</span><span className="fcell-name">{r.name}</span></button>)
           : <p className="finder-empty">{P.empty}</p>}
@@ -131,15 +146,16 @@ function Finder({ place, onPlace, onOpen, onBack, onFwd }) {
     </div>
   </div>
 }
-const AppGlyph = ({ app, s = 16 }) => <span className={`app-glyph ag-${app}`} style={{ width: s, height: s, borderRadius: Math.max(4, s * .23) }}/>
+const AppGlyph = ({ app, s = 16 }) => app === 'projects' ? <ProjectsAppIcon size={s * 1.15}/> : <span className={`app-glyph ag-${app}`} style={{ width: s, height: s, borderRadius: Math.max(4, s * .23) }}/>
 
 // ── Notes (Skills) ──
 const LetterTile = ({ bg, fg, children, round }) => <svg viewBox="0 0 24 24" width="100%" height="100%" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx={round ? 11 : 5} fill={bg}/><text x="12" y="16.2" textAnchor="middle" fontSize="11" fontWeight="700" fill={fg} fontFamily="-apple-system,Helvetica,Arial">{children}</text></svg>
 const OracleMark = () => <svg viewBox="0 0 24 24" width="100%" height="100%" aria-hidden="true"><rect x="2" y="7" width="20" height="10" rx="5" fill="none" stroke="#f80000" strokeWidth="3"/></svg>
 function SkillLogo({ name }) {
+  if (name === 'Java') return <img src="/skills/java.png" alt="" width="100%" height="100%" style={{ objectFit: 'contain' }} draggable="false"/>
   const i = SKILL_ICONS[name]
   if (i) return <svg viewBox="0 0 24 24" width="100%" height="100%" aria-hidden="true"><path d={i.path} fill={`#${i.hex === '000000' || i.hex === '181717' || i.hex === 'FFFFFF' ? '1d1d1f' : i.hex}`}/></svg>
-  if (name === 'PL/SQL' || name === 'Oracle SQL') return <OracleMark/>
+  if (name === 'PL/SQL' || name === 'Oracle SQL' || name.startsWith('Oracle Cloud')) return <OracleMark/>
   if (name === 'Canva') return <svg viewBox="0 0 24 24" width="100%" height="100%" aria-hidden="true"><defs><linearGradient id="canva" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stopColor="#00c4cc"/><stop offset="1" stopColor="#7d2ae8"/></linearGradient></defs><circle cx="12" cy="12" r="11" fill="url(#canva)"/><text x="12" y="16.5" textAnchor="middle" fontSize="12" fontStyle="italic" fontWeight="700" fill="#fff" fontFamily="Georgia,serif">C</text></svg>
   // U-Net: the encoder → bottleneck → decoder "U" with skip connections
   if (name === 'U-Net') return <svg viewBox="0 0 24 24" width="100%" height="100%" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="5" fill="#ede9fe"/><path d="M6 5v8.5a6 6 0 0 0 12 0V5" fill="none" stroke="#6d28d9" strokeWidth="2.4" strokeLinecap="round"/><path d="M8.5 8h7M9 12h6" stroke="#a78bfa" strokeWidth="1.5" strokeDasharray="1.6 1.4"/></svg>
@@ -241,26 +257,91 @@ function Markdown({ text, skipTitle }) {
   return <>{blocks}</>
 }
 const LinkIcon = { github: ico(<path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12 12 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/>, 15), ieee: ico(<><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></>, 15), view: ico(<><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></>, 15), down: ico(<><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></>, 15) }
-function Reader({ project: p }) {
-  const [hasPdf, setHasPdf] = useState(null)
+// A project's card in the Projects app: its illustration, then the name, a one-line description and
+// its tools, so you know what a project is before opening it. Styled like the rest of the portfolio:
+// warm paper, the book's serif, small mono labels and the orange accent.
+function ProjectCover({ p, sel, onSel, onOpen }) {
+  return <button className={`pcard${sel ? ' sel' : ''}`} onClick={onSel} onDoubleClick={onOpen} style={{ '--pc': p.color, '--pt': p.tint }}>
+    <span className="pcard-art"><ProjectVisual id={p.id}/><i className="pcard-no">{p.fig}</i></span>
+    <span className="pcard-body">
+      <span className="pcard-kicker">{p.category}</span>
+      <b className="pcard-name">{p.name}</b>
+      <span className="pcard-line">{p.tagline}</span>
+      <span className="pcard-foot">
+        <span className="pcard-tools">{p.tools.slice(0, 6).map((n) => <i key={n} title={n}><SkillLogo name={n}/></i>)}{p.tools.length > 6 && <small>+{p.tools.length - 6}</small>}</span>
+        <span className="pcard-open">Open {ico(<path d="M5 12h14M13 6l6 6-6 6"/>, 14, 2)}</span>
+      </span>
+    </span>
+  </button>
+}
+
+// The Projects app: a short intro and the project cards.
+function ProjectsApp({ onOpen }) {
+  const [sel, setSel] = useState(null)
+  return <div className="papp">
+    <header className="papp-head">
+      <small>Projects · {PROJECTS.length}</small>
+      <h1>Things I’ve built</h1>
+      <p>From deep-learning research to full-stack apps. Open one to see how it came together.</p>
+    </header>
+    <div className="papp-grid">
+      {PROJECTS.map((p) => <ProjectCover key={p.id} p={p} sel={sel === p.id} onSel={() => { setSel(p.id); if (touch()) onOpen(p) }} onOpen={() => onOpen(p)}/>)}
+    </div>
+  </div>
+}
+
+const SecHead = ({ n, label, title }) => <div className="cs-head"><small>{n} — {label}</small><h2>{title}</h2></div>
+
+// The page a project opens: intro, numbers, overview, tools, goals, how it works and the full write-up.
+function Reader({ project: p, onBack }) {
+  const [hasPdf, setHasPdf] = useState(null), [feat, setFeat] = useState(0)
   useEffect(() => { if (!p.links.pdf) return; fetch(p.links.pdf, { method: 'HEAD' }).then((r) => setHasPdf(r.ok && !/text\/html/.test(r.headers.get('content-type') || ''))).catch(() => setHasPdf(false)) }, [p])
   const pdfOff = hasPdf === false
-  return <div className="reader">
-    <article className="reader-doc">
-      <h1>{p.title}</h1>
-      {p.summary && <p className="reader-summary">{p.summary}</p>}
-      {p.points?.length > 0 && <ul className="reader-points">{p.points.map((t) => <li key={t}>{t}</li>)}</ul>}
-      {p.tools?.length > 0 && <div className="reader-tools"><small>Tools used</small>
-        <div className="nd-chips">{p.tools.map((n) => <span key={n} className="nd-chip"><i><SkillLogo name={n}/></i>{n}</span>)}</div></div>}
-      <small className="reader-label">Quick links</small>
-      <div className="reader-links">
-        {p.links.github && <a className="rd-btn" href={p.links.github} target="_blank" rel="noreferrer">{LinkIcon.github}GitHub</a>}
-        {p.links.ieee && <a className="rd-btn" href={p.links.ieee} target="_blank" rel="noreferrer">{LinkIcon.ieee}View in IEEE Xplore</a>}
-        {p.links.pdf && <a className={`rd-btn${pdfOff ? ' off' : ''}`} href={pdfOff ? undefined : p.links.pdf} target="_blank" rel="noreferrer" title={pdfOff ? 'The paper’s PDF is coming soon' : undefined}>{LinkIcon.view}View PDF</a>}
-        {p.links.pdf && <a className={`rd-btn primary${pdfOff ? ' off' : ''}`} href={pdfOff ? undefined : p.links.pdf} download={pdfOff ? undefined : (p.links.pdfName || `${p.id}.pdf`)} title={pdfOff ? 'The paper’s PDF is coming soon' : undefined}>{LinkIcon.down}Download PDF</a>}
+  const f = p.features?.[feat]
+  return <div className="reader cs" style={{ '--pc': p.color, '--pt': p.tint }}>
+    {onBack && <button className="cs-back" onClick={onBack}>{ico(<path d="M19 12H5M11 6l-6 6 6 6"/>, 15, 2)}All projects</button>}
+    <header className="cs-hero">
+      <div className="cs-hero-text">
+        <small className="cs-kicker">{p.category}</small>
+        <h1>{p.name}</h1>
+        {p.status && <span className="cs-status"><i/>{p.status}</span>}
+        <p className="cs-tagline">{p.tagline}</p>
+        <div className="cs-links">
+          {p.links.github && <a className="cs-btn dark" href={p.links.github} target="_blank" rel="noreferrer">{LinkIcon.github}GitHub</a>}
+          {p.links.ieee && <a className="cs-btn" href={p.links.ieee} target="_blank" rel="noreferrer">{LinkIcon.ieee}IEEE Xplore</a>}
+          {p.links.pdf && <a className={`cs-btn${pdfOff ? ' off' : ''}`} href={pdfOff ? undefined : p.links.pdf} target="_blank" rel="noreferrer">{LinkIcon.view}View PDF</a>}
+          {p.links.pdf && <a className={`cs-btn${pdfOff ? ' off' : ''}`} href={pdfOff ? undefined : p.links.pdf} download={pdfOff ? undefined : (p.links.pdfName || `${p.id}.pdf`)}>{LinkIcon.down}Download PDF</a>}
+        </div>
       </div>
-      <div className="md"><Markdown text={p.markdown} skipTitle/></div>
-    </article>
+      <div className="cs-hero-art"><ProjectVisual id={p.id}/></div>
+    </header>
+    {p.stats?.length > 0 && <div className="cs-stats">{p.stats.map(([n, l]) => <div key={l}><b>{n}</b><span>{l}</span></div>)}</div>}
+    <div className="cs-body">
+      <section className="cs-sec">
+        <SecHead n="01" label="Overview" title="The short version"/>
+        {p.summary && <p className="cs-lede">{p.summary}</p>}
+        {p.points?.length > 0 && <ul className="cs-points">{p.points.map((t) => <li key={t}>{t}</li>)}</ul>}
+      </section>
+      <section className="cs-sec">
+        <SecHead n="02" label="Tools" title="What it’s built with"/>
+        <div className="nd-chips">{p.tools.map((n) => <span key={n} className="nd-chip"><i><SkillLogo name={n}/></i>{n}</span>)}</div>
+      </section>
+      {p.objectives && <section className="cs-sec">
+        <SecHead n="03" label="Goals" title={`What ${p.team ? 'we' : 'I'} set out to solve`}/>
+        <ol className="cs-goals">{p.objectives.map(([t, q], i) => <li key={t}><span>{String(i + 1).padStart(2, '0')}</span><div><b>{t}</b><p>{q}</p></div></li>)}</ol>
+      </section>}
+      {f && <section className="cs-sec">
+        <SecHead n="04" label="How it works" title="How it came together"/>
+        <div className="cs-seg" role="tablist">{p.features.map((x, i) => <button key={x.name} role="tab" aria-selected={i === feat} className={i === feat ? 'on' : ''} onClick={() => setFeat(i)}>{x.name}</button>)}</div>
+        <AnimatePresence mode="wait">
+          <motion.div key={feat} className="cs-card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}>
+            <div className="cs-why"><small>The problem</small><p>{f.why}</p></div>
+            <div className="cs-dec"><small>What {p.team ? 'we' : 'I'} did</small><ul>{f.decisions.map((d) => <li key={d}>{d}</li>)}</ul></div>
+            <div className="cs-trade"><small>The catch</small><p>{f.tradeoff}</p></div>
+          </motion.div>
+        </AnimatePresence>
+      </section>}
+    </div>
   </div>
 }
 
@@ -275,12 +356,13 @@ export function DesktopOS({ stageH }) {
   const openWin = (key, base) => setWins((ws) => ws.some((w) => w.key === key)
     ? ws.map((w) => w.key === key ? { ...w, ...Object.fromEntries(Object.entries(base.patch).filter(([, v]) => v !== undefined)), z: ++zTop.current } : w)
     : [...ws, place({ key, ...base.init, ...base.patch, z: ++zTop.current })])
-  const finderAt = (p) => openWin('finder', { init: sized({ app: 'finder', x: 210, y: 64, w: 720, h: 430, hist: [p], hi: 0 }), patch: {} }) || setWins((ws) => ws.map((w) => w.key !== 'finder' ? w : (w.hist[w.hi] === p ? w : { ...w, hist: [...w.hist.slice(0, w.hi + 1), p], hi: w.hi + 1 })))
+  const finderAt = (p) => openWin('finder', { init: sized({ app: 'finder', x: 120, y: 44, w: 940, h: 560, hist: [p], hi: 0 }), patch: {} }) || setWins((ws) => ws.map((w) => w.key !== 'finder' ? w : (w.hist[w.hi] === p ? w : { ...w, hist: [...w.hist.slice(0, w.hi + 1), p], hi: w.hi + 1 })))
   const T = touch()
   // phones: windows open filling the screen so their text is big enough to read
   const sized = (init) => T ? { ...init, x: 8, y: 34, w: 1164, h: stageH - 34 - 70 } : init
   const open = (it) => {
     if (it.app === 'finder') return finderAt('desktop')
+    if (it.app === 'projects') return openWin('projects', { init: sized({ app: 'projects', x: 110, y: 40, w: 960, h: 570 }), patch: {} })
     if (it.app === 'notes' || it.kind === 'Note') return openWin('notes', { init: sized({ app: 'notes', x: 150, y: 46, w: 860, h: 500 }), patch: { note: it.kind === 'Note' ? it.id : undefined } })
     if (it.kind === 'Folder') return finderAt(it.id)
     // projects open full screen (below the menu bar), on laptop and phone
@@ -297,19 +379,20 @@ export function DesktopOS({ stageH }) {
       if (w.app === 'finder') return <Win {...common} className="win-finder" toolbar={<span className="mac-win-title"/>}>
         <Finder place={w.hist[w.hi]} onPlace={(p) => finderAt(p)} onOpen={open}
           onBack={() => w.hi > 0 && upd(w.key, { hi: w.hi - 1 })} onFwd={() => w.hi < w.hist.length - 1 && upd(w.key, { hi: w.hi + 1 })}/></Win>
-      if (w.app === 'reader') return <Win {...common} className="win-reader" title={w.project?.file}><Reader project={w.project}/></Win>
-      if (w.app === 'notes') return <Win {...common} className="win-notes" title=""><Notes note={w.note || 'skills'} onNote={(n) => upd(w.key, { note: n })}/></Win>
+      if (w.app === 'projects') return <Win {...common} className="win-projects win-full" title="Projects"><ProjectsApp onOpen={(p) => open({ project: p })}/></Win>
+      if (w.app === 'reader') return <Win {...common} className="win-reader win-full" title={w.project?.file}><Reader project={w.project} onBack={() => { close(w.key); open({ app: 'projects' }) }}/></Win>
+      if (w.app === 'notes') return <Win {...common} className="win-notes win-full" title=""><Notes note={w.note || 'skills'} onNote={(n) => upd(w.key, { note: n })}/></Win>
       return null
     })}</AnimatePresence>
     {/* the dock's Finder and Notes open their apps */}
-    <DockHooks onFinder={() => finderAt('desktop')} onNotes={() => open({ app: 'notes' })} onPreview={() => {}}/>
+    <DockHooks onFinder={() => finderAt('desktop')} onNotes={() => open({ app: 'notes' })} onPreview={() => {}} onProjects={() => open({ app: 'projects' })}/>
   </>
 }
 // the dock lives in App; it calls these through a window event so the dock markup can stay there
-function DockHooks({ onFinder, onNotes, onPreview }) {
-  const ref = useRef({}); ref.current = { onFinder, onNotes, onPreview }
+function DockHooks({ onFinder, onNotes, onPreview, onProjects }) {
+  const ref = useRef({}); ref.current = { onFinder, onNotes, onPreview, onProjects }
   useEffect(() => {
-    const h = (e) => { const f = { finder: 'onFinder', notes: 'onNotes', photos: 'onPreview' }[e.detail]; f && ref.current[f]() }
+    const h = (e) => { const f = { finder: 'onFinder', notes: 'onNotes', photos: 'onPreview', code: 'onProjects' }[e.detail]; f && ref.current[f]() }
     window.addEventListener('mac-dock', h); return () => window.removeEventListener('mac-dock', h)
   }, [])
   return null

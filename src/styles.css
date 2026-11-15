@@ -1187,8 +1187,186 @@ body.menu-open .ai-wrap{visibility:hidden}
 .mac-desktop.is-touch .reader-summary{font-size:20px}
 .mac-desktop.is-touch .reader-tools small{font-size:14px}
 /* full-screen project reader: square corners, sits above the dock */
-.mac-win.win-reader{border-radius:0;z-index:610!important;box-shadow:none;left:0!important;top:28px!important;width:100%!important;height:auto!important;bottom:0}
-.mac-win.win-reader > *{border-radius:0!important}
+/* full-screen windows (projects, a project, notes): fill everything below the menu bar, over the dock */
+.mac-win.win-full{border-radius:0;box-shadow:none;left:0!important;top:28px!important;width:100%!important;height:auto!important;bottom:0}
+.mac-win.win-full > *{border-radius:0!important}
 .mac-desktop.is-touch .reader-doc{max-width:980px;margin:0 auto}
 .reader-label{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8e8e93;margin-bottom:8px}
 .mac-desktop.is-touch .reader-label{font-size:14px}
+/* book, first page: spoken languages (one or two lines) */
+.book-langs{margin-top:2.2cqw;max-width:30cqw}
+.book-langs p{margin:0;display:flex;flex-wrap:wrap;gap:.3cqw 1.4cqw;font-size:1.5cqw;color:#2b2622;line-height:1.5}
+.book-langs em{font-style:italic;color:#8a7f70}
+
+/* ───── project visuals ───── */
+.pv{position:absolute;inset:0;overflow:hidden;color:#fff;font-family:'DM Sans',system-ui,sans-serif}
+/* geospatial: before / after / change tiles */
+.pv-geo{background:radial-gradient(circle at 70% 20%,rgba(255,255,255,.12),transparent 60%)}
+.pv-tile{position:absolute;left:50%;top:50%;width:31%;transform:translate(calc(-50% + var(--x) * 1.3),calc(-50% + var(--y) * 1.1)) rotate(var(--r));background:#fff;padding:5px 5px 18px;border-radius:5px;box-shadow:0 10px 24px rgba(0,0,0,.28)}
+.pv-tile span{position:absolute;left:7px;bottom:3px;font:600 9px 'JetBrains Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:#1f5a46}
+.pv-tile:last-child{background:#1d1f22}.pv-tile:last-child span{color:#ff8d73}
+.pv-grid{display:grid;grid-template-columns:repeat(10,1fr);aspect-ratio:1;border-radius:2px;overflow:hidden}
+.pv-grid i{display:block}
+/* scriptsync: a video frame whose sign text cycles languages */
+.pv-script{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7%}
+.pv-frame{position:relative;width:72%;aspect-ratio:16/9;border-radius:9px;overflow:hidden;background:#1d1f22;box-shadow:0 12px 28px rgba(0,0,0,.3)}
+.pv-scene{position:absolute;inset:0;background:linear-gradient(#ffcf9f,#ff9e7a 60%)}
+.pv-sun{position:absolute;width:18%;aspect-ratio:1;border-radius:50%;background:#fff3c4;left:64%;top:16%}
+.pv-hill{position:absolute;bottom:-30%;width:90%;aspect-ratio:2;border-radius:50%}
+.pv-hill.a{left:-20%;background:#e5735b}.pv-hill.b{right:-30%;background:#b84a39;bottom:-38%}
+.pv-sign{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);width:58%;height:30%;background:#fffaf0;border-radius:6px;border:2px solid #1d1f22;display:grid;place-items:center}
+.pv-sign b{grid-area:1/1;font:800 clamp(12px,5cqw,34px) 'DM Sans',system-ui,sans-serif;color:#1d1f22;letter-spacing:.04em;opacity:0;animation:pv-swap 8s infinite}
+@keyframes pv-swap{0%,2%{opacity:0;transform:translateY(6px)}5%,22%{opacity:1;transform:none}25%,100%{opacity:0;transform:translateY(-6px)}}
+.pv-wave{position:absolute;left:6%;right:6%;bottom:6%;height:14%;display:flex;align-items:center;gap:2%}
+.pv-wave i{flex:1;background:rgba(255,255,255,.9);border-radius:2px;animation:pv-bar 1.2s ease-in-out infinite alternate}
+@keyframes pv-bar{to{transform:scaleY(.4)}}
+.pv-strip{width:72%;display:flex;gap:2%}
+.pv-strip i{flex:1;aspect-ratio:1.3;border-radius:4px;background:rgba(255,255,255,.14);display:grid;place-items:center;font:600 8px 'JetBrains Mono',monospace;text-transform:uppercase;color:rgba(255,255,255,.55);font-style:normal}
+.pv-strip i.ocr{background:#ffd166;color:#7a2a1d}
+/* mindgarden: a floating knowledge graph */
+.pv-mind svg{position:absolute;inset:0;width:100%;height:100%}
+.pv-node{position:absolute;transform:translate(-50%,-50%);padding:4px 10px;border-radius:999px;background:var(--c);color:#2a2350;font:600 11px 'DM Sans',system-ui,sans-serif;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.18);animation:pv-float 5s ease-in-out infinite}
+.pv-node.dot{padding:0;width:12px;height:12px}
+.pv-node.main{padding:7px 14px;font-size:13px;background:#fff;color:#5b4bb7}
+@keyframes pv-float{50%{transform:translate(-50%,calc(-50% - 4px))}}
+/* afterword: stacked recap cards */
+.pv-after{display:grid;place-items:center}
+.pv-card{position:absolute;width:52%;aspect-ratio:3/3.4;border-radius:12px;background:#f6f1e7;box-shadow:0 14px 30px rgba(0,0,0,.35)}
+.pv-card.back{transform:rotate(-10deg) translate(-16%,2%);background:#3a3f5c}
+.pv-card.mid{transform:rotate(6deg) translate(14%,0);background:#f2b84b}
+.pv-card.front{display:flex;flex-direction:column;gap:6%;padding:7%;box-sizing:border-box;color:#24283b}
+.pv-ep{display:flex;justify-content:space-between;align-items:center;font:600 9px 'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.06em}
+.pv-ep b{background:#24283b;color:#f6f1e7;padding:3px 7px;border-radius:999px}
+.pv-ep span{color:#3d8a5a}
+.pv-card h4{margin:2% 0 0;font:700 clamp(12px,2.2cqw,20px) Georgia,'Times New Roman',serif;font-style:italic}
+.pv-card.front>i{display:block;height:5%;max-height:7px;border-radius:3px;background:#d9d1c0}
+.pv-foot{margin-top:auto;display:flex;justify-content:space-between;font:600 9px 'DM Sans',system-ui,sans-serif;color:#7a7568}
+.pcover-art,.cs-hero-art{container-type:inline-size}
+
+/* ───── Projects app: cards ───── */
+.win-projects .mac-win-bar{background:rgba(247,244,236,.92);backdrop-filter:blur(14px);border-bottom:1px solid #e8e2d4}
+.papp{flex:1;min-width:0;overflow-y:auto;background:#f7f4ec;padding-top:46px;scrollbar-width:thin;color:#2b2622}
+.papp-head{padding:28px 30px 6px}
+.papp-head small,.pcard-kicker,.cs-kicker,.cs-head small,.cs-card small{font:500 10.5px 'JetBrains Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:#9a8f7f}
+.papp-head h1{margin:8px 0 6px;font:600 36px/1.1 'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;letter-spacing:-.01em}
+.papp-head p{margin:0;font:400 14.5px 'DM Sans',system-ui,sans-serif;color:#6b655c}
+.papp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;padding:20px 30px 34px}
+.pcard{all:unset;box-sizing:border-box;display:flex;flex-direction:column;background:#fffdf8;border-radius:18px;border:1px solid #ebe5d8;overflow:hidden;cursor:default;transition:transform .3s cubic-bezier(.2,.8,.2,1),box-shadow .3s,border-color .3s;-webkit-tap-highlight-color:transparent}
+.pcard-art{position:relative;display:block;aspect-ratio:16/9;margin:8px 8px 0;border-radius:12px;overflow:hidden;background:var(--pc);container-type:inline-size}
+.pcard-art .pv{transition:transform .6s cubic-bezier(.2,.8,.2,1)}
+.pcard-no{position:absolute;right:12px;bottom:6px;font:italic 600 34px/1 'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;color:rgba(255,255,255,.28);pointer-events:none}
+.pcard-body{display:flex;flex-direction:column;gap:7px;padding:16px 18px 16px}
+.pcard-kicker{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.pcard-kicker em,.cs-status{display:inline-flex;align-items:center;gap:6px;font:600 11px 'DM Sans',system-ui,sans-serif;letter-spacing:0;text-transform:none;font-style:normal;color:#b5532f;background:#fbe9e0;border-radius:999px;padding:3px 10px 3px 8px}
+.pcard-kicker em i,.cs-status i{width:6px;height:6px;border-radius:50%;background:#e2673f}
+.pcard-name{font:600 23px/1.15 'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;letter-spacing:-.01em;color:#2b2622}
+.pcard-line{font:400 13.5px/1.5 'DM Sans',system-ui,sans-serif;color:#5f5950}
+.pcard-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px;padding-top:12px;border-top:1px dashed #e3dccd}
+.pcard-tools{display:flex;align-items:center;gap:7px}
+.pcard-tools i{width:20px;height:20px;display:grid;place-items:center;flex:none}
+.pcard-tools small{font:600 11px 'DM Sans',system-ui,sans-serif;color:#9a8f7f}
+.pcard-open{display:inline-flex;align-items:center;gap:5px;font:600 12.5px 'DM Sans',system-ui,sans-serif;color:#9a8f7f;transition:color .2s,gap .2s}
+@media (hover:hover) and (pointer:fine){
+  .pcard:hover{transform:translateY(-4px) rotate(-.3deg);box-shadow:0 18px 36px rgba(60,45,20,.12);border-color:#e0d7c4}
+  .pcard:hover .pv{transform:scale(1.04)}
+  .pcard:hover .pcard-open{color:#e2673f;gap:8px}
+}
+.pcard.sel{border-color:#e2673f;box-shadow:0 0 0 1px #e2673f}
+.mac-desktop.is-touch .papp{padding-top:64px}
+.mac-desktop.is-touch .papp-head{padding:32px 32px 8px}
+.mac-desktop.is-touch .papp-head small,.mac-desktop.is-touch .pcard-kicker{font-size:13px}
+.mac-desktop.is-touch .papp-head h1{font-size:46px}
+.mac-desktop.is-touch .papp-head p{font-size:19px}
+.mac-desktop.is-touch .papp-grid{gap:22px;padding:24px 32px 40px}
+.mac-desktop.is-touch .pcard-name{font-size:30px}
+.mac-desktop.is-touch .pcard-line{font-size:18px}
+.mac-desktop.is-touch .pcard-kicker em{font-size:14px}
+.mac-desktop.is-touch .pcard-tools i{width:26px;height:26px}
+.mac-desktop.is-touch .pcard-open{font-size:16px}
+.mac-desktop.is-touch .pcard.sel{border-color:#ebe5d8;box-shadow:none}
+
+/* ───── a project's page ───── */
+.reader.cs{background:#f7f4ec;padding-top:46px;color:#2b2622}
+.cs-hero{display:grid;grid-template-columns:1fr 1.05fr;align-items:center;gap:40px;max-width:1000px;margin:0 auto;padding:40px 44px 30px}
+.cs-kicker{display:block;margin-bottom:12px}
+.cs-hero h1{margin:0;font:600 50px/1.05 'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;letter-spacing:-.015em}
+.cs-status{margin-top:14px}
+.cs-tagline{margin:14px 0 22px;font:400 17px/1.55 'DM Sans',system-ui,sans-serif;color:#5f5950;max-width:420px}
+.cs-links{display:flex;flex-wrap:wrap;gap:8px}
+.cs-btn{display:inline-flex;align-items:center;gap:7px;padding:9px 14px;border-radius:10px;border:1px solid #ddd5c5;background:#fffdf8;color:#2b2622;font:600 13px 'DM Sans',system-ui,sans-serif;text-decoration:none;transition:background .15s,color .15s,border-color .15s}
+.cs-btn.dark{background:#2b2622;border-color:#2b2622;color:#fffdf8}
+@media (hover:hover) and (pointer:fine){.cs-btn:hover{background:#e2673f;border-color:#e2673f;color:#fff}}
+.cs-btn.off{opacity:.4;pointer-events:none}
+.cs-hero-art{position:relative;aspect-ratio:16/11;border-radius:20px;overflow:hidden;background:var(--pc);container-type:inline-size;box-shadow:0 20px 40px rgba(60,45,20,.14);transform:rotate(1.2deg)}
+.cs-stats{display:flex;max-width:912px;margin:6px auto 0;padding:0 0 4px;border-top:1px solid #e3dccd;border-bottom:1px solid #e3dccd}
+.cs-stats div{flex:1;padding:16px 18px}
+.cs-stats div+div{border-left:1px solid #e3dccd}
+.cs-stats b{display:block;font:600 30px/1 'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;color:var(--pc)}
+.cs-stats span{display:block;margin-top:6px;font:400 12.5px 'DM Sans',system-ui,sans-serif;color:#6b655c}
+.cs-body{max-width:912px;margin:0 auto;padding:8px 0 56px;font-family:'DM Sans',system-ui,sans-serif}
+.cs-sec{margin-top:36px}
+.cs-head{margin-bottom:14px}
+.cs-head h2{margin:6px 0 0;font:600 26px/1.15 'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;letter-spacing:-.01em}
+.cs-lede{margin:0 0 10px;font-size:16px;line-height:1.6;color:#3d3832}
+.cs-points{margin:0;padding-left:20px;color:#3d3832;font-size:14.5px;line-height:1.6}
+.cs-points li{margin:5px 0}.cs-points li::marker{color:#e2673f}
+.cs-goals{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.cs-goals li{display:flex;gap:12px;padding:16px 16px 18px;background:#fffdf8;border:1px solid #ebe5d8;border-radius:16px}
+.cs-goals li>span{font:italic 600 24px/1 'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;color:#e2673f}
+.cs-goals b{display:block;font-size:15px;margin-bottom:6px}
+.cs-goals p{margin:0;font:italic 400 14px/1.5 'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;color:#6b655c}
+.cs-seg{display:inline-flex;flex-wrap:wrap;gap:4px;padding:4px;background:#ece6d9;border-radius:12px;margin-bottom:14px}
+.cs-seg button{all:unset;cursor:pointer;padding:8px 14px;border-radius:9px;font:600 13px 'DM Sans',system-ui,sans-serif;color:#6b655c;transition:background .15s,color .15s}
+.cs-seg button.on{background:#fffdf8;color:#2b2622;box-shadow:0 1px 3px rgba(60,45,20,.12)}
+@media (hover:hover) and (pointer:fine){.cs-seg button:not(.on):hover{color:#e2673f}}
+.cs-card{display:grid;grid-template-columns:1fr 1.4fr;gap:0;background:#fffdf8;border:1px solid #ebe5d8;border-radius:18px;overflow:hidden}
+.cs-card>div{padding:18px 20px}
+.cs-card small{display:block;margin-bottom:8px}
+.cs-card p,.cs-card ul{margin:0;font-size:14.5px;line-height:1.55;color:#3d3832}
+.cs-card ul{padding-left:18px}.cs-card li{margin:4px 0}.cs-card li::marker{color:#e2673f}
+.cs-why{border-right:1px solid #ebe5d8}
+.cs-why p{font:italic 400 17px/1.5 'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;color:#2b2622}
+.cs-dec{grid-row:span 2}
+.cs-trade{grid-column:1;border-right:1px solid #ebe5d8;border-top:1px solid #ebe5d8;background:#fbf6ec}
+.cs-trade small{color:#b5532f}
+.cs-readme{border-top:1px solid #e3dccd;padding-top:20px}
+.cs-readme-btn{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:14px;color:#e2673f}
+.cs-readme .md{margin-top:16px}
+/* phones: the window fills the screen, so everything goes up a size */
+.mac-desktop.is-touch .reader.cs{padding-top:64px}
+.mac-desktop.is-touch .cs-hero{max-width:none;padding:44px 48px 34px}
+.mac-desktop.is-touch .cs-kicker,.mac-desktop.is-touch .cs-head small,.mac-desktop.is-touch .cs-card small{font-size:13px}
+.mac-desktop.is-touch .cs-hero h1{font-size:60px}
+.mac-desktop.is-touch .cs-status{font-size:15px}
+.mac-desktop.is-touch .cs-tagline{font-size:21px}
+.mac-desktop.is-touch .cs-btn{font-size:16px;padding:12px 18px}
+.mac-desktop.is-touch .cs-stats,.mac-desktop.is-touch .cs-body{max-width:none;margin-left:48px;margin-right:48px}
+.mac-desktop.is-touch .cs-stats b{font-size:38px}.mac-desktop.is-touch .cs-stats span{font-size:15px}
+.mac-desktop.is-touch .cs-head h2{font-size:34px}
+.mac-desktop.is-touch .cs-lede{font-size:20px}
+.mac-desktop.is-touch .cs-points,.mac-desktop.is-touch .cs-card p,.mac-desktop.is-touch .cs-card ul{font-size:18px}
+.mac-desktop.is-touch .cs-why p{font-size:21px}
+.mac-desktop.is-touch .cs-goals b{font-size:19px}.mac-desktop.is-touch .cs-goals p{font-size:17px}
+.mac-desktop.is-touch .cs-seg button{font-size:17px;padding:11px 18px}
+.mac-desktop.is-touch .cs-readme-btn{font-size:18px}
+
+/* desktop icons fade in together with the widgets */
+.desk-icons .desk-icon{animation:desk-icon-in .5s ease .35s backwards}
+@keyframes desk-icon-in{from{opacity:0}to{opacity:1}}
+.mac-desktop.is-touch .pcard-art{aspect-ratio:16/7.5}
+/* back to the projects grid, pinned to the top of a project page */
+.cs-back{position:sticky;top:12px;z-index:5;margin:12px 0 -46px 24px;display:inline-flex;align-items:center;gap:7px;padding:8px 14px 8px 11px;border:1px solid #e3dccd;border-radius:999px;background:rgba(255,253,248,.92);backdrop-filter:blur(10px);color:#2b2622;font:600 13px 'DM Sans',system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 14px rgba(60,45,20,.08);transition:color .15s,border-color .15s}
+@media (hover:hover) and (pointer:fine){.cs-back:hover{color:#e2673f;border-color:#e2673f}}
+.mac-desktop.is-touch .cs-back{font-size:17px;padding:11px 18px 11px 14px;margin-left:30px}
+.win-full .papp-head,.win-full .papp-grid{max-width:1000px;margin-left:auto;margin-right:auto;box-sizing:border-box}
+/* phones: zoomed-in computer screen scrolls inside its frame */
+.mac-zoom{position:relative}
+.mac-display.is-zoomed{overflow:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.mac-display.is-zoomed::-webkit-scrollbar{display:none}
+.mac-display.is-zoomed{touch-action:none;cursor:grab}
+.mac-display.is-zoomed:active{cursor:grabbing}
+/* "drag to look around" cue over the zoomed computer screen (turned with the screen) */
+.mac-drag-cue-wrap{position:absolute;display:grid;place-items:center;pointer-events:none;transform-origin:50% 50%;z-index:3}
+.mac-drag-cue{display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;background:rgba(29,31,34,.82);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;font:600 13px 'DM Sans',system-ui,sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.mac-drag-cue svg{animation:drag-cue-nudge 1.4s ease-in-out infinite}
+@keyframes drag-cue-nudge{0%,100%{transform:translate(0,0)}25%{transform:translate(3px,0)}75%{transform:translate(-3px,0)}}

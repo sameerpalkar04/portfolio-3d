@@ -40,7 +40,7 @@ export function createDesktopTexture() {
     font(700, 196); ctx.fillText(t.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M$/i, ''), W / 2, 318)
     ctx.restore()
     // status icons, top right
-    ctx.fillStyle = 'rgba(255,255,255,.95)'; font(600, 15); ctx.textAlign = 'right'; ctx.fillText('U.S.', W - 120, 30)
+    ctx.fillStyle = 'rgba(255,255,255,.95)'; font(600, 15); ctx.textAlign = 'right'; ctx.fillText('IND', W - 120, 30)
     ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 1.6; rr(ctx, W - 92, 19, 28, 13, 4); ctx.stroke(); ctx.fillRect(W - 89, 22, 18, 7)
     ctx.beginPath(); ctx.arc(W - 38, 34, 3, 0, Math.PI * 2); ctx.fill()
     for (const r of [8, 13]) { ctx.beginPath(); ctx.arc(W - 38, 34, r, Math.PI * 1.25, Math.PI * 1.75); ctx.stroke() }

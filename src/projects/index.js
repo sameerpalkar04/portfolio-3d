@@ -4,8 +4,9 @@ import geospatial from './geospatial-segmentation.md?raw'
 import scriptsync from './scriptsync.md?raw'
 import mindgarden from './mindgarden.md?raw'
 import afterword from './afterword.md?raw'
+import { CASE } from './caseStudies'
 
-export const PROJECTS = [
+const LIST = [
   {
     id: 'geospatial-segmentation', file: 'Geospatial-Segmentation.md', date: 'Today, 11:30 PM', size: '3 KB',
     title: 'Geospatial Image Segmentation and Temporal Change Analysis',
@@ -63,3 +64,6 @@ export const PROJECTS = [
     links: { github: 'https://github.com/sameerpalkar04/recap-website' },
   },
 ]
+
+// each project's case-study content (cover card + page) is merged in from caseStudies.js
+export const PROJECTS = LIST.map((p, i) => ({ ...p, ...CASE[p.id], fig: String(i + 1).padStart(2, '0') }))

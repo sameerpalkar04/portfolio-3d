@@ -209,7 +209,7 @@ function NatePanel({ onClose, compact }) {
       <button className="nate-close" onClick={onClose} aria-label="Close Nate"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </header>
     <div className="nate-body">
-      <h3>Ask anything about <em>Sameer</em>!</h3>
+      <h3>Ask anything about <em>Sameer!</em></h3>
       <div className="nate-chips">{NATE_ASKS.map((q) => <button key={q} type="button">{q}</button>)}</div>
     </div>
     <form className="nate-input" onSubmit={(e) => e.preventDefault()}>
@@ -447,6 +447,10 @@ const bookSpread = (page, goTo) => page === 0 ? [
       <span className="book-index-title">Contents</span>
       {BOOK_INDEX.map(([label, n, spread]) => <button key={label} onClick={(e) => { e.stopPropagation(); goTo(spread, n) }}><span>{label}</span><i/><b>{n}</b></button>)}
     </nav>
+    <div className="book-langs">
+      <span className="book-index-title">Spoken languages</span>
+      <p>{[['English', 'Professional'], ['Hindi', 'Native'], ['Marathi', 'Native']].map(([l, lvl]) => <span key={l}>{l} <em>({lvl})</em></span>)}</p>
+    </div>
     <span className="folio">2</span>
   </section>,
 ] : page === 1 ? [
@@ -751,7 +755,7 @@ const DockGlyph = ({ k }) => {
 // On Interact, once the camera has settled, the password fills in and it opens onto the desktop.
 function LockScreen({ now, typed }) {
   return <motion.div className="mac-lock" initial={{ opacity: 1 }} exit={{ opacity: 0, filter: 'blur(6px)', scale: 1.04 }} transition={{ duration: .55, ease: [.4, 0, .2, 1] }}>
-    <div className="lock-status"><span>U.S.</span>
+    <div className="lock-status"><span>IND</span>
       <svg viewBox="0 0 26 12" width="22" height="11" fill="none" stroke="currentColor" aria-hidden="true"><rect x=".5" y=".5" width="22" height="11" rx="3"/><rect x="2.5" y="2.5" width="15" height="7" rx="1.5" fill="currentColor" stroke="none"/><path d="M24.5 4v4" strokeWidth="1.5" strokeLinecap="round"/></svg>
       {WX.ico(<><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.6 16a5 5 0 0 1 6.8 0"/><circle cx="12" cy="19.2" r=".9" fill="currentColor"/></>, 15)}
     </div>
@@ -822,7 +826,7 @@ function PortfolioSystem({ stageH = 660 }) {
       </section>
     </div>
     {home && <DesktopOS stageH={stageH}/>}
-    <div className="mac-dock">{DOCK.map(([a, b, k], i) => <span key={k} className={`dock-app${['finder', 'notes'].includes(k) ? ' live' : ''}`} style={{ background: `linear-gradient(${a},${b})` }} onClick={() => window.dispatchEvent(new CustomEvent('mac-dock', { detail: k }))}><DockGlyph k={k}/>{i === 0 && <i className="dock-dot"/>}</span>)}
+    <div className="mac-dock">{DOCK.map(([a, b, k], i) => <span key={k} className={`dock-app${['finder', 'notes', 'code'].includes(k) ? ' live' : ''}`} style={{ background: `linear-gradient(${a},${b})` }} onClick={() => window.dispatchEvent(new CustomEvent('mac-dock', { detail: k }))}><DockGlyph k={k}/>{i === 0 && <i className="dock-dot"/>}</span>)}
       <em/><span className="dock-app" style={{ background: 'linear-gradient(#7cc6ff,#3a9bf0)' }}>{WX.ico(<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="#fff" stroke="none"/>, 26)}</span>
       <span className="dock-app trash">{WX.ico(<><path d="M5 7h14l-1.2 13H6.2z" fill="#e8eaee" stroke="#9aa0a8"/><path d="M4 7h16M9 4h6" stroke="#9aa0a8"/></>, 28)}</span>
     </div>
@@ -842,15 +846,77 @@ function ComputerView({ onClose, getRect }) {
   }, [getRect])
   const long = rect ? (rect.rotated ? rect.height : rect.width) : 0, short = rect ? (rect.rotated ? rect.width : rect.height) : 0
   const DW = isTouch() ? 680 : 1180, scale = long / DW, DH = short / scale
+  // phones: zoom buttons enlarge the screen; when zoomed in it scrolls, so you can look around
+  const ZOOMS = [1, 1.5, 2, 2.5]
+  const [zi, setZi] = useState(0), zoom = ZOOMS[zi]
+  const disp = useRef(null), centre = useRef([.5, .5])
+  // a short "drag to look around" cue each time you zoom in from the normal size
+  const [dragCue, setDragCue] = useState(false)
+  useEffect(() => { if (zi === 0) { setDragCue(false); return undefined } const t = setTimeout(() => setDragCue(false), 5000); return () => clearTimeout(t) }, [zi, dragCue])
+  const zoomBy = (d) => {
+    if (d > 0 && zi === 0) setDragCue(true)
+    const el = disp.current
+    if (el && el.scrollWidth) centre.current = [(el.scrollLeft + el.clientWidth / 2) / el.scrollWidth, (el.scrollTop + el.clientHeight / 2) / el.scrollHeight]
+    setZi((i) => Math.max(0, Math.min(ZOOMS.length - 1, i + d)))
+  }
+  // zoomed in: drag to move around the screen. A drag scrolls whatever it starts on (a window's page)
+  // first, then the screen itself; a drag never counts as a tap.
+  const panK = scale * zoom * DW / STAGE_W
+  const pan = useRef(null)
+  const panDown = (e) => {
+    if (zoom === 1 || e.button > 0) return
+    pan.current = { x: e.clientX, y: e.clientY, moved: false, target: e.target }
+    const move = (ev) => {
+      const p = pan.current; if (!p) return
+      const dx = ev.clientX - p.x, dy = ev.clientY - p.y
+      if (!p.moved && Math.hypot(dx, dy) < 6) return
+      p.moved = true; p.x = ev.clientX; p.y = ev.clientY
+      // finger movement on screen → scroll in the screen's own (possibly sideways) axes
+      let sx = rect.rotated ? -dy : -dx, sy = rect.rotated ? dx : -dy
+      for (let el = p.target; el && (sx || sy); el = el.parentElement) {
+        const own = el === disp.current, k = own ? 1 : panK, cs = getComputedStyle(el)
+        if (own || /(auto|scroll)/.test(cs.overflowY + cs.overflowX)) {
+          const l = el.scrollLeft, t = el.scrollTop
+          el.scrollLeft += sx / k; el.scrollTop += sy / k
+          sx -= (el.scrollLeft - l) * k; sy -= (el.scrollTop - t) * k
+        }
+        if (own) break
+      }
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up)
+      if (pan.current?.moved) { const stop = (ev) => { ev.stopPropagation(); ev.preventDefault() }; window.addEventListener('click', stop, { capture: true, once: true }); setTimeout(() => window.removeEventListener('click', stop, { capture: true }), 50) }
+      pan.current = null
+    }
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up)
+  }
+  useLayoutEffect(() => {
+    const el = disp.current; if (!el) return
+    const [cx, cy] = centre.current
+    el.scrollLeft = cx * el.scrollWidth - el.clientWidth / 2; el.scrollTop = cy * el.scrollHeight - el.clientHeight / 2
+  }, [zi])
   return <motion.div className="phone-overlay mac-overlay" onClick={onClose} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
     {rect && <>
-      <motion.div className="mac-display" onClick={(e) => e.stopPropagation()}
+      <motion.div ref={disp} className={`mac-display${zoom > 1 ? ' is-zoomed' : ''}`} onClick={(e) => e.stopPropagation()} onPointerDownCapture={panDown}
         style={rect.rotated
           ? { left: rect.left + rect.width / 2 - long / 2, top: rect.top + rect.height / 2 - short / 2, width: long, height: short, rotate: 90 }
           : { left: rect.left, top: rect.top, width: long, height: short }}
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .4 }}>
-        <div className="mac-frame" style={{ width: STAGE_W, height: DH * STAGE_W / DW, transform: `scale(${scale * DW / STAGE_W})` }}><PortfolioSystem onClose={onClose} stageH={DH * STAGE_W / DW}/></div>
+        <div className="mac-zoom" style={{ width: long * zoom, height: short * zoom }}>
+          <div className="mac-frame" style={{ width: STAGE_W, height: DH * STAGE_W / DW, transform: `scale(${scale * zoom * DW / STAGE_W})` }}><PortfolioSystem onClose={onClose} stageH={DH * STAGE_W / DW}/></div>
+        </div>
       </motion.div>
+      <AnimatePresence>{dragCue && <motion.div key="drag-cue" className="mac-drag-cue-wrap"
+        style={rect.rotated
+          ? { left: rect.left + rect.width / 2 - long / 2, top: rect.top + rect.height / 2 - short / 2, width: long, height: short, rotate: 90 }
+          : { left: rect.left, top: rect.top, width: long, height: short }}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .3 }}>
+        <span className="mac-drag-cue"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/></svg>Drag to look around</span>
+      </motion.div>}</AnimatePresence>
+      {isTouch() && <>
+        <button className="cam-nav stack-nav up zoom-btn" onClick={(e) => { e.stopPropagation(); zoomBy(1) }} disabled={zi === ZOOMS.length - 1} aria-label="Zoom in"><svg style={rect.rotated ? { transform: 'rotate(90deg)' } : undefined} viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5M10.5 7.5v6M7.5 10.5h6"/></svg></button>
+        <button className="cam-nav stack-nav down zoom-btn" onClick={(e) => { e.stopPropagation(); zoomBy(-1) }} disabled={zi === 0} aria-label="Zoom out"><svg style={rect.rotated ? { transform: 'rotate(90deg)' } : undefined} viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5M7.5 10.5h6"/></svg></button>
+      </>}
       {rect.rotated && <div className="rotate-hint"><RotateIcon/>Rotate your phone for a bigger view</div>}
     </>}
   </motion.div>
@@ -1324,11 +1390,12 @@ export default function App() {
   // only the control being taught is live; after "Start exploring" everything is
   useEffect(() => {
     const scene = sceneRef.current; if (!scene?.setControls) return
+    // nothing works until the first cue is on screen (the name intro plays first)
     scene.setControls(tourStep === 'done' ? { walk: true, look: true, open: true }
-      : tourStep === 'walk' ? { walk: true, look: false, open: false }
+      : tourStep === 'walk' ? { walk: showCue && introPhase === 'corner', look: false, open: false }
       : tourStep === 'look' && !showExplore ? { walk: false, look: true, open: false }
       : { walk: false, look: false, open: false })
-  }, [tourStep, showExplore, introPhase])
+  }, [tourStep, showExplore, introPhase, showCue])
   const onKey = (key, down) => window.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { key, bubbles: true }))
   const closeSystem = () => sceneRef.current?.closeSystem()
   const getPhoneRect = useCallback(() => sceneRef.current?.phoneScreenRect() ?? null, [])
