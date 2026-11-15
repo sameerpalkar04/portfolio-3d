@@ -6,6 +6,7 @@ import Loader from './Loader'
 import { viewW, viewH, fracAlong, phoneLandscape, setPortraitLock } from './orientation'
 import { ACHIEVEMENTS } from './achievements'
 import { DesktopOS } from './MacOS'
+import { RESUME_URL, RESUME_VIEW, RESUME_DOWNLOAD, RESUME_NAME, loadResume } from './resume'
 
 // Songs on the speaker: add your picks here as { title, artist, link? }.
 const songs = []
@@ -15,35 +16,8 @@ function Playlist() {
   return <><p>A few songs I keep on repeat while I work.</p><ol className="playlist">{songs.map((s) => <li key={s.title}><b>{s.title}</b><span>{s.artist}</span>{s.link && <a href={s.link} target="_blank" rel="noreferrer">listen ↗</a>}</li>)}</ol></>
 }
 
-// The résumé is the latest PDF in my Google Drive folder, served by /api/resume (api/resume.js).
-const RESUME_URL = '/api/resume', RESUME_VIEW = '/api/resume?view=1', RESUME_DOWNLOAD = '/api/resume?dl=1', RESUME_NAME = 'Sameer-Palkar-Resume.pdf'
 function ResumeLink() {
   return <a className="mail-link" href={RESUME_DOWNLOAD} download={RESUME_NAME}>Download résumé (PDF) <Arrow dir="down" size={13}/></a>
-}
-// Fetch the PDF once and render its first page with pdf.js (served from /public/pdfjs):
-// { canvas, url (image), aspect (height / width), links: [{ href, left, top, width, height } in %] }
-let resumeJob = null
-function loadResume() {
-  if (resumeJob) return resumeJob
-  resumeJob = (async () => {
-    // a plain browser import: Vite would otherwise rewrite it and refuse a file from /public
-    const pdfjs = await new Function('u', 'return import(u)')('/pdfjs/pdf.min.mjs')
-    pdfjs.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.mjs'
-    const res = await fetch(RESUME_URL); if (!res.ok) throw new Error(await res.text())
-    const doc = await pdfjs.getDocument({ data: await res.arrayBuffer() }).promise
-    const page = await doc.getPage(1)
-    const base = page.getViewport({ scale: 1 }), view = page.getViewport({ scale: 2200 / base.width })
-    const canvas = document.createElement('canvas'); canvas.width = Math.round(view.width); canvas.height = Math.round(view.height)
-    const ctx = canvas.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height)
-    await page.render({ canvasContext: ctx, viewport: view }).promise
-    const [x0, y0, x1, y1] = page.view, pw = x1 - x0, ph = y1 - y0
-    const links = (await page.getAnnotations()).filter((a) => a.subtype === 'Link' && a.url).map((a) => ({
-      href: a.url, left: (a.rect[0] - x0) / pw * 100, top: (y1 - a.rect[3]) / ph * 100, width: (a.rect[2] - a.rect[0]) / pw * 100, height: (a.rect[3] - a.rect[1]) / ph * 100,
-    }))
-    return { canvas, url: canvas.toDataURL('image/png'), aspect: canvas.height / canvas.width, links }
-  })()
-  resumeJob.catch(() => { resumeJob = null }) // try again next time
-  return resumeJob
 }
 
 const apps = [
@@ -261,7 +235,7 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interact
     <AnimatePresence>
       {interacting
         ? <motion.div key="back" className="fab-row" initial={{ opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }}>
-            {showDisco && <button className={`fab-disco${disco ? ' on' : ''}`} onClick={onDisco} aria-pressed={disco} aria-label={disco ? 'Turn off disco lights' : 'Turn on disco lights'}><DiscoIcon s={22}/></button>}
+            {showDisco && <button className={`fab-disco${disco ? ' on' : ''}`} onClick={onDisco} aria-pressed={disco} aria-label={disco ? 'Turn off disco lights' : 'Turn on disco lights'}><DiscoIcon s={20}/>DISCO</button>}
             <button className="fab-action" onClick={onBack}><Arrow dir="left"/> BACK TO ROOM</button>
           </motion.div>
         : here && <motion.button key="interact" className="fab-action" onClick={onOpen} initial={{ opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }}>INTERACT <Arrow/></motion.button>}
@@ -774,14 +748,14 @@ function LockScreen({ now, typed }) {
     </div>
   </motion.div>
 }
-function PortfolioSystem({ stageH = 660 }) {
+function PortfolioSystem({ stageH = 660, lockDelay = 0 }) {
   const [now, setNow] = useState(new Date())
   // lock → typing the password → desktop
   const [typed, setTyped] = useState(0), [home, setHome] = useState(false)
   useEffect(() => {
     const ts = []
-    for (let i = 1; i <= 8; i++) ts.push(window.setTimeout(() => setTyped(i), 650 + i * 70))
-    ts.push(window.setTimeout(() => setHome(true), 1450))
+    for (let i = 1; i <= 8; i++) ts.push(window.setTimeout(() => setTyped(i), lockDelay + 650 + i * 70))
+    ts.push(window.setTimeout(() => setHome(true), lockDelay + 1450))
     return () => ts.forEach(window.clearTimeout)
   }, [])
   useEffect(() => { const t = window.setInterval(() => setNow(new Date()), 1000); return () => window.clearInterval(t) }, [])
@@ -856,6 +830,11 @@ function ComputerView({ onClose, getRect }) {
   const ZOOMS = [1, 1.5, 2, 2.5]
   const [zi, setZi] = useState(0), zoom = ZOOMS[zi]
   const disp = useRef(null), centre = useRef([.5, .5])
+  // phones: a tip about the zoom buttons on the lock screen; the screen stays locked a little longer so
+  // the tip is gone before the desktop appears
+  const LOCK_DELAY = isTouch() ? 2400 : 0
+  const [zoomTip, setZoomTip] = useState(false), hasRect = !!rect
+  useEffect(() => { if (!hasRect || !isTouch()) return undefined; setZoomTip(true); const t = setTimeout(() => setZoomTip(false), LOCK_DELAY + 300); return () => clearTimeout(t) }, [hasRect])
   // a short "drag to look around" cue each time you zoom in from the normal size
   const [dragCue, setDragCue] = useState(false)
   useEffect(() => { if (zi === 0) { setDragCue(false); return undefined } const t = setTimeout(() => setDragCue(false), 5000); return () => clearTimeout(t) }, [zi, dragCue])
@@ -909,9 +888,16 @@ function ComputerView({ onClose, getRect }) {
           : { left: rect.left, top: rect.top, width: long, height: short }}
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .4 }}>
         <div className="mac-zoom" style={{ width: long * zoom, height: short * zoom }}>
-          <div className="mac-frame" style={{ width: STAGE_W, height: DH * STAGE_W / DW, transform: `scale(${scale * zoom * DW / STAGE_W})` }}><PortfolioSystem onClose={onClose} stageH={DH * STAGE_W / DW}/></div>
+          <div className="mac-frame" style={{ width: STAGE_W, height: DH * STAGE_W / DW, transform: `scale(${scale * zoom * DW / STAGE_W})` }}><PortfolioSystem onClose={onClose} stageH={DH * STAGE_W / DW} lockDelay={LOCK_DELAY}/></div>
         </div>
       </motion.div>
+      <AnimatePresence>{zoomTip && !dragCue && <motion.div key="zoom-tip" className="mac-drag-cue-wrap"
+        style={rect.rotated
+          ? { left: rect.left + rect.width / 2 - long / 2, top: rect.top + rect.height / 2 - short / 2, width: long, height: short, rotate: 90 }
+          : { left: rect.left, top: rect.top, width: long, height: short }}
+        initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { delay: .3, duration: .3 } }} exit={{ opacity: 0, transition: { duration: .3 } }}>
+        <span className="mac-drag-cue"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5M10.5 7.5v6M7.5 10.5h6"/></svg>Text too small? Use the zoom buttons</span>
+      </motion.div>}</AnimatePresence>
       <AnimatePresence>{dragCue && <motion.div key="drag-cue" className="mac-drag-cue-wrap"
         style={rect.rotated
           ? { left: rect.left + rect.width / 2 - long / 2, top: rect.top + rect.height / 2 - short / 2, width: long, height: short, rotate: 90 }

@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { SKILL_ICONS, SKILL_GROUPS } from './skillIcons'
 import { PROJECTS } from './projects'
 import { ProjectVisual } from './projectVisuals'
+import { RESUME_DOWNLOAD, RESUME_NAME, loadResume } from './resume'
 
 const touch = () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
 const ico = (d, s = 14, sw = 1.8) => <svg viewBox="0 0 24 24" width={s} height={s} fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>
@@ -23,11 +24,11 @@ export function FolderIcon({ tone = 'blue', glyph, size = 64 }) {
   </svg>
 }
 // a Markdown document: a white page with a folded corner and an "MD" label
-export const MdIcon = ({ size = 64 }) => <svg viewBox="0 0 52 64" width={size * 52 / 64} height={size} aria-hidden="true">
+export const MdIcon = ({ size = 64, label = 'MD', tone = '#e2673f' }) => <svg viewBox="0 0 52 64" width={size * 52 / 64} height={size} aria-hidden="true">
   <path d="M6 2h28l14 14v42a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4z" fill="#fff" stroke="#d1d1d6"/>
   <path d="M34 2v10a4 4 0 0 0 4 4h10" fill="#ececf0" stroke="#d1d1d6"/>
   {[26, 32].map((y) => <path key={y} d={`M10 ${y}h30`} stroke="#d1d1d6" strokeWidth="2" strokeLinecap="round"/>)}
-  <rect x="8" y="42" width="26" height="13" rx="3" fill="#e2673f"/><text x="21" y="51.6" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="#fff" fontFamily="-apple-system,Helvetica,Arial">MD</text>
+  <rect x="8" y="42" width="26" height="13" rx="3" fill={tone}/><text x="21" y="51.6" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="#fff" fontFamily="-apple-system,Helvetica,Arial">{label}</text>
 </svg>
 // The Projects app icon: a squircle of four tiles in the projects' own colours
 export const ProjectsAppIcon = ({ size = 64 }) => <svg viewBox="0 0 64 64" width={size} height={size} aria-hidden="true">
@@ -62,12 +63,14 @@ const DESKTOP = [
   { id: 'certs', name: 'Certifications', kind: 'Note', date: 'Today, 5:58 PM', icon: (s) => <NoteIcon size={s}/> },
   { id: 'skills', name: 'Skills', kind: 'Note', date: 'Today, 5:55 PM', icon: (s) => <NoteIcon size={s}/> },
 ]
+// the résumé PDF (the same file as in the room's Files), opens in Preview
+const RESUME_ITEM = { id: 'resume', name: RESUME_NAME, kind: 'PDF document', date: 'Today, 9:00 AM', size: '120 KB', icon: (s) => <MdIcon size={s} label="PDF" tone="#e5483b"/> }
 const PLACES = {
   desktop: { title: 'Desktop', items: DESKTOP },
-  documents: { title: 'Documents', items: DESKTOP },
-  recents: { title: 'Recents', items: DESKTOP.slice(1) },
+  documents: { title: 'Documents', items: [...DESKTOP, RESUME_ITEM] },
+  recents: { title: 'Recents', items: [RESUME_ITEM, ...DESKTOP.slice(1)] },
   projects: { title: 'Projects', items: PROJECTS.map((p) => ({ id: p.id, name: p.file, kind: 'Markdown document', date: p.date, size: p.size, project: p, icon: (sz) => <MdIcon size={sz}/> })) },
-  downloads: { title: 'Downloads', items: [], empty: 'No items' },
+  downloads: { title: 'Downloads', items: [RESUME_ITEM] },
   applications: { title: 'Applications', items: [], apps: true },
 }
 const SIDEBAR = [['Favorites', [['airdrop', 'AirDrop', ico(<><circle cx="12" cy="12" r="2"/><path d="M8.5 15.5a5 5 0 1 1 7 0M5.6 18.4a9 9 0 1 1 12.8 0"/></>)], ['recents', 'Recents', ico(<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>)], ['applications', 'Applications', ico(<path d="M12 3 4 21M12 3l8 18M7 15h10"/>)], ['desktop', 'Desktop', ico(<><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M9 21h6M12 17v4"/></>)], ['documents', 'Documents', ico(<><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></>)], ['downloads', 'Downloads', ico(<><circle cx="12" cy="12" r="9"/><path d="M12 7v9M8 12l4 4 4-4"/></>)]]],
@@ -345,6 +348,18 @@ function Reader({ project: p, onBack }) {
   </div>
 }
 
+// Preview: the résumé's page (rendered with pdf.js), its links still clickable
+function PdfPreview() {
+  const [doc, setDoc] = useState(null), [failed, setFailed] = useState(false)
+  useEffect(() => { loadResume().then(setDoc, () => setFailed(true)) }, [])
+  return <div className="pdf-view">
+    {doc ? <div className="pdf-page" style={{ aspectRatio: `1 / ${doc.aspect}` }}>
+      <img src={doc.url} alt="Sameer Palkar's résumé" draggable="false"/>
+      {doc.links.map((l, i) => <a key={i} href={l.href} target="_blank" rel="noreferrer" style={{ left: `${l.left}%`, top: `${l.top}%`, width: `${l.width}%`, height: `${l.height}%` }} aria-label={l.href}/>)}
+    </div> : <p className="pdf-wait">{failed ? 'Couldn’t load the résumé. Use the download button above.' : 'Opening…'}</p>}
+  </div>
+}
+
 // ── the desktop: icons + windows ──
 export function DesktopOS({ stageH }) {
   const [wins, setWins] = useState([]), [sel, setSel] = useState(null)
@@ -365,6 +380,7 @@ export function DesktopOS({ stageH }) {
     if (it.app === 'projects') return openWin('projects', { init: sized({ app: 'projects', x: 110, y: 40, w: 960, h: 570 }), patch: {} })
     if (it.app === 'notes' || it.kind === 'Note') return openWin('notes', { init: sized({ app: 'notes', x: 150, y: 46, w: 860, h: 500 }), patch: { note: it.kind === 'Note' ? it.id : undefined } })
     if (it.kind === 'Folder') return finderAt(it.id)
+    if (it.kind === 'PDF document') return openWin('pdf', { init: { app: 'pdf', x: 0, y: 28, w: 1180, h: stageH - 28 }, patch: {} })
     // projects open full screen (below the menu bar), on laptop and phone
     if (it.project) return openWin('reader', { init: { app: 'reader', x: 0, y: 28, w: 1180, h: stageH - 28 }, patch: { project: it.project } })
   }
@@ -379,6 +395,8 @@ export function DesktopOS({ stageH }) {
       if (w.app === 'finder') return <Win {...common} className="win-finder" toolbar={<span className="mac-win-title"/>}>
         <Finder place={w.hist[w.hi]} onPlace={(p) => finderAt(p)} onOpen={open}
           onBack={() => w.hi > 0 && upd(w.key, { hi: w.hi - 1 })} onFwd={() => w.hi < w.hist.length - 1 && upd(w.key, { hi: w.hi + 1 })}/></Win>
+      if (w.app === 'pdf') return <Win {...common} className="win-preview win-full win-pdf" toolbar={<><span className="mac-win-title">{RESUME_NAME}</span>
+        <a className="pdf-dl" href={RESUME_DOWNLOAD} download={RESUME_NAME} title="Download PDF" aria-label="Download PDF">{ico(<><path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 20h14"/></>, 17, 2)}</a></>}><PdfPreview/></Win>
       if (w.app === 'projects') return <Win {...common} className="win-projects win-full" title="Projects"><ProjectsApp onOpen={(p) => open({ project: p })}/></Win>
       if (w.app === 'reader') return <Win {...common} className="win-reader win-full" title={w.project?.file}><Reader project={w.project} onBack={() => { close(w.key); open({ app: 'projects' }) }}/></Win>
       if (w.app === 'notes') return <Win {...common} className="win-notes win-full" title=""><Notes note={w.note || 'skills'} onNote={(n) => upd(w.key, { note: n })}/></Win>
