@@ -10,7 +10,7 @@ import { ACHIEVEMENTS } from './achievements'
 import { PHONE, BOOK, CAMERA_SCREEN, createOpenBook, createDigitalCamera, createTableLamp, createGlobe, createCertificateWall, createPolaroid, createModelAirplane, createPhone, createFloorPlant, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight, createFileFolder, createShihTzu, DOG_COATS, createDogBowl, createPlushDuck, FOLDER } from './props'
 import { createDesktopTexture, BEACH_PHOTO_URL } from './screens'
 
-const MODEL_URL = '/models/home-office.glb'
+const MODEL_URL = '/models/home-office.glb?v=3'
 const SPOT_RATIOS = [
   { x: .50, z: .16 }, // start at the far end of the room
   { x: .20, z: .94 }, // window-side corner
@@ -88,6 +88,10 @@ function createScene(canvas, handlers) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = .9
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  // Performance: the sun's shadow map is redrawn a few times a second (or every frame while something is
+  // being picked up), not on every frame
+  renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true
+  let pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5)
   const scene = new THREE.Scene(), dayColor = new THREE.Color('#9ec7e2'), nightColor = new THREE.Color('#050b18')
   scene.background = nightColor.clone(); scene.fog = new THREE.Fog(dayColor, 48, 120)
   const camera = new THREE.PerspectiveCamera(DEFAULT_FOV, 1, .08, 180); camera.rotation.order = 'YXZ'
@@ -105,6 +109,16 @@ function createScene(canvas, handlers) {
   const alwaysOnLights = []
   // Daytime-only fill (dayFillLights) and the shelf LED mood lights (moodLights): { light, max, glow?, glowMax }
   const dayFillLights = [], moodLights = []
+  // Disco mode (from the speaker): the room goes to night and the LED strips turn party colours.
+  // `disco` eases 0 → 1.
+  let discoOn = false, disco = 0
+  // coveLights: disco-only glowing strips along the top of the long walls, with a soft additive glow on
+  // the ceiling beside them (painted, not a real light, so it costs almost nothing to draw)
+  let lastMix = 0
+  const coveLights = []
+  const fillBase = fill.color.clone(), discoPurple = new THREE.Color('#3a3fd9'), discoTmp = new THREE.Color()
+  // a colour from the party palette: hue `h` (blue .64 · violet .74 · magenta .86) drifting a little over time
+  const discoHue = (t, off, h = .84, amp = .06) => discoTmp.setHSL(((h + amp * Math.sin(t * .35 + off)) % 1 + 1) % 1, 1, .55)
   let windowSun=null
   const loader = new GLTFLoader()
   const panoramaLoader = new THREE.TextureLoader()
@@ -340,7 +354,7 @@ function createScene(canvas, handlers) {
       filament.traverse((o) => { if (o.isMesh) o.material = bulb })
       const p = worldPos(filament)
       const lamp = new THREE.PointLight('#ffc983', 0, 3, 1.7); lamp.position.copy(p).add(new THREE.Vector3(0, -.06, 0)); scene.add(lamp)
-      alwaysOnLights.push({ light: lamp, day: 1.1, night: 1.8 })
+      alwaysOnLights.push({ light: lamp, day: 1.1, night: 1.8, glow: bulb, glowMax: 3 })
       const pool = new THREE.SpotLight('#ffcb88', 0, 2.2, .75, .7, 1.6); pool.position.copy(p).add(new THREE.Vector3(0, -.04, 0))
       pool.target.position.set(p.x, deskTopY, p.z); scene.add(pool); scene.add(pool.target)
       alwaysOnLights.push({ light: pool, day: 4, night: 3 })
@@ -385,7 +399,7 @@ function createScene(canvas, handlers) {
       const stripMat = new THREE.MeshStandardMaterial({ color: '#fff3dc', emissive: '#ffcf8f', emissiveIntensity: 0 })
       const strip = new THREE.Mesh(new THREE.BoxGeometry(Math.max(windowBox.max.x-windowBox.min.x, windowBox.max.z-windowBox.min.z)*.9, .015, .02), stripMat)
       strip.position.set(c.x+inward.x*.62, floorY+.47, c.z+inward.z*.62); strip.rotation.y = Math.atan2(inward.x, inward.z); scene.add(strip)
-      nightLights.push({ light: null, max: 0, glow: stripMat, glowMax: 2.2 })
+      nightLights.push({ light: null, max: 0, glow: stripMat, glowMax: 2.2, led: true }) // an LED strip: takes the RGB colours
       // Night light on the front of the window-seat base: a small brass-framed panel that is
       // visible (switched off) by day and at night throws a warm pool across the floor.
       // find the seat base's front face: cast from just in front of it (past the chair) toward the window
@@ -452,6 +466,32 @@ function createScene(canvas, handlers) {
       const area = new THREE.RectAreaLight('#ffd29a', 0, length, Math.abs(front - back) * .8)
       area.rotation.x = -Math.PI / 2; holder.add(area); scene.add(holder)
       moodLights.push({ light: area, max: 7, glow, glowMax: 2.6 })
+    }
+    // Disco: ceiling cove strips along both long walls (pink → orange), each with a glow painted on the ceiling
+    {
+      const rb = roomBounds, mid = rb.getCenter(new THREE.Vector3()), size = rb.getSize(new THREE.Vector3())
+      const long = size.z > size.x
+      const gc = document.createElement('canvas'); gc.width = 4; gc.height = 64
+      const gx = gc.getContext('2d'), grad = gx.createLinearGradient(0, 0, 0, 64)
+      grad.addColorStop(0, 'rgba(255,255,255,1)'); grad.addColorStop(.35, 'rgba(255,255,255,.45)'); grad.addColorStop(1, 'rgba(255,255,255,0)')
+      gx.fillStyle = grad; gx.fillRect(0, 0, 4, 64)
+      const glowTex = new THREE.CanvasTexture(gc)
+      ;[-1, 1].forEach((side, i) => {
+        const len = (long ? size.z : size.x) * .94, y = ceilingSurfaceY - .035
+        const mat = new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#ff4fd8', emissiveIntensity: 0, roughness: .5 })
+        const strip = new THREE.Mesh(new THREE.BoxGeometry(long ? .018 : len, .014, long ? len : .018), mat)
+        const edge = long ? (side < 0 ? rb.min.x + .07 : rb.max.x - .07) : (side < 0 ? rb.min.z + .07 : rb.max.z - .07)
+        if (long) strip.position.set(edge, y, mid.z); else strip.position.set(mid.x, y, edge)
+        strip.visible = false; scene.add(strip)
+        // the glow: a plane just under the ceiling, bright at the wall and fading into the room
+        const glowMat = new THREE.MeshBasicMaterial({ map: glowTex, color: '#ff4fd8', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })
+        const glowW = .9, plane = new THREE.Mesh(new THREE.PlaneGeometry(len, glowW), glowMat)
+        plane.rotation.x = Math.PI / 2 // face down
+        if (long) { plane.rotation.z = side < 0 ? -Math.PI / 2 : Math.PI / 2; plane.position.set(edge - side * glowW / 2, ceilingSurfaceY - .004, mid.z) }
+        else { plane.rotation.z = side < 0 ? Math.PI : 0; plane.position.set(mid.x, ceilingSurfaceY - .004, edge - side * glowW / 2) }
+        plane.visible = false; scene.add(plane)
+        coveLights.push({ strip, glow: mat, plane, glowMat, off: i * 2.4, h: i ? 1.0 : .9 })
+      })
     }
     // Fill both wall shelves with books and box files, around what's already on them
     // (storage boxes, book stacks, magazines) and stopping at the window wall.
@@ -1154,10 +1194,24 @@ function createScene(canvas, handlers) {
   // `light` eases toward `lightTarget` (set from the time of day); `night` is the eased darkness.
   let frame=0,last=performance.now(),uiTime=0,lightTarget=lightAt(nowHour),light={...lightTarget},progress=light.night,night=light.night
   const walkDirection=new THREE.Vector3()
+  // Frame pacing: at most 60 fps while something is happening (input in the last few seconds, the
+  // camera moving, disco), 30 fps when the room is just sitting there. High-refresh screens would
+  // otherwise draw 120 frames a second. If frames keep running slow, the resolution steps down a bit.
+  let lastInput=performance.now(), lastDraw=0, lastShadow=0, slowFrames=0
+  const poke=()=>{lastInput=performance.now()}
+  ;['pointermove','pointerdown','keydown','wheel','touchmove'].forEach((e)=>window.addEventListener(e,poke,{passive:true}))
   const tick=(now)=>{
+    const busy=now-lastInput<3000||travel||focus||hold||folder||keys.size||disco>.001||musicOn
+    if(now-lastDraw<(busy?1000/60:1000/30)-2){frame=requestAnimationFrame(tick);return}
+    const drawGap=now-lastDraw; lastDraw=now
+    if(busy&&drawGap<200){ slowFrames=drawGap>24?slowFrames+1:Math.max(0,slowFrames-1); if(slowFrames>90&&pixelRatio>1){pixelRatio=Math.max(1,pixelRatio-.25);renderer.setPixelRatio(pixelRatio);resize();slowFrames=0} }
+    if(hold||folder||now-lastShadow>250){renderer.shadowMap.needsUpdate=true;lastShadow=now}
     const dt=Math.min((now-last)/1000,.04);last=now;uiTime+=dt
     tickPets(dt)
-    light.night=THREE.MathUtils.damp(light.night,lightTarget.night,2.2,dt); light.warm=THREE.MathUtils.damp(light.warm,lightTarget.warm,2.2,dt)
+    // disco mode forces night; turning it off eases back to the time of day
+    const lt=discoOn?{night:1,warm:0}:lightTarget
+    light.night=THREE.MathUtils.damp(light.night,lt.night,2.2,dt); light.warm=THREE.MathUtils.damp(light.warm,lt.warm,2.2,dt)
+    disco+=((discoOn?1:0)-disco)*Math.min(1,dt*1.6); if(!discoOn&&disco<.002)disco=0
     progress=light.night
     night=progress*progress*(3-2*progress)
     const warm=light.warm
@@ -1173,6 +1227,29 @@ function createScene(canvas, handlers) {
     moodLights.forEach((entry)=>{const k=lerp(.12,1,lampsOn);entry.light.intensity=entry.max*k;entry.glow.emissiveIntensity=entry.glowMax*k})
     alwaysOnLights.forEach((entry)=>{entry.light.intensity=lerp(entry.day,entry.night,night)})
     nightLights.forEach((entry)=>{if(entry.light)entry.light.intensity=entry.max*lampsOn;if(entry.glow)entry.glow.emissiveIntensity=entry.glowMax*lampsOn})
+    // Disco: the LED strips take party colours and pulse with the song; the warm lights go off.
+    const mix=disco
+    if(mix>.001||lastMix>0){
+      lastMix=mix>.001?mix:0
+      const t=now/1000, beat=musicOn?.7+.6*Math.min(1,musicSm*1.6):.9+.1*Math.sin(t*1.6)
+      moodLights.forEach((entry,i)=>{
+        entry.base??=entry.light.color.clone(); entry.glowBase??=entry.glow.emissive.clone()
+        const c=discoHue(t,i*1.7,i%2?.6:.86,.05)
+        entry.light.color.copy(entry.base).lerp(c,mix); entry.glow.emissive.copy(entry.glowBase).lerp(c,mix)
+        entry.light.intensity=lerp(entry.light.intensity,entry.max*.9*beat,mix); entry.glow.emissiveIntensity=lerp(entry.glow.emissiveIntensity,3.6*beat,mix)
+      })
+      // RGB / disco: every warm light goes fully off (pendants, picture lights, the desk lamp)
+      const warmOff=Math.min(1,mix)
+      nightLights.forEach((entry)=>{
+        if(entry.light)entry.light.intensity*=1-warmOff
+        if(entry.glow&&!entry.led)entry.glow.emissiveIntensity*=1-warmOff
+        if(entry.glow&&entry.led){entry.glowBase??=entry.glow.emissive.clone();entry.glow.emissive.copy(entry.glowBase).lerp(discoTmp.set('#22c8ff'),mix);entry.glow.emissiveIntensity=lerp(entry.glow.emissiveIntensity,3.4,mix)}
+      })
+      coveLights.forEach((d)=>{const c=discoHue(t,d.off,d.h,.05),on=mix>.001;d.strip.visible=d.plane.visible=on;d.glow.emissive.copy(c);d.glow.emissiveIntensity=4*mix*beat;d.glowMat.color.copy(c);d.glowMat.opacity=.85*mix*beat})
+      alwaysOnLights.forEach((entry)=>{entry.light.intensity*=1-warmOff;if(entry.glow)entry.glow.emissiveIntensity=entry.glowMax*(1-warmOff)})
+      fill.color.copy(fillBase).lerp(discoPurple,mix*.8); fill.intensity=lerp(fill.intensity,.14,mix)
+      hemi.intensity*=1-.8*disco
+    }
     if(windowSun){windowSun.intensity=lerp(2.1,.22,night);windowSun.color.copy(sunDay).lerp(sunGold,warm).lerp(moonColor,night*(1-warm*.5))}
     if (groundMaterial) groundMaterial.color.setRGB(1-.62*night,1-.58*night,1-.5*night)
     const turn=Number(keys.has('arrowright'))-Number(keys.has('arrowleft')), forward=Number(keys.has('arrowup'))-Number(keys.has('arrowdown'))
@@ -1318,6 +1395,7 @@ function createScene(canvas, handlers) {
     phoneScreenRect(){ return this.focusRect('contact') },
     // the song card: how loud the preview is right now (0–1), and whether one is playing
     setMusic({level=0,playing=false}={}){ musicLevel=level; musicOn=playing },
+    setDisco(on){ discoOn=!!on },
     // phones: show the left (-1) or right (1) page of the open book
     setBookSide(side){ if(side===bookSide)return; bookSide=side; if(state.system&&focus?.to.id==='about'&&sideways())refocus(focusView('about'),null,true) },
     // achievements: open / step through / leave the certificates
@@ -1386,7 +1464,7 @@ function createScene(canvas, handlers) {
       return {left:x0,top:y0,width:x1-x0,height:y1-y0,bodyLeft:bx0,bodyRight:bx1,bodyTop:by0,bodyBottom:by1,rotated:sideways()}
     },
     goToSpot(index){if(!spots[index])return;const spot=nearestFree(spots[index].x,spots[index].z);state.x=spot.x;state.z=spot.z;const target=index===3?spots[0]:desk;state.yaw=target?Math.atan2(-(target.x-state.x),-(target.z-state.z)):-Math.PI/2;state.pitch=0},
-    dispose(){disposed=true;cancelAnimationFrame(frame);observer.disconnect();window.removeEventListener('keydown',onDown);window.removeEventListener('keyup',onUp);window.removeEventListener('blur',clearKeys);canvas.removeEventListener('pointerdown',pointerDown);canvas.removeEventListener('pointermove',pointerMove);canvas.removeEventListener('pointermove',hoverCert);canvas.removeEventListener('pointerup',pointerUp);canvas.removeEventListener('pointercancel',pointerUp);canvas.removeEventListener('wheel',onWheel);scene.traverse((object)=>{object.geometry?.dispose();if(Array.isArray(object.material))object.material.forEach((m)=>m.dispose());else object.material?.dispose()});groundMaterial?.map?.dispose();wallTexture.dispose();wallSource.dispose();floorTexture.dispose();cabinetTexture.dispose();doorTexture.dispose();desktopTexture.userData.dispose?.();desktopTexture.dispose();exteriorTexture.dispose();renderer.dispose()},
+    dispose(){disposed=true;cancelAnimationFrame(frame);['pointermove','pointerdown','keydown','wheel','touchmove'].forEach((e)=>window.removeEventListener(e,poke));observer.disconnect();window.removeEventListener('keydown',onDown);window.removeEventListener('keyup',onUp);window.removeEventListener('blur',clearKeys);canvas.removeEventListener('pointerdown',pointerDown);canvas.removeEventListener('pointermove',pointerMove);canvas.removeEventListener('pointermove',hoverCert);canvas.removeEventListener('pointerup',pointerUp);canvas.removeEventListener('pointercancel',pointerUp);canvas.removeEventListener('wheel',onWheel);scene.traverse((object)=>{object.geometry?.dispose();if(Array.isArray(object.material))object.material.forEach((m)=>m.dispose());else object.material?.dispose()});groundMaterial?.map?.dispose();wallTexture.dispose();wallSource.dispose();floorTexture.dispose();cabinetTexture.dispose();doorTexture.dispose();desktopTexture.userData.dispose?.();desktopTexture.dispose();exteriorTexture.dispose();renderer.dispose()},
   }
 }
 

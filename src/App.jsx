@@ -235,7 +235,9 @@ function AiButton({ compact, locked }) {
   </div>
 }
 
-function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interacting, onBack, locked }) {
+// a disco ball, for the speaker's party-lights button
+const DiscoIcon = ({ s = 18 }) => <svg viewBox="0 0 24 24" width={s} height={s} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5v17M5 7.5h14M5 16.5h14M8.4 4.3c-1.6 4.9-1.6 10.5 0 15.4M15.6 4.3c1.6 4.9 1.6 10.5 0 15.4"/></svg>
+function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interacting, onBack, locked, showDisco, disco, onDisco }) {
   const [panel, setPanel] = useState(null)
   const ref = useRef(null)
   useEffect(() => {
@@ -258,7 +260,10 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interact
   if (compact && !open) return <motion.div key="fabs" className="touch-fabs" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4 }}>
     <AnimatePresence>
       {interacting
-        ? <motion.button key="back" className="fab-action" onClick={onBack} initial={{ opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }}><Arrow dir="left"/> BACK TO ROOM</motion.button>
+        ? <motion.div key="back" className="fab-row" initial={{ opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }}>
+            {showDisco && <button className={`fab-disco${disco ? ' on' : ''}`} onClick={onDisco} aria-pressed={disco} aria-label={disco ? 'Turn off disco lights' : 'Turn on disco lights'}><DiscoIcon s={22}/></button>}
+            <button className="fab-action" onClick={onBack}><Arrow dir="left"/> BACK TO ROOM</button>
+          </motion.div>
         : here && <motion.button key="interact" className="fab-action" onClick={onOpen} initial={{ opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }}>INTERACT <Arrow/></motion.button>}
     </AnimatePresence>
     <AiButton compact locked={locked}/>
@@ -283,7 +288,8 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interact
         {compact
           ? <button className="bar-open is-close" onClick={() => { setPanel(null); setOpen(false) }} aria-label="Close menu"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg> CLOSE</button>
           : interacting
-          ? <button className="bar-open is-back" onClick={onBack} title="Back to the room"><Arrow dir="left"/> BACK TO ROOM</button>
+          ? <>{showDisco && <button className={`bar-open is-disco${disco ? ' on' : ''}`} onClick={onDisco} aria-pressed={disco} title={disco ? 'Turn off the disco lights' : 'Turn on the disco lights'}><DiscoIcon/> DISCO</button>}
+            <button className="bar-open is-back" onClick={onBack} title="Back to the room"><Arrow dir="left"/> BACK TO ROOM</button></>
           : <button className="bar-open" onClick={onOpen} disabled={!here} title={here ? (here.id === 'pets' ? 'Pet Rio & Bruno' : `Open ${here.opens.toLowerCase()}`) : locked ? 'Finish the walkthrough first' : 'Walk up to something first'}>INTERACT <Arrow/></button>}
       </div>
     </nav>
@@ -947,13 +953,10 @@ function useBarSpot() {
 // the place badge: gold for 1st, silver for 2nd, bronze for 3rd
 const placeTone = (place) => (/^1/.test(place) ? 'gold' : /^2/.test(place) ? 'silver' : /^3/.test(place) ? 'bronze' : 'gold')
 const MedalIcon = () => <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 3h8l-2.5 6h-3z"/><circle cx="12" cy="15" r="5.5"/><path d="m12 12.3.9 1.8 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2-1.45-1.4 2-.3z" fill="currentColor" stroke="none"/></svg>
-function CertDetails({ a, cue }) {
+function CertDetails({ a }) {
   return <>
     <div className="cert-head">
       <span className={`cert-place ${placeTone(a.place)}`}><MedalIcon/>{a.place}</span>
-      {/* phones: a nudge that there's more to read below, gone once they slide */}
-      <AnimatePresence>{cue && <motion.span key="cue" className="cert-scroll-cue" initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ delay: .5, duration: .3 }}>
-        <Arrow dir="up" size={13}/>Slide up to read more</motion.span>}</AnimatePresence>
     </div>
     <h3>{a.title}</h3>
     <p className="cert-meta">{a.event} · {a.date}</p>
@@ -966,18 +969,19 @@ function CertDetails({ a, cue }) {
   </>
 }
 
-// phone details box: the text scrolls inside; the slide cue shows while there's more below and nothing has been scrolled
-function CertScroll({ a }) {
+// phone details box: everything fits in one box with no scrolling. The text starts at full size and
+// steps down a little at a time until it fits the space between the certificate and the buttons.
+function CertFit({ a }) {
   const ref = useRef(null)
-  const [cue, setCue] = useState(false)
-  useEffect(() => {
+  const [fs, setFs] = useState(1)
+  useLayoutEffect(() => { setFs(1) }, [a])
+  useLayoutEffect(() => {
     const el = ref.current; if (!el) return
-    const check = () => setCue((c) => c === 'done' ? c : el.scrollHeight - el.clientHeight > 8)
-    check(); const t = setTimeout(check, 400)
-    return () => clearTimeout(t)
-  }, [a])
-  return <div className="cert-box-scroll" ref={ref} onScroll={(e) => { if (e.currentTarget.scrollTop > 6) setCue('done') }}>
-    <CertDetails a={a} cue={cue === true}/>
+    if (el.scrollHeight > el.clientHeight + 1 && fs > .62) setFs((f) => Math.round((f - .04) * 100) / 100)
+  })
+  useEffect(() => { const on = () => setFs(1); window.addEventListener('resize', on); return () => window.removeEventListener('resize', on) }, [])
+  return <div className="cert-box-fit" ref={ref} style={{ '--fs': fs }}>
+    <CertDetails a={a}/>
   </div>
 }
 
@@ -1003,6 +1007,17 @@ function AchievementsView({ certId, getRect, onNext, onBack }) {
   }, [getRect])
   const dock = useBarSpot()
   const [btnTop, setBtnTop] = useState(null)
+  // phones: the swipe cue goes away once they drag across the wall
+  const [dragged, setDragged] = useState(false)
+  useEffect(() => {
+    if (!phone || dragged) return undefined
+    let start = null
+    const down = (e) => { start = [e.clientX, e.clientY] }
+    const move = (e) => { if (start && Math.hypot(e.clientX - start[0], e.clientY - start[1]) > 12) setDragged(true) }
+    const up = () => { start = null }
+    window.addEventListener('pointerdown', down); window.addEventListener('pointermove', move); window.addEventListener('pointerup', up)
+    return () => { window.removeEventListener('pointerdown', down); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up) }
+  }, [phone, dragged])
   const a = ACHIEVEMENTS.find((x) => x.id === certId)
   const shown = a && rect && rect.id === certId ? a : null
   const nextStyle = dock ? (dock.mode === 'beside' ? { left: dock.right + 8, bottom: viewH() - dock.mid - 22 } : { right: viewW() - dock.right, bottom: viewH() - dock.top + 8 }) : undefined
@@ -1011,10 +1026,10 @@ function AchievementsView({ certId, getRect, onNext, onBack }) {
       {/* the same cue boxes as "Pinch to zoom" on the résumé; phones also get one for swiping along the wall */}
       {phone
         // phones: one box with two rows, like the cue at the desk corner
-        ? <motion.div className="look-cue cam-cue desk-cue is-touch" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .8, duration: .35 }}>
+        ? <AnimatePresence>{!dragged && <motion.div key="swipe-cue" className="look-cue cam-cue desk-cue is-touch" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0, transition: { delay: .8, duration: .35 } }} exit={{ opacity: 0, y: -6, transition: { duration: .25 } }}>
             <span className="dc-row on"><span className="cue-cam"><SwipeIcon/></span><span className="cue-text"><b>Swipe left to see the whole wall</b><small>Drag across to move along it</small></span></span>
             <span className="dc-row on"><span className="cue-cam">{CUES.achievements.icon}</span><span className="cue-text"><b>Tap a certificate to view it</b><small>See what each achievement was for</small></span></span>
-          </motion.div>
+          </motion.div>}</AnimatePresence>
         : <motion.div className="look-cue cam-cue achv-cue" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .8, duration: .35 }}>
             <span className="cue-cam">{CUES.achievements.icon}</span>
             <span className="cue-text"><b>Click a certificate to view it</b><small>See what each achievement was for</small></span>
@@ -1026,9 +1041,9 @@ function AchievementsView({ certId, getRect, onNext, onBack }) {
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .3 }}>
           {/* a soft blur over the room below the certificate (the frame itself stays sharp) */}
           <i className="cert-scrim-phone" aria-hidden="true" style={{ top: rect.frameBottom + 4 }}/>
-          {/* fixed in place, equal gaps above and below; its text scrolls inside it */}
+          {/* fixed in place, equal gaps above and below; the text sizes itself to fit */}
           <article className="cert-box fixed" style={{ top: rect.frameBottom + 16, bottom: viewH() - (btnTop ?? viewH() - 130) + 16 }}>
-            <CertScroll a={shown}/>
+            <CertFit a={shown}/>
           </article>
         </motion.div>
       // laptop: the certificate on the left, this card on the right
@@ -1119,12 +1134,13 @@ function MusicPanel({ onClose, onMusic }) {
   }, [onMusic])
   const song = SONGS[cur], missing = noPreview[song.id]
   const stop = (e) => e.stopPropagation()
+  const phone = isTouch()
   return <motion.div className="phone-overlay music-overlay" onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
     <motion.article ref={card} className="music-card" onClick={stop} initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 10, opacity: 0 }} transition={{ delay: .75, duration: .4, ease: [.2, .8, .2, 1] }}>
       <header><h3>On my speaker</h3><span className="music-sub">Songs on repeat</span></header>
       <p className="music-tag">The songs that keep me going.</p>
-      {/* now playing */}
-      <div className={`np${playing ? ' is-playing' : ''}`}>
+      {/* now playing (phones: it sits beside the buttons at the bottom instead) */}
+      {!phone && <div className={`np${playing ? ' is-playing' : ''}`}>
         <img src={song.art} alt="" width="64" height="64"/>
         <div className="np-text">
           <small>{missing ? 'No preview for this one' : loading ? 'Loading…' : playing ? 'Now playing' : 'Tap play to listen'}</small>
@@ -1135,7 +1151,7 @@ function MusicPanel({ onClose, onMusic }) {
           ? <a className="np-btn" href={`https://open.spotify.com/track/${song.id}`} target="_blank" rel="noreferrer" aria-label="Open in Spotify"><OutIcon/></a>
           : <button className="np-btn primary" onClick={() => playAt(cur)} aria-label={playing ? 'Pause' : 'Play'}>{playing ? <PauseIcon/> : <PlayIcon/>}</button>}
         <button className="np-btn" onClick={next} aria-label="Next song"><NextIcon/></button>
-      </div>
+      </div>}
       <ol className="music-list">{SONGS.map((s, i) => <li key={s.id}>
         <div className={`music-row${i === cur ? ' on' : ''}`} role="button" tabIndex={0} onClick={() => playAt(i)} onKeyDown={(e) => { if (e.key === 'Enter') playAt(i) }} aria-label={`Play ${s.title}`}>
           <span className="music-n">{i === cur && playing ? <Eq/> : i + 1}</span>
@@ -1145,6 +1161,18 @@ function MusicPanel({ onClose, onMusic }) {
         </div>
       </li>)}</ol>
     </motion.article>
+    {phone && <motion.div className={`np-dock${playing ? ' is-playing' : ''}`} onClick={stop} initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 8, opacity: 0 }} transition={{ delay: .85, duration: .35 }}>
+      <img src={song.art} alt="" width="38" height="38"/>
+      <div className="np-dock-text">
+        <small>{missing ? 'No preview' : loading ? 'Loading…' : playing ? 'Now playing' : 'Tap play'}</small>
+        <b>{song.title}</b>
+      </div>
+      {missing
+        ? <a className="np-btn" href={`https://open.spotify.com/track/${song.id}`} target="_blank" rel="noreferrer" aria-label="Open in Spotify"><OutIcon/></a>
+        : <button className="np-btn primary" onClick={() => playAt(cur)} aria-label={playing ? 'Pause' : 'Play'}>{playing ? <PauseIcon/> : <PlayIcon/>}</button>}
+      <button className="np-btn" onClick={next} aria-label="Next song"><NextIcon/></button>
+      <i className="np-dock-bar" style={{ width: `${prog * 100}%` }}/>
+    </motion.div>}
   </motion.div>
 }
 
@@ -1397,7 +1425,14 @@ export default function App() {
       : { walk: false, look: false, open: false })
   }, [tourStep, showExplore, introPhase, showCue])
   const onKey = (key, down) => window.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { key, bubbles: true }))
-  const closeSystem = () => sceneRef.current?.closeSystem()
+  // disco lights (at the speaker): on Back, the room returns to normal first, then the camera pans out
+  const [disco, setDisco] = useState(false)
+  useEffect(() => { sceneRef.current?.setDisco?.(disco) }, [disco])
+  useEffect(() => { if (!(systemOpen && systemApp === 'music')) setDisco(false) }, [systemOpen, systemApp])
+  const closeSystem = () => {
+    if (disco) { setDisco(false); window.setTimeout(() => sceneRef.current?.closeSystem(), 1300); return }
+    sceneRef.current?.closeSystem()
+  }
   const getPhoneRect = useCallback(() => sceneRef.current?.phoneScreenRect() ?? null, [])
   const getCameraRect = useCallback(() => sceneRef.current?.cameraScreenRect() ?? null, [])
   const setMusic = useCallback((m) => sceneRef.current?.setMusic?.(m), [])
@@ -1441,7 +1476,8 @@ export default function App() {
         {!isTouch() && <div className="ai-dock"><AiButton locked={tourStep !== 'done'}/></div>}
         <BottomBar hour={hour} auto={manualHour === null} onHour={setManualHour} onAuto={() => { setManualHour(null); setClockHour(systemHour()) }} hotspot={hotspot}
           onGo={(id) => { if (systemOpen) sceneRef.current?.switchTo(id); else sceneRef.current?.goTo(id) }} onOpen={() => sceneRef.current?.openSpot()}
-          interacting={systemOpen} onBack={closeSystem} locked={tourStep !== 'done'}/>
+          interacting={systemOpen} onBack={closeSystem} locked={tourStep !== 'done'}
+          showDisco={systemOpen && systemApp === 'music'} disco={disco} onDisco={() => setDisco((d) => !d)}/>
         {isTouch() && !systemOpen && <MobileControls onKey={onKey}/>}
       </>}
       <AnimatePresence>{showCue && introPhase === 'corner' && !systemOpen && <TourCue key={tourStep} step={tourStep} onDone={dismissCue}/>}</AnimatePresence>
