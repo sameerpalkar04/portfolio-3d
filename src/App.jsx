@@ -1065,6 +1065,20 @@ const PlayIcon = () => <svg viewBox="0 0 24 24" width="18" height="18" fill="cur
 const PauseIcon = () => <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>
 const NextIcon = () => <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M5 6.2v11.6a1 1 0 0 0 1.55.83L15 13v4.8a1 1 0 0 0 2 0V6.2a1 1 0 0 0-2 0V11L6.55 5.37A1 1 0 0 0 5 6.2z"/></svg>
 const OutIcon = () => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg>
+// a line of text that scrolls continuously (one direction, looping) when it's too long to fit
+// (artist names). Every long name uses the same timing, so they all move together.
+function ScrollText({ text }) {
+  const box = useRef(null), probe = useRef(null), [long, setLong] = useState(false)
+  useLayoutEffect(() => {
+    const measure = () => { const b = box.current, p = probe.current; if (b && p) setLong(p.scrollWidth > b.clientWidth + 2) }
+    measure(); const ro = new ResizeObserver(measure); if (box.current) ro.observe(box.current)
+    return () => ro.disconnect()
+  }, [text])
+  return <small ref={box} className={`scroll-text${long ? ' is-long' : ''}`}>
+    <span ref={probe} className="st-probe" aria-hidden={long}>{text}</span>
+    {long && <span className="st-track" aria-label={text}><span>{text}</span><span aria-hidden="true">{text}</span></span>}
+  </small>
+}
 // little equaliser bars beside the song that's playing (heights follow the music: --l0 … --l2 on the card)
 const Eq = () => <span className="eq" aria-hidden="true"><i/><i/><i/></span>
 
@@ -1098,7 +1112,8 @@ function MusicPanel({ onClose, onMusic }) {
     const on = (e, f) => a.addEventListener(e, f)
     on('play', () => setPlaying(true)); on('pause', () => setPlaying(false)); on('playing', () => setLoading(false))
     on('timeupdate', () => setProg(a.duration ? a.currentTime / a.duration : 0))
-    on('ended', () => playRef.current((curRef.current + 1) % SONGS.length))
+    // the song plays on repeat until another one is picked
+    on('ended', () => { a.currentTime = 0; a.play().catch(() => {}) })
     on('error', () => { setLoading(false); setPlaying(false); setNoPreview((m) => ({ ...m, [SONGS[curRef.current].id]: true })) })
     // levels → the equaliser bars and the speaker
     let raf = 0, lv = 0
@@ -1142,7 +1157,7 @@ function MusicPanel({ onClose, onMusic }) {
         <div className={`music-row${i === cur ? ' on' : ''}`} role="button" tabIndex={0} onClick={() => playAt(i)} onKeyDown={(e) => { if (e.key === 'Enter') playAt(i) }} aria-label={`Play ${s.title}`}>
           <span className="music-n">{i === cur && playing ? <Eq/> : i + 1}</span>
           <img src={s.art} alt={`${s.title} cover art`} loading="lazy" width="48" height="48"/>
-          <span className="music-text"><b>{s.title}</b><small>{s.by}</small></span>
+          <span className="music-text"><b>{s.title}</b><ScrollText text={s.by}/></span>
           <a className="music-go" href={s.href || `https://open.spotify.com/track/${s.id}`} target="_blank" rel="noreferrer" onClick={stop}>Spotify <OutIcon/></a>
         </div>
       </li>)}</ol>

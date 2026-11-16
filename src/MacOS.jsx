@@ -58,17 +58,18 @@ const OCI = {
   tags: ['Machine Learning', 'Transformers', 'RAG', 'Large Language Models'], image: '/certs/oci-ai-foundations.jpg', pdf: '/certs/oci-ai-foundations.pdf',
   link: 'https://catalog-education.oracle.com/ords/certview/sharebadge?id=7824262FBF3F3E095BB71DF852E083CA468D553B477E117F84ECCD06AE90EE76',
 }
+// the résumé PDF (the same file as in the room's Files), opens in Preview
+const RESUME_ITEM = { id: 'resume', name: RESUME_NAME, kind: 'PDF document', date: 'Today, 9:00 AM', size: '120 KB', icon: (s) => <MdIcon size={s} label="PDF" tone="#e5483b"/> }
 const DESKTOP = [
   { id: 'projects', name: 'Projects', kind: 'Application', app: 'projects', date: 'Today, 6:00 PM', icon: (s) => <ProjectsAppIcon size={s}/> },
   { id: 'certs', name: 'Certifications', kind: 'Note', date: 'Today, 5:58 PM', icon: (s) => <NoteIcon size={s}/> },
   { id: 'skills', name: 'Skills', kind: 'Note', date: 'Today, 5:55 PM', icon: (s) => <NoteIcon size={s}/> },
+  RESUME_ITEM,
 ]
-// the résumé PDF (the same file as in the room's Files), opens in Preview
-const RESUME_ITEM = { id: 'resume', name: RESUME_NAME, kind: 'PDF document', date: 'Today, 9:00 AM', size: '120 KB', icon: (s) => <MdIcon size={s} label="PDF" tone="#e5483b"/> }
 const PLACES = {
   desktop: { title: 'Desktop', items: DESKTOP },
-  documents: { title: 'Documents', items: [...DESKTOP, RESUME_ITEM] },
-  recents: { title: 'Recents', items: [RESUME_ITEM, ...DESKTOP.slice(1)] },
+  documents: { title: 'Documents', items: DESKTOP },
+  recents: { title: 'Recents', items: DESKTOP },
   projects: { title: 'Projects', items: PROJECTS.map((p) => ({ id: p.id, name: p.file, kind: 'Markdown document', date: p.date, size: p.size, project: p, icon: (sz) => <MdIcon size={sz}/> })) },
   downloads: { title: 'Downloads', items: [RESUME_ITEM] },
   applications: { title: 'Applications', items: [], apps: true },
