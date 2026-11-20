@@ -1093,7 +1093,7 @@ function createScene(canvas, handlers) {
   const enterSystem=()=>{
     if(state.hotspot?.id==='pets'&&!state.system){petDogs();return}
     if(!state.hotspot||state.system)return
-    state.system=true; keys.clear(); travel=null
+    state.system=true; keys.clear(); stick.x=stick.y=0; travel=null
     if(state.hotspot.id==='photos'){
       const obj=scene.getObjectByName('desk-camera')
       if(obj){ if(!obj.userData.rest)obj.userData.rest={pos:obj.position.clone(),quat:obj.quaternion.clone()}; hold={phase:'in',t:0,obj,from:{pos:obj.position.clone(),quat:obj.quaternion.clone(),fov:camera.fov},savedFov:camera.fov} }
@@ -1112,7 +1112,7 @@ function createScene(canvas, handlers) {
   let pendingGo=null, pendingOut=false
   // Walk to one of the explorable spots and face it.
   const goTo=(id)=>{
-    const spot=hotspots.find((h)=>h.id===id); if(!spot||state.system||state.allowWalk===false||state.allowOpen===false)return // not during the walkthrough
+    const spot=hotspots.find((h)=>h.id===id); if(!spot||state.system||state.allowWalk===false)return // not during the walkthrough
     const view=spot.view, yaw=Math.atan2(-(spot.pos.x-view.x),-(spot.pos.z-view.z))
     const eyeY=floorY+EYE_HEIGHT, pitch=THREE.MathUtils.clamp(Math.atan2(spot.pos.y-eyeY,Math.hypot(spot.pos.x-view.x,spot.pos.z-view.z)),-.75,.5)
     const dYaw=Math.atan2(Math.sin(yaw-state.yaw),Math.cos(yaw-state.yaw))
@@ -1128,7 +1128,7 @@ function createScene(canvas, handlers) {
     if(hold)hold={...hold,phase:'out',t:0,from:{pos:hold.obj.position.clone(),quat:hold.obj.quaternion.clone(),fov:camera.fov}}
     handlers.onSystem(false)
   }
-  const keys = new Set()
+  const keys = new Set(), stick = { x: 0, y: 0 }
   const onDown = (event) => {
     const key=event.key.toLowerCase()
     if (state.system && ['backspace','delete','escape'].includes(key)) { event.preventDefault(); exitSystem(); return }
@@ -1164,7 +1164,7 @@ function createScene(canvas, handlers) {
     tapRay.setFromCamera(tapNdc,camera)
     const hit=tapRay.intersectObjects(scene.children,true).find((h)=>h.object.isMesh&&visibleHit(h.object))
     if(!hit)return
-    if((spot.obj&&isPart(hit.object,spot.obj))||hit.point.distanceTo(spot.pos)<(spot.reach||.2))enterSystem()
+    if((spot.obj&&isPart(hit.object,spot.obj))||hit.point.distanceTo(spot.pos)<Math.max(spot.reach||.2,.5))enterSystem() // fingers are big: anything around the object counts
   }
   const pointerUp=(event)=>{
     const p=pointer; pointer=null
@@ -1201,7 +1201,7 @@ function createScene(canvas, handlers) {
   const poke=()=>{lastInput=performance.now()}
   ;['pointermove','pointerdown','keydown','wheel','touchmove'].forEach((e)=>window.addEventListener(e,poke,{passive:true}))
   const tick=(now)=>{
-    const busy=now-lastInput<3000||travel||focus||hold||folder||keys.size||disco>.001||musicOn
+    const busy=now-lastInput<3000||travel||focus||hold||folder||keys.size||stick.x||stick.y||disco>.001||musicOn
     if(now-lastDraw<(busy?1000/60:1000/30)-2){frame=requestAnimationFrame(tick);return}
     const drawGap=now-lastDraw; lastDraw=now
     if(busy&&drawGap<200){ slowFrames=drawGap>24?slowFrames+1:Math.max(0,slowFrames-1); if(slowFrames>90&&pixelRatio>1){pixelRatio=Math.max(1,pixelRatio-.25);renderer.setPixelRatio(pixelRatio);resize();slowFrames=0} }
@@ -1252,7 +1252,8 @@ function createScene(canvas, handlers) {
     }
     if(windowSun){windowSun.intensity=lerp(2.1,.22,night);windowSun.color.copy(sunDay).lerp(sunGold,warm).lerp(moonColor,night*(1-warm*.5))}
     if (groundMaterial) groundMaterial.color.setRGB(1-.62*night,1-.58*night,1-.5*night)
-    const turn=Number(keys.has('arrowright'))-Number(keys.has('arrowleft')), forward=Number(keys.has('arrowup'))-Number(keys.has('arrowdown'))
+    // keys, plus the phone's on-screen joystick (analog: a small push walks or turns slowly)
+    const turn=THREE.MathUtils.clamp(Number(keys.has('arrowright'))-Number(keys.has('arrowleft'))+stick.x,-1,1), forward=THREE.MathUtils.clamp(Number(keys.has('arrowup'))-Number(keys.has('arrowdown'))+stick.y,-1,1)
     if(turn&&!state.system)state.yaw-=turn*1.6*dt
     if(forward&&!state.system&&walkBounds){
       // forward = +1 walks ahead, -1 walks backwards.
@@ -1373,7 +1374,7 @@ function createScene(canvas, handlers) {
     switchTo(id){ if(!state.system){goTo(id);return} pendingGo=id; exitSystem(true) },
     openSpot(){ if(state.allowOpen!==false)enterSystem() },
     // first-visit walkthrough: which controls are live yet
-    setControls({walk=true,look=true,open=true}={}){ state.allowWalk=walk; state.allowLook=look; state.allowOpen=open; if(!walk)keys.clear() },
+    setControls({walk=true,look=true,open=true}={}){ state.allowWalk=walk; state.allowLook=look; state.allowOpen=open; if(!walk){keys.clear();stick.x=stick.y=0} },
     closeSystem(){ exitSystem() },
     // Where the phone's screen is on the page once the camera has settled over it (null until then).
     // Where the close-up surface (phone screen, book pages) is on the page once the camera has
@@ -1396,6 +1397,8 @@ function createScene(canvas, handlers) {
     // the song card: how loud the preview is right now (0–1), and whether one is playing
     setMusic({level=0,playing=false}={}){ musicLevel=level; musicOn=playing },
     setDisco(on){ discoOn=!!on },
+    // the phone joystick: x = turn (right +), y = walk (forward +), each -1…1
+    setStick(x,y){ if(state.system||state.allowWalk===false){stick.x=stick.y=0;return} stick.x=x; stick.y=y; if(x||y)travel=null },
     // phones: show the left (-1) or right (1) page of the open book
     setBookSide(side){ if(side===bookSide)return; bookSide=side; if(state.system&&focus?.to.id==='about'&&sideways())refocus(focusView('about'),null,true) },
     // achievements: open / step through / leave the certificates

@@ -138,12 +138,18 @@ function TimePanel({ hour, auto, onHour, onAuto }) {
   </div>
 }
 
-function HelpPanel() {
+function HelpPanel({ moveMode, onMoveMode }) {
   const touch = isTouch()
   return <div className="bar-panel help-panel" role="dialog" aria-label="Instructions">
+    {touch && onMoveMode && <div className="mode-switch"><h4>Controls</h4><div className="mood-seg">
+      <button className={moveMode === 'joystick' ? 'on' : ''} onClick={() => onMoveMode('joystick')}>Joystick</button>
+      <button className={moveMode === 'buttons' ? 'on' : ''} onClick={() => onMoveMode('buttons')}>Buttons</button>
+    </div></div>}
     <h4>Moving around</h4>
     {touch
-      ? <ul><li><span className="keys"><kbd><Arrow dir="up" size={12}/></kbd><kbd><Arrow dir="down" size={12}/></kbd></span>tap to walk forward / back</li><li><span className="keys"><kbd><Arrow dir="left" size={12}/></kbd><kbd><Arrow dir="right" size={12}/></kbd></span>tap to turn</li><li><span className="keys">drag</span>look around</li><li><span className="keys">pinch</span>zoom</li></ul>
+      ? moveMode === 'buttons'
+        ? <ul><li><span className="keys">tap</span>a place in the bar to go there</li><li><span className="keys">Personal</span>camera, speaker and the dogs</li><li><span className="keys">drag</span>look around</li><li><span className="keys">pinch</span>zoom</li></ul>
+        : <ul><li><span className="keys">joystick</span>push up / down to walk</li><li><span className="keys">joystick</span>push left / right to turn</li><li><span className="keys">drag</span>look around</li><li><span className="keys">pinch</span>zoom</li></ul>
       : <ul><li><span className="keys"><kbd><Arrow dir="up" size={12}/></kbd><kbd><Arrow dir="down" size={12}/></kbd></span>walk forward / back</li><li><span className="keys"><kbd><Arrow dir="left" size={12}/></kbd><kbd><Arrow dir="right" size={12}/></kbd></span>turn left / right</li><li><span className="keys">drag</span>look around</li><li><span className="keys">scroll</span>zoom in / out</li><li><span className="keys"><kbd>↵</kbd></span>open what you're facing</li><li><span className="keys"><kbd>⌫</kbd></span>close it again</li></ul>}
     <h4>Things to explore</h4>
     <ul className="explore">{ALL_SPOTS.map((s) => <li key={s.id}><b>{s.object}</b><span>{s.opens}</span></li>)}</ul>
@@ -211,7 +217,19 @@ function AiButton({ compact, locked }) {
 
 // a disco ball, for the speaker's party-lights button
 const DiscoIcon = ({ s = 18 }) => <svg viewBox="0 0 24 24" width={s} height={s} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5v17M5 7.5h14M5 16.5h14M8.4 4.3c-1.6 4.9-1.6 10.5 0 15.4M15.6 4.3c1.6 4.9 1.6 10.5 0 15.4"/></svg>
-function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interacting, onBack, locked, showDisco, disco, onDisco }) {
+// Phones in "buttons" mode: a menu of the fun corners (camera, speaker, the dogs)
+const FUN_SPOTS = [
+  { id: 'photos', label: 'Camera', sub: 'Through my lens', icon: <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg> },
+  { id: 'music', label: 'Speaker', sub: 'Songs on repeat', icon: <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><rect x="6" y="3" width="12" height="18" rx="2.5"/><circle cx="12" cy="14" r="3.2"/><circle cx="12" cy="7.5" r="1" fill="currentColor"/></svg> },
+  { id: 'pets', label: 'Rio & Bruno', sub: 'Pet them', icon: <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><circle cx="7" cy="9" r="2"/><circle cx="17" cy="9" r="2"/><circle cx="10" cy="5.5" r="1.8"/><circle cx="14" cy="5.5" r="1.8"/><path d="M12 11.5c-2.6 0-5 3-5 5.3 0 1.7 1.4 2.5 2.8 2.2 1-.2 1.4-.6 2.2-.6s1.2.4 2.2.6c1.4.3 2.8-.5 2.8-2.2 0-2.3-2.4-5.3-5-5.3z"/></svg> },
+]
+function FunPanel({ onGo }) {
+  return <div className="bar-panel fun-panel" role="dialog" aria-label="Fun stuff">
+    <h4>Off the clock</h4>
+    {FUN_SPOTS.map((f) => <button key={f.id} className="fun-row" onClick={() => onGo(f.id)}><span className="fun-ico">{f.icon}</span><span className="fun-text"><b>{f.label}</b><small>{f.sub}</small></span><Arrow size={14}/></button>)}
+  </div>
+}
+function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interacting, onBack, locked, spotsLocked = locked, showDisco, disco, onDisco, buttonsMode, moveMode, onMoveMode }) {
   const [panel, setPanel] = useState(null)
   const ref = useRef(null)
   useEffect(() => {
@@ -229,9 +247,12 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interact
   const compact = isTouch()
   const [open, setOpen] = useState(false)
   // phone: while the menu is open, the close-up controls (page / photo buttons, rotate cue) step aside
-  useEffect(() => { document.body.classList.toggle('menu-open', open); return () => document.body.classList.remove('menu-open') }, [open])
+  useEffect(() => { if (buttonsMode) setOpen(false) }, [buttonsMode]) // the buttons bar has no menu to stay open
+  useEffect(() => { document.body.classList.toggle('menu-open', open && !buttonsMode); return () => document.body.classList.remove('menu-open') }, [open, buttonsMode])
   useEffect(() => { if (interacting) setOpen(false) }, [interacting])
-  if (compact && !open) return <motion.div key="fabs" className="touch-fabs" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4 }}>
+  // phones in buttons mode: the full bar stays open in the room (close-ups keep the floating buttons)
+  const sheet = compact && (open || (buttonsMode && !interacting))
+  if (compact && !sheet) return <motion.div key="fabs" className="touch-fabs" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4 }}>
     <AnimatePresence>
       {interacting
         ? <motion.div key="back" className="fab-row" initial={{ opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }}>
@@ -241,25 +262,34 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interact
         : here && <motion.button key="interact" className="fab-action" onClick={onOpen} initial={{ opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }}>INTERACT <Arrow/></motion.button>}
     </AnimatePresence>
     <AiButton compact locked={locked}/>
-    <button className={`fab-menu${locked ? ' is-locked' : ''}`} disabled={locked} onClick={() => setOpen(true)} aria-label={locked ? 'Menu (available after the walkthrough)' : 'Open menu'}>
+    {!buttonsMode && <button className={`fab-menu${locked ? ' is-locked' : ''}`} disabled={locked} onClick={() => setOpen(true)} aria-label={locked ? 'Menu (available after the walkthrough)' : 'Open menu'}>
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-    </button>
+    </button>}
   </motion.div>
-  return <motion.div key="dock" ref={ref} className={`hud-dock${compact ? ' is-sheet' : ''}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .45, ease: [.2, .8, .2, 1] }}>
+  const keepOpen = compact && buttonsMode && !interacting
+  return <motion.div key="dock" ref={ref} className={`hud-dock${compact ? ' is-sheet' : ''}${keepOpen ? ' is-buttons' : ''}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .45, ease: [.2, .8, .2, 1] }}>
     {panel === 'time' && <TimePanel hour={hour} auto={auto} onHour={onHour} onAuto={onAuto}/>}
-    {panel === 'help' && <HelpPanel/>}
-    <nav className="bottom-bar" aria-label="Controls">
+    {panel === 'help' && <HelpPanel moveMode={moveMode} onMoveMode={(m) => { onMoveMode?.(m); setPanel(null) }}/>}
+    {panel === 'fun' && <FunPanel onGo={(id) => { setPanel(null); onGo(id) }}/>}
+    {/* buttons mode: INTERACT only appears above the bar when you're at something */}
+    <AnimatePresence>{keepOpen && here && <motion.button key="sheet-interact" className="fab-action sheet-interact" onClick={onOpen} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .2 }}>INTERACT <Arrow/></motion.button>}</AnimatePresence>
+    <nav className={`bottom-bar${keepOpen ? ' has-fun' : ''}`} aria-label="Controls">
       <div className="bar-section sec-time">
         <button className={`bar-icon ${isDark(hour) ? 'is-night' : 'is-day'}${panel === 'time' ? ' open' : ''}`} onClick={() => toggle('time')} aria-expanded={panel === 'time'} title="Time of day">{isDark(hour) ? <MoonIcon/> : <SunIcon/>}</button>
       </div>
+      {keepOpen && <div className="bar-section sec-fun">
+        <button className={`bar-btn fun-btn${panel === 'fun' ? ' on' : ''}`} onClick={() => toggle('fun')} disabled={spotsLocked} aria-expanded={panel === 'fun'} title="Camera, speaker and the dogs">Personal</button>
+      </div>}
       <div className="bar-section sec-help">
         <button className={`bar-btn${panel === 'help' ? ' on' : ''}`} onClick={() => toggle('help')} aria-expanded={panel === 'help'}>Instructions</button>
       </div>
       <div className="bar-section sec-spots" role="group" aria-label="Go to">
         <div className="bar-spots">
-          {SPOTS.map((s) => <button key={s.id} className={hotspot === s.id && !locked ? 'here' : ''} disabled={locked} onClick={() => { setPanel(null); setOpen(false); onGo(s.id) }} title={locked ? 'Finish the walkthrough first' : `Go to the ${s.object.toLowerCase()} · ${s.opens}`}>{s.object}</button>)}
+          {SPOTS.map((s) => <button key={s.id} className={hotspot === s.id && !locked ? 'here' : ''} disabled={spotsLocked} onClick={() => { setPanel(null); setOpen(false); onGo(s.id) }} title={spotsLocked ? 'Finish the walkthrough first' : `Go to the ${s.object.toLowerCase()} · ${s.opens}`}>{s.object}</button>)}
         </div>
-        {compact
+        {keepOpen
+          ? <div className="sheet-ai"><AiButton compact locked={locked}/></div>
+          : compact
           ? <button className="bar-open is-close" onClick={() => { setPanel(null); setOpen(false) }} aria-label="Close menu"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg> CLOSE</button>
           : interacting
           ? <>{showDisco && <button className={`bar-open is-disco${disco ? ' on' : ''}`} onClick={onDisco} aria-pressed={disco} title={disco ? 'Turn off the disco lights' : 'Turn on the disco lights'}><DiscoIcon/> DISCO</button>}
@@ -329,14 +359,16 @@ function ExploreCue({ onDismiss }) {
 
 // First-visit walkthrough: walk → look around → see what's in the room → start exploring.
 // Each step waits for the visitor to actually do it.
-function TourCue({ step, onDone }) {
-  const touch = isTouch()
+function TourCue({ step, onDone, moveMode }) {
+  const touch = isTouch(), buttons = touch && moveMode === 'buttons'
   useEffect(() => {
     if (step === 'walk') {
       let t = 0
       const onKey = (e) => { if (e.key.startsWith('Arrow') && !t) t = window.setTimeout(onDone, 700) }
-      window.addEventListener('keydown', onKey)
-      return () => { window.removeEventListener('keydown', onKey); window.clearTimeout(t) }
+      const onJoy = () => { if (!t) t = window.setTimeout(onDone, 900) }
+      const onSpot = () => { if (!t) t = window.setTimeout(onDone, 1600) }
+      window.addEventListener('keydown', onKey); window.addEventListener('joystick-move', onJoy); window.addEventListener('spot-go', onSpot)
+      return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('joystick-move', onJoy); window.removeEventListener('spot-go', onSpot); window.clearTimeout(t) }
     }
     if (step === 'look') {
       let down = null, moved = 0, done = false
@@ -352,8 +384,25 @@ function TourCue({ step, onDone }) {
   return <motion.div className={`look-cue tour-cue${touch ? ' is-touch' : ''}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .4 }}>
     <span className="tour-step">Step {n} of 3</span>
     {step === 'walk'
-      ? <><span className="cue-arrows"><i><Arrow dir="up" size={12}/></i><i><Arrow dir="left" size={12}/></i><i><Arrow dir="down" size={12}/></i><i><Arrow dir="right" size={12}/></i></span><b>{touch ? 'Tap the arrows to walk' : 'Use the arrow keys to walk'}</b><small>{touch ? 'Try it now: tap any arrow' : 'Try it now: press any arrow key'}</small></>
+      ? buttons
+        ? <><span className="cue-tap"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11"/><path d="M12 10.5v-1a1.5 1.5 0 0 1 3 0v1.5M15 11a1.5 1.5 0 0 1 3 0v3.5a6 6 0 0 1-6 6h-.6a5 5 0 0 1-4-2l-2.6-3.5a1.5 1.5 0 0 1 2.3-1.9L9 15"/></svg></span><b>Tap a place in the bar to go there</b><small>Try it now: tap Books, Computer…</small></>
+        : touch
+        ? <><span className="cue-joy"><i/></span><b>Use the joystick to walk</b><small>Try it now: drag the joystick</small></>
+        : <><span className="cue-arrows"><i><Arrow dir="up" size={12}/></i><i><Arrow dir="left" size={12}/></i><i><Arrow dir="down" size={12}/></i><i><Arrow dir="right" size={12}/></i></span><b>Use the arrow keys to walk</b><small>Try it now: press any arrow key</small></>
       : <>{touch ? <span className="cue-swipe"><svg viewBox="0 0 48 24" width="48" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 12h36M11 7l-5 5 5 5M37 7l5 5-5 5"/><circle cx="24" cy="12" r="4.5" fill="currentColor" stroke="none"/></svg></span> : <span className="cue-mouse"><i/></span>}<b>{touch ? 'Drag on the screen to look around' : 'Click and drag to look around'}</b><small>Try it now</small></>}
+  </motion.div>
+}
+
+// Phones, first thing: how do you want to get around — a joystick, or buttons that take you to each spot?
+function ModeChoice({ onPick }) {
+  return <motion.div className="look-cue mode-cue is-touch" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .4 }}>
+    <span className="tour-step">Before we start</span>
+    <b>How would you like to move around?</b>
+    <div className="mode-opts">
+      <button onClick={() => onPick('joystick')}><span className="mode-ico joy"><i/></span><b>Joystick</b><small>Walk around freely</small></button>
+      <button onClick={() => onPick('buttons')}><span className="mode-ico btns"><i/><i/><i/><i/></span><b>Buttons</b><small>Tap to go to each spot</small></button>
+    </div>
+    <small>You can change this later in Instructions</small>
   </motion.div>
 }
 
@@ -1359,16 +1408,31 @@ function CameraView({ onClose, getRect }) {
   </motion.div>
 }
 
-function MobileControls({ onKey }) {
-  const control = (key) => ({
-    onPointerDown: (event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); onKey(key, true) },
-    onPointerUp: () => onKey(key, false),
-    onPointerCancel: () => onKey(key, false),
-    onLostPointerCapture: () => onKey(key, false),
-  })
-  return <div className="mobile-controls" aria-label="Movement controls"><div className="dpad">
-    <button {...control('ArrowUp')} aria-label="Walk forward"><Arrow dir="up" size={26}/></button><button {...control('ArrowLeft')} aria-label="Turn left"><Arrow dir="left" size={26}/></button><button {...control('ArrowDown')} aria-label="Walk backward"><Arrow dir="down" size={26}/></button><button {...control('ArrowRight')} aria-label="Turn right"><Arrow dir="right" size={26}/></button>
-  </div></div>
+// Phones: an on-screen joystick. Push up/down to walk forward/back, left/right to turn; how far you push
+// sets the speed. Letting go springs the knob back to the middle.
+function Joystick({ onStick }) {
+  const base = useRef(null), [knob, setKnob] = useState({ x: 0, y: 0, active: false })
+  const R = 36 // how far the knob travels from the centre (px)
+  const move = (e) => {
+    const r = base.current.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2
+    let dx = e.clientX - cx, dy = e.clientY - cy; const d = Math.hypot(dx, dy)
+    if (d > R) { dx = dx / d * R; dy = dy / d * R }
+    setKnob({ x: dx, y: dy, active: true })
+    // a small dead zone in the middle, then a smooth ramp to full speed
+    const ease = (v) => { const a = Math.abs(v); return a < .18 ? 0 : Math.sign(v) * ((a - .18) / .82) ** 1.3 }
+    onStick(ease(dx / R), ease(-dy / R))
+    window.dispatchEvent(new CustomEvent('joystick-move'))
+  }
+  const end = () => { setKnob({ x: 0, y: 0, active: false }); onStick(0, 0) }
+  useEffect(() => () => onStick(0, 0), [onStick])
+  return <div className="joystick" aria-label="Movement joystick: drag to walk and turn">
+    <div ref={base} className={`joy-base${knob.active ? ' on' : ''}`}
+      onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); move(e) }}
+      onPointerMove={(e) => { if (knob.active) move(e) }} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end}>
+      <i className="joy-tri up"/><i className="joy-tri down"/><i className="joy-tri left"/><i className="joy-tri right"/>
+      <span className="joy-knob" style={{ transform: `translate(${knob.x}px, ${knob.y}px)`, transition: knob.active ? 'none' : 'transform .25s cubic-bezier(.2,.8,.2,1.2)' }}/>
+    </div>
+  </div>
 }
 
 export default function App() {
@@ -1411,6 +1475,10 @@ export default function App() {
   // after the look-around cue goes, the list of things to explore shows once
   const [showExplore, setShowExplore] = useState(false)
   const [tourStep, setTourStep] = useState('walk') // walk → look → (explore card) → done
+  // phones: 'joystick' (walk freely) or 'buttons' (the full bar stays open; tap a place to go there), picked
+  // at the start of the walkthrough (null until then)
+  const [moveMode, setMoveMode] = useState(null)
+  const touchUI = isTouch(), buttonsMode = touchUI && moveMode === 'buttons'
   const dismissCue = useCallback(() => {
     if (tourStep === 'walk') { setShowCue(false); window.setTimeout(() => { setTourStep('look'); setShowCue(true) }, 350); return }
     setShowCue(false); window.setTimeout(() => setShowExplore(true), 350)
@@ -1421,11 +1489,11 @@ export default function App() {
     const scene = sceneRef.current; if (!scene?.setControls) return
     // nothing works until the first cue is on screen (the name intro plays first)
     scene.setControls(tourStep === 'done' ? { walk: true, look: true, open: true }
-      : tourStep === 'walk' ? { walk: showCue && introPhase === 'corner', look: false, open: false }
+      : tourStep === 'walk' ? { walk: showCue && introPhase === 'corner' && (!touchUI || !!moveMode), look: false, open: false }
       : tourStep === 'look' && !showExplore ? { walk: false, look: true, open: false }
       : { walk: false, look: false, open: false })
-  }, [tourStep, showExplore, introPhase, showCue])
-  const onKey = (key, down) => window.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { key, bubbles: true }))
+  }, [tourStep, showExplore, introPhase, showCue, moveMode, touchUI])
+  const setStick = useCallback((x, y) => sceneRef.current?.setStick?.(x, y), [])
   // disco lights (at the speaker): on Back, the room returns to normal first, then the camera pans out
   const [disco, setDisco] = useState(false)
   useEffect(() => { sceneRef.current?.setDisco?.(disco) }, [disco])
@@ -1470,18 +1538,22 @@ export default function App() {
       : systemApp === 'resume'
       ? <ResumeView key="resume" onClose={closeSystem} getRect={getResumeRect} setInsets={setResumeInsets}/>
       : <SpotCard key={systemApp} app={systemApp} onClose={closeSystem}/>)}</AnimatePresence>
-    {!loading && <div className={`office-hud${systemOpen ? ' is-interacting' : ''}`}>
+    {!loading && <div className={`office-hud${systemOpen ? ' is-interacting' : ''}${buttonsMode ? ' is-buttons' : ''}`}>
       {introPhase !== 'hidden' && !systemOpen && <NameTag phase={introPhase}/>}
       {introPhase === 'corner' && <>
         {/* laptop: the AI assistant button sits at the far right, level with the bar (phones: beside the menu button) */}
         {!isTouch() && <div className="ai-dock"><AiButton locked={tourStep !== 'done'}/></div>}
         <BottomBar hour={hour} auto={manualHour === null} onHour={setManualHour} onAuto={() => { setManualHour(null); setClockHour(systemHour()) }} hotspot={hotspot}
-          onGo={(id) => { if (systemOpen) sceneRef.current?.switchTo(id); else sceneRef.current?.goTo(id) }} onOpen={() => sceneRef.current?.openSpot()}
+          onGo={(id) => { window.dispatchEvent(new CustomEvent('spot-go')); if (systemOpen) sceneRef.current?.switchTo(id); else sceneRef.current?.goTo(id) }} onOpen={() => sceneRef.current?.openSpot()}
           interacting={systemOpen} onBack={closeSystem} locked={tourStep !== 'done'}
+          spotsLocked={tourStep !== 'done' && !(buttonsMode && tourStep === 'walk' && showCue)}
+          buttonsMode={buttonsMode} moveMode={moveMode} onMoveMode={setMoveMode}
           showDisco={systemOpen && systemApp === 'music'} disco={disco} onDisco={() => setDisco((d) => !d)}/>
-        {isTouch() && !systemOpen && <MobileControls onKey={onKey}/>}
+        {touchUI && moveMode === 'joystick' && !systemOpen && <Joystick onStick={setStick}/>}
       </>}
-      <AnimatePresence>{showCue && introPhase === 'corner' && !systemOpen && <TourCue key={tourStep} step={tourStep} onDone={dismissCue}/>}</AnimatePresence>
+      <AnimatePresence>{showCue && introPhase === 'corner' && !systemOpen && (touchUI && !moveMode && tourStep === 'walk'
+        ? <ModeChoice key="mode" onPick={setMoveMode}/>
+        : <TourCue key={tourStep + (moveMode || '')} step={tourStep} onDone={dismissCue} moveMode={moveMode}/>)}</AnimatePresence>
       <AnimatePresence>{showExplore && introPhase === 'corner' && !systemOpen && <ExploreCue key="explore" onDismiss={dismissExplore}/>}</AnimatePresence>
       <AnimatePresence>{!showCue && !showExplore && tourStep === 'done' && introPhase === 'corner' && !systemOpen && (deskNear && (!hotspot || hotspot === 'projects' || hotspot === 'achievements')
         ? <DeskCue key="desk" hotspot={hotspot}/>
