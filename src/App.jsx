@@ -80,6 +80,16 @@ function NameTag({ phase }) {
 
 // Time of day: six named stops along one slider. The value 0…5 maps to an hour of the day.
 const PHASES = [['Sunrise', 6], ['Morning', 9], ['Afternoon', 14], ['Sunset', 18], ['Evening', 20.5], ['Night', 23.5]]
+// one small picture per time of day, in place of its name under the slider
+const PI = (d) => <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>
+const PHASE_ICONS = [
+  PI(<><path d="M3 19h18M7 19a5 5 0 0 1 10 0M12 4v5M9.5 6.5 12 4l2.5 2.5M4.6 13.6l1.4 1M19.4 13.6l-1.4 1"/></>), // sunrise
+  PI(<><circle cx="12" cy="12" r="3.5"/><path d="M12 4v2M12 18v2M4 12h2M18 12h2"/></>), // morning
+  PI(<><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></>), // afternoon
+  PI(<><path d="M3 19h18M7 19a5 5 0 0 1 10 0M12 9V4M9.5 6.5 12 9l2.5-2.5M4.6 13.6l1.4 1M19.4 13.6l-1.4 1"/></>), // sunset
+  PI(<><path d="M3 19h18M16.5 15.5A5.5 5.5 0 0 1 9 8a5.5 5.5 0 1 0 7.5 7.5z"/></>), // evening
+  PI(<><path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/><path d="M17 3.5v3M15.5 5h3M20.5 8.5v2M19.5 9.5h2"/></>), // night
+]
 const sliderToHour = (v) => { const i = Math.min(4, Math.floor(v)), t = v - i; return PHASES[i][1] + (PHASES[i + 1][1] - PHASES[i][1]) * t }
 const hourToSlider = (h) => {
   if (h < 6) h += 24
@@ -121,39 +131,48 @@ function TimeSlider({ value, onChange }) {
   </div>
 }
 
-function TimePanel({ hour, auto, onHour, onAuto }) {
+function TimePanel({ hour, auto, onHour, onAuto, children, label = 'Time of day' }) {
   const value = hourToSlider(hour)
   // in auto mode show the real system time, kept current
   const [now, setNow] = useState(() => new Date())
   useEffect(() => { const t = window.setInterval(() => setNow(new Date()), 5000); return () => window.clearInterval(t) }, [])
   const systemTime = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
   const phase = PHASES[Math.min(5, Math.round(value))][0]
-  return <div className="bar-panel time-panel" role="dialog" aria-label="Time of day">
+  return <div className={`bar-panel time-panel${children ? ' settings-panel' : ''}`} role="dialog" aria-label={label}>
+    {children && <h4>Time of day</h4>}
     <div className="panel-head"><b>{phase}</b><span>{auto ? `auto · ${systemTime}` : clock(hour)}</span></div>
     <div className="time-row">
-      <TimeSlider value={value} onChange={(v) => onHour(sliderToHour(v))}/>
+      <div className="time-col">
+        <TimeSlider value={value} onChange={(v) => onHour(sliderToHour(v))}/>
+        <div className="time-ticks">{PHASES.map(([name], i) => <button key={name} className={Math.round(value) === i ? 'on' : ''} onClick={() => onHour(PHASES[i][1])} style={{ left: `calc(17px + (100% - 34px) * ${i / 5})` }} title={name} aria-label={name}>{PHASE_ICONS[i]}</button>)}</div>
+      </div>
       <button className={`auto-btn${auto ? ' on' : ''}`} onClick={onAuto} aria-pressed={auto} title="Follow your clock">Auto</button>
     </div>
-    <div className="time-ticks">{PHASES.map(([name], i) => <button key={name} className={Math.round(value) === i ? 'on' : ''} onClick={() => onHour(PHASES[i][1])}>{name}</button>)}</div>
+    
+    {children}
   </div>
 }
 
-function HelpPanel({ moveMode, onMoveMode }) {
-  const touch = isTouch()
-  return <div className="bar-panel help-panel" role="dialog" aria-label="Instructions">
-    {touch && onMoveMode && <div className="mode-switch"><h4>Controls</h4><div className="mood-seg">
+function SettingsPanel({ moveMode, onMoveMode, ...time }) {
+  return <TimePanel {...time} label="Settings">
+    <div className="mode-switch"><h4>Controls</h4><div className="mood-seg">
       <button className={moveMode === 'joystick' ? 'on' : ''} onClick={() => onMoveMode('joystick')}>Joystick</button>
       <button className={moveMode === 'buttons' ? 'on' : ''} onClick={() => onMoveMode('buttons')}>Buttons</button>
-    </div></div>}
+    </div></div>
+  </TimePanel>
+}
+function HelpPanel({ moveMode }) {
+  const touch = isTouch()
+  return <div className="bar-panel help-panel" role="dialog" aria-label="Instructions">
     <h4>Moving around</h4>
     {touch
       ? moveMode === 'buttons'
-        ? <ul><li><span className="keys">tap</span>a place in the bar to go there</li><li><span className="keys">Personal</span>camera, speaker and the dogs</li><li><span className="keys">drag</span>look around</li><li><span className="keys">pinch</span>zoom</li></ul>
+        ? <ul><li><span className="keys">Work</span>books, computer, files and more</li><li><span className="keys">Life</span>camera, speaker and the dogs</li><li><span className="keys">drag</span>look around</li><li><span className="keys">pinch</span>zoom</li></ul>
         : <ul><li><span className="keys">joystick</span>push up / down to walk</li><li><span className="keys">joystick</span>push left / right to turn</li><li><span className="keys">drag</span>look around</li><li><span className="keys">pinch</span>zoom</li></ul>
-      : <ul><li><span className="keys"><kbd><Arrow dir="up" size={12}/></kbd><kbd><Arrow dir="down" size={12}/></kbd></span>walk forward / back</li><li><span className="keys"><kbd><Arrow dir="left" size={12}/></kbd><kbd><Arrow dir="right" size={12}/></kbd></span>turn left / right</li><li><span className="keys">drag</span>look around</li><li><span className="keys">scroll</span>zoom in / out</li><li><span className="keys"><kbd>↵</kbd></span>open what you're facing</li><li><span className="keys"><kbd>⌫</kbd></span>close it again</li></ul>}
+      : <ul><li><span className="keys"><kbd><Arrow dir="up" size={12}/></kbd><kbd><Arrow dir="down" size={12}/></kbd><em>or</em><kbd>W</kbd><kbd>S</kbd></span>walk forward / back</li><li><span className="keys"><kbd><Arrow dir="left" size={12}/></kbd><kbd><Arrow dir="right" size={12}/></kbd><em>or</em><kbd>A</kbd><kbd>D</kbd></span>turn left / right</li><li><span className="keys">drag</span>look around</li><li><span className="keys">scroll</span>zoom in / out</li><li><span className="keys"><kbd>↵</kbd></span>open what you're facing</li><li><span className="keys"><kbd>⌫</kbd></span>close it again</li></ul>}
     <h4>Things to explore</h4>
     <ul className="explore">{ALL_SPOTS.map((s) => <li key={s.id}><b>{s.object}</b><span>{s.opens}</span></li>)}</ul>
-    <p>Walk up to one of them, or use the shortcuts in the bar to go straight there.</p>
+    <p>{touch && moveMode === 'buttons' ? 'Open Work or Life and pick one to go straight there.' : 'Walk up to one of them, or use the shortcuts in the bar to go straight there.'}</p>
   </div>
 }
 
@@ -223,15 +242,40 @@ const FUN_SPOTS = [
   { id: 'music', label: 'Speaker', sub: 'Songs on repeat', icon: <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><rect x="6" y="3" width="12" height="18" rx="2.5"/><circle cx="12" cy="14" r="3.2"/><circle cx="12" cy="7.5" r="1" fill="currentColor"/></svg> },
   { id: 'pets', label: 'Rio & Bruno', sub: 'Pet them', icon: <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><circle cx="7" cy="9" r="2"/><circle cx="17" cy="9" r="2"/><circle cx="10" cy="5.5" r="1.8"/><circle cx="14" cy="5.5" r="1.8"/><path d="M12 11.5c-2.6 0-5 3-5 5.3 0 1.7 1.4 2.5 2.8 2.2 1-.2 1.4-.6 2.2-.6s1.2.4 2.2.6c1.4.3 2.8-.5 2.8-2.2 0-2.3-2.4-5.3-5-5.3z"/></svg> },
 ]
+const OB = (d) => <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{d}</svg>
+const OB_ICONS = {
+  settings: OB(<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></>),
+  work: OB(<><rect x="3.5" y="7" width="17" height="12.5" rx="2"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M3.5 12.5h17"/></>),
+  play: OB(<><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01"/></>),
+  help: OB(<><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17.2h.01"/></>),
+}
+// phones, buttons mode: every work spot in one list, opened from Places
+function PlacesPanel({ hotspot, onGo }) {
+  return <div className="bar-panel fun-panel" role="dialog" aria-label="Places">
+    <h4>Work</h4>
+    {SPOTS.map((s) => <button key={s.id} className={`fun-row${hotspot === s.id ? ' here' : ''}`} onClick={() => onGo(s.id)}><span className="fun-ico">{CUES[s.id]?.icon}</span><span className="fun-text"><b>{s.object}</b><small>{s.opens}</small></span>{hotspot === s.id ? <small className="fun-here">You’re here</small> : <Arrow size={14}/>}</button>)}
+  </div>
+}
 function FunPanel({ onGo }) {
   return <div className="bar-panel fun-panel" role="dialog" aria-label="Fun stuff">
     <h4>Off the clock</h4>
     {FUN_SPOTS.map((f) => <button key={f.id} className="fun-row" onClick={() => onGo(f.id)}><span className="fun-ico">{f.icon}</span><span className="fun-text"><b>{f.label}</b><small>{f.sub}</small></span><Arrow size={14}/></button>)}
   </div>
 }
-function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interacting, onBack, locked, spotsLocked = locked, showDisco, disco, onDisco, buttonsMode, moveMode, onMoveMode }) {
+const BAR_FOLD = 900 // px: below this the laptop bar folds the five shortcuts into Work (keeps clear of Nate)
+function BottomBar({ hour, auto, onHour, onAuto, hotspot: hotspotNow, onGo: goNow, onOpen, interacting, onBack, locked, spotsLocked = locked, workLocked = spotsLocked, playLocked = spotsLocked, teach, showDisco, disco, onDisco, buttonsMode, moveMode, onMoveMode }) {
+  // picking a place from the bar: until the camera gets there, the bar shows that place (not whatever
+  // the camera sweeps past on the way), so only the button you chose turns black
+  const [goingTo, setGoingTo] = useState(null)
+  useEffect(() => { if (!goingTo) return undefined; const t = window.setTimeout(() => setGoingTo(null), 2200); return () => window.clearTimeout(t) }, [goingTo])
+  const onGo = (id) => { setGoingTo(id); goNow(id) }
+  const hotspot = goingTo || hotspotNow
   const [panel, setPanel] = useState(null)
   const ref = useRef(null)
+  // laptop: on narrower windows the five shortcuts fold into one Work button so the bar stays on one row
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.innerWidth < BAR_FOLD)
+  useEffect(() => { const on = () => setNarrow(window.innerWidth < BAR_FOLD); window.addEventListener('resize', on); return () => window.removeEventListener('resize', on) }, [])
+  useEffect(() => { if (!narrow && panel === 'work') setPanel(null) }, [narrow, panel])
   useEffect(() => {
     if (!panel) return undefined
     const close = (e) => { if (!(ref.current?.contains(e.target) || e.target.closest?.('.hud-dock'))) setPanel(null) }
@@ -240,8 +284,12 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interact
     return () => { window.removeEventListener('pointerdown', close); window.removeEventListener('keydown', esc) }
   }, [panel])
   const toggle = (name) => setPanel((p) => (p === name ? null : name))
+  useEffect(() => { window.dispatchEvent(new CustomEvent('bar-panel', { detail: panel })) }, [panel])
+  // the walkthrough's shortcut demo opens and closes panels itself
+  useEffect(() => { const on = (e) => setPanel(e.detail); window.addEventListener('bar-demo', on); return () => window.removeEventListener('bar-demo', on) }, [])
+  useEffect(() => { const on = (e) => setOpen(e.detail); window.addEventListener('menu-demo', on); return () => window.removeEventListener('menu-demo', on) }, [])
   // during the first-visit walkthrough only Instructions and the appearance slider work
-  const here = locked ? null : ALL_SPOTS.find((s) => s.id === hotspot)
+  const here = locked || goingTo ? null : ALL_SPOTS.find((s) => s.id === hotspot)
   // Phones: the bar folds away into one menu button so the room gets the screen.
   // Only the action that matters right now (INTERACT / BACK TO ROOM) floats beside it.
   const compact = isTouch()
@@ -262,31 +310,54 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot, onGo, onOpen, interact
         : here && <motion.button key="interact" className="fab-action" onClick={onOpen} initial={{ opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }}>INTERACT <Arrow/></motion.button>}
     </AnimatePresence>
     <AiButton compact locked={locked}/>
-    {!buttonsMode && <button className={`fab-menu${locked ? ' is-locked' : ''}`} disabled={locked} onClick={() => setOpen(true)} aria-label={locked ? 'Menu (available after the walkthrough)' : 'Open menu'}>
+    {!buttonsMode && <button className={`fab-menu${spotsLocked ? ' is-locked' : ''}`} disabled={spotsLocked} onClick={() => setOpen(true)} aria-label={locked ? 'Menu (available after the walkthrough)' : 'Open menu'}>
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
     </button>}
   </motion.div>
   const keepOpen = compact && buttonsMode && !interacting
+  // phones in buttons mode: one tall row (icon over label) — time, places, personal, help — with Nate beside it
+  // which tab the place you're at belongs to (it stays black while you're there)
+  const atGroup = locked ? null : SPOTS.some((x) => x.id === hotspot) ? 'work' : FUN_SPOTS.some((x) => x.id === hotspot) ? 'play' : null
+  if (keepOpen) return <motion.div key="onebar" ref={ref} className="hud-dock is-sheet is-buttons is-onebar" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .45, ease: [.2, .8, .2, 1] }}>
+    {panel === 'settings' && <SettingsPanel hour={hour} auto={auto} onHour={onHour} onAuto={onAuto} moveMode={moveMode} onMoveMode={(m) => { onMoveMode?.(m); setPanel(null) }}/>}
+    {panel === 'help' && <HelpPanel moveMode={moveMode}/>}
+    {panel === 'work' && <PlacesPanel hotspot={locked ? null : hotspot} onGo={(id) => { setPanel(null); onGo(id) }}/>}
+    {panel === 'play' && <FunPanel onGo={(id) => { setPanel(null); onGo(id) }}/>}
+    <AnimatePresence>{here && !panel && <motion.button key="sheet-interact" className="fab-action sheet-interact" onClick={onOpen} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .2 }}>INTERACT <Arrow/></motion.button>}</AnimatePresence>
+    <div className="onebar">
+      <nav className="onebar-nav" aria-label="Controls">
+        {[['work', 'Work', workLocked], ['play', 'Life', playLocked], ['settings', 'Settings', false], ['help', 'Help', false]].map(([id, label, off]) =>
+          <button key={id} className={`ob-btn${panel === id || (!panel && atGroup === id) ? ' on' : ''}${teach === id ? ' teach' : ''}`} onClick={() => toggle(id)} disabled={off} aria-expanded={panel === id}><span className="ob-ico">{OB_ICONS[id]}</span>{label}</button>)}
+      </nav>
+      <div className="ob-nate"><AiButton compact locked={locked}/></div>
+    </div>
+  </motion.div>
   return <motion.div key="dock" ref={ref} className={`hud-dock${compact ? ' is-sheet' : ''}${keepOpen ? ' is-buttons' : ''}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .45, ease: [.2, .8, .2, 1] }}>
-    {panel === 'time' && <TimePanel hour={hour} auto={auto} onHour={onHour} onAuto={onAuto}/>}
-    {panel === 'help' && <HelpPanel moveMode={moveMode} onMoveMode={(m) => { onMoveMode?.(m); setPanel(null) }}/>}
-    {panel === 'fun' && <FunPanel onGo={(id) => { setPanel(null); onGo(id) }}/>}
+    {panel === 'time' && (compact ? <SettingsPanel hour={hour} auto={auto} onHour={onHour} onAuto={onAuto} moveMode={moveMode} onMoveMode={(m) => { onMoveMode?.(m); setPanel(null) }}/> : <TimePanel hour={hour} auto={auto} onHour={onHour} onAuto={onAuto}/>)}
+    {panel === 'help' && <HelpPanel moveMode={moveMode}/>}
+    {panel === 'fun' && <FunPanel onGo={(id) => { setPanel(null); setOpen(false); onGo(id) }}/>}
+    {panel === 'work' && <PlacesPanel hotspot={locked ? null : hotspot} onGo={(id) => { setPanel(null); setOpen(false); onGo(id) }}/>}
     {/* buttons mode: INTERACT only appears above the bar when you're at something */}
     <AnimatePresence>{keepOpen && here && <motion.button key="sheet-interact" className="fab-action sheet-interact" onClick={onOpen} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .2 }}>INTERACT <Arrow/></motion.button>}</AnimatePresence>
     <nav className={`bottom-bar${keepOpen ? ' has-fun' : ''}`} aria-label="Controls">
       <div className="bar-section sec-time">
-        <button className={`bar-icon ${isDark(hour) ? 'is-night' : 'is-day'}${panel === 'time' ? ' open' : ''}`} onClick={() => toggle('time')} aria-expanded={panel === 'time'} title="Time of day">{isDark(hour) ? <MoonIcon/> : <SunIcon/>}</button>
+        {compact
+          ? <button className={`bar-btn settings-btn${panel === 'time' ? ' on' : ''}`} onClick={() => toggle('time')} aria-expanded={panel === 'time'} aria-label="Settings" title="Settings">{OB_ICONS.settings}</button>
+          : <button className={`bar-icon ${isDark(hour) ? 'is-night' : 'is-day'}${panel === 'time' ? ' open' : ''}`} onClick={() => toggle('time')} aria-expanded={panel === 'time'} title="Time of day">{isDark(hour) ? <MoonIcon/> : <SunIcon/>}</button>}
       </div>
-      {keepOpen && <div className="bar-section sec-fun">
-        <button className={`bar-btn fun-btn${panel === 'fun' ? ' on' : ''}`} onClick={() => toggle('fun')} disabled={spotsLocked} aria-expanded={panel === 'fun'} title="Camera, speaker and the dogs">Personal</button>
-      </div>}
       <div className="bar-section sec-help">
         <button className={`bar-btn${panel === 'help' ? ' on' : ''}`} onClick={() => toggle('help')} aria-expanded={panel === 'help'}>Instructions</button>
       </div>
+      {(!compact || !buttonsMode) && <div className="bar-section sec-fun">
+        <button className={`bar-btn fun-btn${panel === 'fun' ? ' on' : ''}`} onClick={() => toggle('fun')} disabled={spotsLocked} aria-expanded={panel === 'fun'} title={spotsLocked ? 'Finish the walkthrough first' : 'Camera, speaker and the dogs'}>Life</button>
+      </div>}
+      {!compact && narrow && <div className="bar-section sec-work">
+        <button className={`bar-btn fun-btn${panel === 'work' ? ' on' : ''}`} onClick={() => toggle('work')} disabled={spotsLocked} aria-expanded={panel === 'work'} title={spotsLocked ? 'Finish the walkthrough first' : 'Books, computer, achievements, files and phone'}>Work</button>
+      </div>}
       <div className="bar-section sec-spots" role="group" aria-label="Go to">
-        <div className="bar-spots">
+        {!(narrow && !compact) && <div className="bar-spots">
           {SPOTS.map((s) => <button key={s.id} className={hotspot === s.id && !locked ? 'here' : ''} disabled={spotsLocked} onClick={() => { setPanel(null); setOpen(false); onGo(s.id) }} title={spotsLocked ? 'Finish the walkthrough first' : `Go to the ${s.object.toLowerCase()} · ${s.opens}`}>{s.object}</button>)}
-        </div>
+        </div>}
         {keepOpen
           ? <div className="sheet-ai"><AiButton compact locked={locked}/></div>
           : compact
@@ -343,11 +414,69 @@ function SpotCue({ id }) {
   </motion.div>
 }
 
+// Laptop walkthrough, step 3: a pointer shows the bar at work (~9 s) — Life opens its menu, a place
+// shortcut walks you there — then the camera glides back to where the walkthrough started.
+const DemoPointer = () => <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M5 3l14 8.5-6.2 1.4L9.6 19z" fill="#1d1f22" stroke="#fff" strokeWidth="1.6" strokeLinejoin="round"/></svg>
+const DEMO_PACE = 1 // the timeline below is already ~9 s; raise to stretch it further
+function BarDemo({ sceneRef, startPose, onDone }) {
+  const [ptr, setPtr] = useState(null) // {x, y, click}
+  const touch = isTouch()
+  useEffect(() => {
+    let alive = true; const timers = []
+    const at = (ms, fn) => timers.push(window.setTimeout(() => { if (alive) fn() }, ms * DEMO_PACE))
+    const centre = (sel) => { const el = document.querySelector(sel); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left + r.width * .55, y: r.top + r.height * .6 } }
+    const moveTo = (sel) => { const c = centre(sel); if (c) setPtr({ ...c, click: false }) }
+    const click = () => setPtr((p) => p && { ...p, click: true })
+    const panel = (name) => window.dispatchEvent(new CustomEvent('bar-demo', { detail: name }))
+    setPtr({ x: window.innerWidth / 2, y: window.innerHeight * .62, click: false })
+    if (touch) { // phones (joystick): tap the menu, it opens to show the shortcuts, tap CLOSE (~5.5 s, slow glides)
+      const menu = (v) => window.dispatchEvent(new CustomEvent('menu-demo', { detail: v }))
+      at(150, () => moveTo('.fab-menu'))
+      at(1350, click); at(1500, () => menu(true))
+      at(2300, () => moveTo('.bar-spots'))
+      at(3500, () => moveTo('.bar-open.is-close'))
+      at(4650, click); at(4800, () => menu(false))
+      at(5050, () => setPtr(null))
+      at(5600, onDone)
+      return () => { alive = false; timers.forEach(window.clearTimeout); menu(false) }
+    }
+    const folded = !document.querySelector('.bar-spots button')
+    at(200, () => moveTo('.sec-fun .bar-btn'))
+    at(1300, click)
+    at(1450, () => panel('fun'))
+    at(2900, () => panel(null))
+    let t
+    if (folded) { // narrow window: the places live under Work
+      at(3100, () => moveTo('.sec-work .bar-btn'))
+      at(4200, click); at(4350, () => panel('work'))
+      at(4700, () => moveTo('.fun-row'))
+      at(5800, click); t = 5950
+    } else {
+      at(3100, () => moveTo('.bar-spots button'))
+      at(4200, click); t = 4350
+    }
+    at(t, () => { panel(null); sceneRef.current?.demoGo?.('about', 2) })
+    at(t + 500, () => setPtr(null))
+    at(t + 2500, () => sceneRef.current?.goPose?.(startPose, 2))
+    at(t + 4800, onDone)
+    return () => { alive = false; timers.forEach(window.clearTimeout); panel(null) }
+  }, [sceneRef, startPose, onDone, touch])
+  return <>
+    <motion.div className={`look-cue tour-cue demo-cue${touch ? ' is-touch' : ''}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .4 }}>
+      <span className="tour-step">Step 3 of 4</span>
+      {touch
+        ? <><b>Quick access is in the menu</b><small>Tap ☰ for every spot, Life, settings and help</small></>
+        : <><b>The bar takes you anywhere</b><small>Life opens the camera, speaker and dogs · the others walk you straight there</small></>}
+    </motion.div>
+    <AnimatePresence>{ptr && <motion.div key="ptr" className="demo-pointer" initial={{ opacity: 0, x: ptr.x, y: ptr.y }} animate={{ opacity: 1, x: ptr.x, y: ptr.y, scale: ptr.click ? .82 : 1 }} exit={{ opacity: 0 }} transition={{ x: { duration: 1.05, ease: [.45, 0, .2, 1] }, y: { duration: 1.05, ease: [.45, 0, .2, 1] }, scale: { duration: .22, ease: 'easeOut' }, opacity: { duration: .35 } }}>{touch ? <span className="demo-tap"/> : <DemoPointer/>}</motion.div>}</AnimatePresence>
+  </>
+}
+
 // Shown once at the start, after the look-around cue: what there is to find in the room.
-function ExploreCue({ onDismiss }) {
+function ExploreCue({ onDismiss, total = 3 }) {
   const touch = isTouch()
   return <motion.div className={`look-cue explore-cue${touch ? ' is-touch' : ''}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .4 }}>
-    <span className="tour-step">Step 3 of 3</span>
+    <span className="tour-step">Step {total} of {total}</span>
     <b>Things to explore</b>
     <ul className="explore-rows">{ALL_SPOTS.map((s) => <li key={s.id}><span className="cue-cam">{CUES[s.id]?.icon}</span><span className="ex-name">{s.object}</span><small>{s.opens}</small></li>)}
       <li key="ai"><span className="cue-cam ex-ai"><AiIcon size={18}/></span><span className="ex-name">Ask Nate</span><small>AI assistant · soon</small></li>
@@ -361,10 +490,23 @@ function ExploreCue({ onDismiss }) {
 // Each step waits for the visitor to actually do it.
 function TourCue({ step, onDone, moveMode }) {
   const touch = isTouch(), buttons = touch && moveMode === 'buttons'
+  // phones, buttons mode, once the menu being taught opens: 'ask' (tap Work) fades 'out', then ~1 s later
+  // 'close' (tap again to close it) fades in
+  const [phase, setPhase] = useState('ask'), menuOpen = phase === 'close'
   useEffect(() => {
+    if (buttons && (step === 'walk' || step === 'play')) {
+      const want = step === 'walk' ? 'work' : 'play'; let seen = false, t = 0
+      let swap = 0
+      const onPanel = (e) => {
+        if (e.detail === want) { seen = true; setPhase('out'); window.clearTimeout(swap); swap = window.setTimeout(() => setPhase((p) => (p === 'out' ? 'close' : p)), 1000) }
+        else if (!e.detail && seen && !t) { window.clearTimeout(swap); setPhase('out'); t = window.setTimeout(onDone, 300) }
+      }
+      window.addEventListener('bar-panel', onPanel)
+      return () => { window.removeEventListener('bar-panel', onPanel); window.clearTimeout(t); window.clearTimeout(swap) }
+    }
     if (step === 'walk') {
       let t = 0
-      const onKey = (e) => { if (e.key.startsWith('Arrow') && !t) t = window.setTimeout(onDone, 700) }
+      const onKey = (e) => { if ((e.key.startsWith('Arrow') || (/^[wasd]$/i.test(e.key) && !e.target?.closest?.('input,textarea'))) && !t) t = window.setTimeout(onDone, 700) }
       const onJoy = () => { if (!t) t = window.setTimeout(onDone, 900) }
       const onSpot = () => { if (!t) t = window.setTimeout(onDone, 1600) }
       window.addEventListener('keydown', onKey); window.addEventListener('joystick-move', onJoy); window.addEventListener('spot-go', onSpot)
@@ -379,16 +521,20 @@ function TourCue({ step, onDone, moveMode }) {
       return () => { window.removeEventListener('pointerdown', onDown); window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp) }
     }
     return undefined
-  }, [step, onDone])
-  const n = step === 'walk' ? 1 : 2
-  return <motion.div className={`look-cue tour-cue${touch ? ' is-touch' : ''}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .4 }}>
-    <span className="tour-step">Step {n} of 3</span>
-    {step === 'walk'
+  }, [step, onDone, buttons])
+  const n = step === 'walk' ? 1 : step === 'play' ? 2 : buttons ? 3 : 2
+  return <motion.div className={`look-cue tour-cue${touch ? ' is-touch' : ''}${phase !== 'ask' ? ' is-open' : ''}`} initial={{ opacity: 0, y: 10 }} animate={phase === 'out' ? { opacity: 0, y: 6 } : { opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .4, ease: 'easeOut' }}>
+    <span className="tour-step">Step {n} of 4</span>
+    {menuOpen
+      ? <><span className="cue-tap">{OB_ICONS[step === 'walk' ? 'work' : 'play']}</span><b>Tap {step === 'walk' ? 'Work' : 'Life'} again to close it</b><small>Or pick one and you’ll walk straight there</small></>
+      : step === 'play'
+      ? <><span className="cue-tap">{OB_ICONS.play}</span><b>Now tap Life</b><small>The camera, the speaker and my dogs</small></>
+      : step === 'walk'
       ? buttons
-        ? <><span className="cue-tap"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11"/><path d="M12 10.5v-1a1.5 1.5 0 0 1 3 0v1.5M15 11a1.5 1.5 0 0 1 3 0v3.5a6 6 0 0 1-6 6h-.6a5 5 0 0 1-4-2l-2.6-3.5a1.5 1.5 0 0 1 2.3-1.9L9 15"/></svg></span><b>Tap a place in the bar to go there</b><small>Try it now: tap Books, Computer…</small></>
+        ? <><span className="cue-tap">{OB_ICONS.work}</span><b>Tap Work below</b><small>Books, computer, files and more · pick one to go there</small></>
         : touch
         ? <><span className="cue-joy"><i/></span><b>Use the joystick to walk</b><small>Try it now: drag the joystick</small></>
-        : <><span className="cue-arrows"><i><Arrow dir="up" size={12}/></i><i><Arrow dir="left" size={12}/></i><i><Arrow dir="down" size={12}/></i><i><Arrow dir="right" size={12}/></i></span><b>Use the arrow keys to walk</b><small>Try it now: press any arrow key</small></>
+        : <><span className="cue-keys"><span className="cue-arrows"><i><Arrow dir="up" size={12}/></i><i><Arrow dir="left" size={12}/></i><i><Arrow dir="down" size={12}/></i><i><Arrow dir="right" size={12}/></i></span><span className="cue-or">or</span><span className="cue-arrows cue-wasd"><i>W</i><i>A</i><i>S</i><i>D</i></span></span><b>Use the arrow keys or WASD to walk</b><small>Try it now: press any of them</small></>
       : <>{touch ? <span className="cue-swipe"><svg viewBox="0 0 48 24" width="48" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 12h36M11 7l-5 5 5 5M37 7l5 5-5 5"/><circle cx="24" cy="12" r="4.5" fill="currentColor" stroke="none"/></svg></span> : <span className="cue-mouse"><i/></span>}<b>{touch ? 'Drag on the screen to look around' : 'Click and drag to look around'}</b><small>Try it now</small></>}
   </motion.div>
 }
@@ -396,13 +542,11 @@ function TourCue({ step, onDone, moveMode }) {
 // Phones, first thing: how do you want to get around — a joystick, or buttons that take you to each spot?
 function ModeChoice({ onPick }) {
   return <motion.div className="look-cue mode-cue is-touch" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .4 }}>
-    <span className="tour-step">Before we start</span>
     <b>How would you like to move around?</b>
     <div className="mode-opts">
       <button onClick={() => onPick('joystick')}><span className="mode-ico joy"><i/></span><b>Joystick</b><small>Walk around freely</small></button>
       <button onClick={() => onPick('buttons')}><span className="mode-ico btns"><i/><i/><i/><i/></span><b>Buttons</b><small>Tap to go to each spot</small></button>
     </div>
-    <small>You can change this later in Instructions</small>
   </motion.div>
 }
 
@@ -1480,9 +1624,13 @@ export default function App() {
   const [moveMode, setMoveMode] = useState(null)
   const touchUI = isTouch(), buttonsMode = touchUI && moveMode === 'buttons'
   const dismissCue = useCallback(() => {
-    if (tourStep === 'walk') { setShowCue(false); window.setTimeout(() => { setTourStep('look'); setShowCue(true) }, 350); return }
+    if (tourStep === 'walk' || tourStep === 'play') { const next = tourStep === 'walk' && buttonsMode ? 'play' : 'look'; setShowCue(false); window.setTimeout(() => { setTourStep(next); setShowCue(true) }, 350); return }
+    if (tourStep === 'look' && (!touchUI || moveMode === 'joystick')) { setShowCue(false); window.setTimeout(() => { setTourStep('demo'); setShowCue(true) }, 350); return }
     setShowCue(false); window.setTimeout(() => setShowExplore(true), 350)
-  }, [tourStep])
+  }, [tourStep, buttonsMode, touchUI, moveMode])
+  // where the walkthrough starts; the laptop demo glides back here
+  const startPose = useRef(null)
+  useEffect(() => { if (tourStep === 'walk' && showCue && introPhase === 'corner' && !startPose.current) startPose.current = sceneRef.current?.getPose?.() || null }, [tourStep, showCue, introPhase])
   const dismissExplore = useCallback(() => { setShowExplore(false); setTourStep('done') }, [])
   // only the control being taught is live; after "Start exploring" everything is
   useEffect(() => {
@@ -1490,9 +1638,10 @@ export default function App() {
     // nothing works until the first cue is on screen (the name intro plays first)
     scene.setControls(tourStep === 'done' ? { walk: true, look: true, open: true }
       : tourStep === 'walk' ? { walk: showCue && introPhase === 'corner' && (!touchUI || !!moveMode), look: false, open: false }
-      : tourStep === 'look' && !showExplore ? { walk: false, look: true, open: false }
+      : tourStep === 'play' ? { walk: true, look: false, open: false }
+      : tourStep === 'look' && !showExplore ? { walk: buttonsMode, look: true, open: false }
       : { walk: false, look: false, open: false })
-  }, [tourStep, showExplore, introPhase, showCue, moveMode, touchUI])
+  }, [tourStep, showExplore, introPhase, showCue, moveMode, touchUI, buttonsMode])
   const setStick = useCallback((x, y) => sceneRef.current?.setStick?.(x, y), [])
   // disco lights (at the speaker): on Back, the room returns to normal first, then the camera pans out
   const [disco, setDisco] = useState(false)
@@ -1538,7 +1687,7 @@ export default function App() {
       : systemApp === 'resume'
       ? <ResumeView key="resume" onClose={closeSystem} getRect={getResumeRect} setInsets={setResumeInsets}/>
       : <SpotCard key={systemApp} app={systemApp} onClose={closeSystem}/>)}</AnimatePresence>
-    {!loading && <div className={`office-hud${systemOpen ? ' is-interacting' : ''}${buttonsMode ? ' is-buttons' : ''}`}>
+    {!loading && <div className={`office-hud${systemOpen ? ' is-interacting' : ''}${buttonsMode ? ' is-buttons' : ''}${tourStep === 'demo' && !showExplore ? ' is-demo' : ''}`}>
       {introPhase !== 'hidden' && !systemOpen && <NameTag phase={introPhase}/>}
       {introPhase === 'corner' && <>
         {/* laptop: the AI assistant button sits at the far right, level with the bar (phones: beside the menu button) */}
@@ -1546,16 +1695,18 @@ export default function App() {
         <BottomBar hour={hour} auto={manualHour === null} onHour={setManualHour} onAuto={() => { setManualHour(null); setClockHour(systemHour()) }} hotspot={hotspot}
           onGo={(id) => { window.dispatchEvent(new CustomEvent('spot-go')); if (systemOpen) sceneRef.current?.switchTo(id); else sceneRef.current?.goTo(id) }} onOpen={() => sceneRef.current?.openSpot()}
           interacting={systemOpen} onBack={closeSystem} locked={tourStep !== 'done'}
-          spotsLocked={tourStep !== 'done' && !(buttonsMode && tourStep === 'walk' && showCue)}
+          spotsLocked={tourStep !== 'done' && !(tourStep === 'demo' && !showExplore)} workLocked={tourStep !== 'done' && !(tourStep === 'demo' && !showExplore) && !(buttonsMode && tourStep === 'walk')} playLocked={tourStep !== 'done' && !(buttonsMode && tourStep === 'play')}
+          teach={buttonsMode && showCue ? (tourStep === 'walk' ? 'work' : tourStep === 'play' ? 'play' : null) : null}
           buttonsMode={buttonsMode} moveMode={moveMode} onMoveMode={setMoveMode}
           showDisco={systemOpen && systemApp === 'music'} disco={disco} onDisco={() => setDisco((d) => !d)}/>
         {touchUI && moveMode === 'joystick' && !systemOpen && <Joystick onStick={setStick}/>}
       </>}
       <AnimatePresence>{showCue && introPhase === 'corner' && !systemOpen && (touchUI && !moveMode && tourStep === 'walk'
         ? <ModeChoice key="mode" onPick={setMoveMode}/>
+        : tourStep === 'demo' ? <BarDemo key="demo" sceneRef={sceneRef} startPose={startPose.current} onDone={dismissCue}/>
         : <TourCue key={tourStep + (moveMode || '')} step={tourStep} onDone={dismissCue} moveMode={moveMode}/>)}</AnimatePresence>
-      <AnimatePresence>{showExplore && introPhase === 'corner' && !systemOpen && <ExploreCue key="explore" onDismiss={dismissExplore}/>}</AnimatePresence>
-      <AnimatePresence>{!showCue && !showExplore && tourStep === 'done' && introPhase === 'corner' && !systemOpen && (deskNear && (!hotspot || hotspot === 'projects' || hotspot === 'achievements')
+      <AnimatePresence>{showExplore && introPhase === 'corner' && !systemOpen && <ExploreCue key="explore" onDismiss={dismissExplore} total={4}/>}</AnimatePresence>
+      <AnimatePresence>{!showCue && !showExplore && tourStep === 'done' && introPhase === 'corner' && !systemOpen && (deskNear && !buttonsMode && (!hotspot || hotspot === 'projects' || hotspot === 'achievements')
         ? <DeskCue key="desk" hotspot={hotspot}/>
         : hotspot && <SpotCue key={hotspot} id={hotspot}/>)}</AnimatePresence>
     </div>}

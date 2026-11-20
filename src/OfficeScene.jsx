@@ -172,6 +172,7 @@ function createScene(canvas, handlers) {
   let grid = null, computer = null
   // Explorable spots (computer, phone, files, books, speaker) and an optional walk-to tween.
   let hotspots = [], travel = null
+  let smoothTurn = 0, smoothFwd = 0 // eased walking input, so starts and stops glide instead of snapping
   // Rio and Bruno on the window seat: where to stand to pet them, and the hearts they send up
   let petSpot = null, petGroup = null, petT = -1; const hearts = []
   // controls start locked; the app unlocks them once the walkthrough's first cue is showing
@@ -1093,7 +1094,7 @@ function createScene(canvas, handlers) {
   const enterSystem=()=>{
     if(state.hotspot?.id==='pets'&&!state.system){petDogs();return}
     if(!state.hotspot||state.system)return
-    state.system=true; keys.clear(); stick.x=stick.y=0; travel=null
+    state.system=true; keys.clear(); stick.x=stick.y=0; smoothTurn=smoothFwd=0; travel=null
     if(state.hotspot.id==='photos'){
       const obj=scene.getObjectByName('desk-camera')
       if(obj){ if(!obj.userData.rest)obj.userData.rest={pos:obj.position.clone(),quat:obj.quaternion.clone()}; hold={phase:'in',t:0,obj,from:{pos:obj.position.clone(),quat:obj.quaternion.clone(),fov:camera.fov},savedFov:camera.fov} }
@@ -1111,8 +1112,8 @@ function createScene(canvas, handlers) {
   // camera pulls out, then it walks to the new spot (one after another, not all at once)
   let pendingGo=null, pendingOut=false
   // Walk to one of the explorable spots and face it.
-  const goTo=(id)=>{
-    const spot=hotspots.find((h)=>h.id===id); if(!spot||state.system||state.allowWalk===false)return // not during the walkthrough
+  const goTo=(id,force=false)=>{
+    const spot=hotspots.find((h)=>h.id===id); if(!spot||state.system||(state.allowWalk===false&&!force))return // not during the walkthrough
     const view=spot.view, yaw=Math.atan2(-(spot.pos.x-view.x),-(spot.pos.z-view.z))
     const eyeY=floorY+EYE_HEIGHT, pitch=THREE.MathUtils.clamp(Math.atan2(spot.pos.y-eyeY,Math.hypot(spot.pos.x-view.x,spot.pos.z-view.z)),-.75,.5)
     const dYaw=Math.atan2(Math.sin(yaw-state.yaw),Math.cos(yaw-state.yaw))
@@ -1129,13 +1130,17 @@ function createScene(canvas, handlers) {
     handlers.onSystem(false)
   }
   const keys = new Set(), stick = { x: 0, y: 0 }
+  // WASD walks too, same as the arrow keys (but not while typing in a text field)
+  const WASD={w:'arrowup',a:'arrowleft',s:'arrowdown',d:'arrowright'}
+  const typing=(event)=>!!event.target?.closest?.('input,textarea,[contenteditable="true"]')
+  const keyOf=(event)=>{ const k=event.key.toLowerCase(); return WASD[k]&&!event.metaKey&&!event.ctrlKey&&!event.altKey&&!typing(event)?WASD[k]:k }
   const onDown = (event) => {
-    const key=event.key.toLowerCase()
+    const key=keyOf(event)
     if (state.system && ['backspace','delete','escape'].includes(key)) { event.preventDefault(); exitSystem(); return }
     if (!state.system && key==='enter' && state.hotspot && state.allowOpen!==false) { event.preventDefault(); enterSystem(); return }
     if (!state.system && ['arrowup','arrowdown','arrowleft','arrowright'].includes(key)) { event.preventDefault(); if(state.allowWalk===false)return; keys.add(key); travel=null }
   }
-  const onUp=(event)=>keys.delete(event.key.toLowerCase()), clearKeys=()=>keys.clear()
+  const onUp=(event)=>{ const k=event.key.toLowerCase(); keys.delete(k); if(WASD[k])keys.delete(WASD[k]) }, clearKeys=()=>keys.clear()
   window.addEventListener('keydown',onDown); window.addEventListener('keyup',onUp); window.addEventListener('blur',clearKeys)
   let pointer=null
   const pointerDown=(event)=>{ if(event.button!==0)return; travel=null; pointer={id:event.pointerId,x:event.clientX,y:event.clientY,x0:event.clientX,y0:event.clientY,t0:performance.now()}; canvas.setPointerCapture?.(event.pointerId) }
@@ -1201,11 +1206,13 @@ function createScene(canvas, handlers) {
   const poke=()=>{lastInput=performance.now()}
   ;['pointermove','pointerdown','keydown','wheel','touchmove'].forEach((e)=>window.addEventListener(e,poke,{passive:true}))
   const tick=(now)=>{
-    const busy=now-lastInput<3000||travel||focus||hold||folder||keys.size||stick.x||stick.y||disco>.001||musicOn
-    if(now-lastDraw<(busy?1000/60:1000/30)-2){frame=requestAnimationFrame(tick);return}
+    const busy=now-lastInput<3000||travel||focus||hold||folder||keys.size||stick.x||stick.y||smoothTurn||smoothFwd||disco>.001||musicOn
+    // busy: draw every frame the display gives us (a fixed 60 fps cap judders on 90/120 Hz phones); idle: ~30 fps
+    if(!busy&&now-lastDraw<1000/30-2){frame=requestAnimationFrame(tick);return}
     const drawGap=now-lastDraw; lastDraw=now
     if(busy&&drawGap<200){ slowFrames=drawGap>24?slowFrames+1:Math.max(0,slowFrames-1); if(slowFrames>90&&pixelRatio>1){pixelRatio=Math.max(1,pixelRatio-.25);renderer.setPixelRatio(pixelRatio);resize();slowFrames=0} }
-    if(hold||folder||now-lastShadow>250){renderer.shadowMap.needsUpdate=true;lastShadow=now}
+    // shadows don't move with the camera, so skip re-rendering them while walking (that spike every 250 ms was a stutter)
+    if(hold||folder||(now-lastShadow>250&&!smoothTurn&&!smoothFwd)){renderer.shadowMap.needsUpdate=true;lastShadow=now}
     const dt=Math.min((now-last)/1000,.04);last=now;uiTime+=dt
     tickPets(dt)
     // disco mode forces night; turning it off eases back to the time of day
@@ -1253,7 +1260,11 @@ function createScene(canvas, handlers) {
     if(windowSun){windowSun.intensity=lerp(2.1,.22,night);windowSun.color.copy(sunDay).lerp(sunGold,warm).lerp(moonColor,night*(1-warm*.5))}
     if (groundMaterial) groundMaterial.color.setRGB(1-.62*night,1-.58*night,1-.5*night)
     // keys, plus the phone's on-screen joystick (analog: a small push walks or turns slowly)
-    const turn=THREE.MathUtils.clamp(Number(keys.has('arrowright'))-Number(keys.has('arrowleft'))+stick.x,-1,1), forward=THREE.MathUtils.clamp(Number(keys.has('arrowup'))-Number(keys.has('arrowdown'))+stick.y,-1,1)
+    const wantTurn=state.system?0:THREE.MathUtils.clamp(Number(keys.has('arrowright'))-Number(keys.has('arrowleft'))+stick.x,-1,1), wantFwd=state.system?0:THREE.MathUtils.clamp(Number(keys.has('arrowup'))-Number(keys.has('arrowdown'))+stick.y,-1,1)
+    const ease=1-Math.exp(-dt*9) // ~110 ms to catch up with the stick
+    smoothTurn+=(wantTurn-smoothTurn)*ease; smoothFwd+=(wantFwd-smoothFwd)*ease
+    if(Math.abs(smoothTurn)<.004&&!wantTurn)smoothTurn=0; if(Math.abs(smoothFwd)<.004&&!wantFwd)smoothFwd=0
+    const turn=smoothTurn, forward=smoothFwd
     if(turn&&!state.system)state.yaw-=turn*1.6*dt
     if(forward&&!state.system&&walkBounds){
       // forward = +1 walks ahead, -1 walks backwards.
@@ -1370,6 +1381,10 @@ function createScene(canvas, handlers) {
   return {
     setTimeOfDay(hour){lightTarget=lightAt(hour)},
     goTo(id){ goTo(id) },
+    // the walkthrough's shortcut demo: walk to a spot even while walking is locked, then glide back
+    getPose(){ return {x:state.x,z:state.z,yaw:state.yaw,pitch:state.pitch} },
+    demoGo(id,duration){ goTo(id,true); if(travel&&duration)travel.duration=duration },
+    goPose(p,duration=1.1){ if(!p||state.system)return; const dYaw=Math.atan2(Math.sin(p.yaw-state.yaw),Math.cos(p.yaw-state.yaw)); travel={t:0,duration,from:{x:state.x,z:state.z,yaw:state.yaw,pitch:state.pitch},to:{x:p.x,z:p.z,pitch:p.pitch},dYaw} },
     // from inside a close-up: close it (file back on the shelf, camera out) and only then walk to `id`
     switchTo(id){ if(!state.system){goTo(id);return} pendingGo=id; exitSystem(true) },
     openSpot(){ if(state.allowOpen!==false)enterSystem() },

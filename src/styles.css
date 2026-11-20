@@ -319,7 +319,7 @@
 .name-tag h1{width:max-content}
 .name-tag .name-holder{visibility:hidden}
 .name-tag .name-big{position:absolute;left:0;top:0;margin:0;width:max-content}
-@media(max-width:1180px){.name-tag.is-corner{top:18px;bottom:auto;left:20px}}
+@media(max-width:1240px){.name-tag.is-corner{top:18px;bottom:auto;left:20px}}
 .tslider{position:relative;flex:1;height:32px;cursor:pointer;touch-action:none;-webkit-user-select:none;user-select:none;outline:none}
 .tslider-rail{position:absolute;left:0;right:0;top:50%;height:6px;margin-top:-3px;border-radius:3px;background:#e3e5e8;overflow:hidden}
 .tslider-rail i{display:block;height:100%;background:#1d1f22}
@@ -1511,3 +1511,117 @@ body:has(.office-hud.is-buttons) .np-dock{right:calc(76px + env(safe-area-inset-
 @media (pointer:coarse){
   .office-hud .look-cue.is-touch:not(.explore-cue):not(.mode-cue),.office-hud .look-cue.cam-cue:not(.turned){top:calc(78px + env(safe-area-inset-top));bottom:auto}
 }
+
+/* phones, buttons mode: one tall row — time · places · personal · help — and Nate beside it */
+.hud-dock.is-onebar{left:calc(12px + env(safe-area-inset-left));right:calc(12px + env(safe-area-inset-right));width:auto;max-width:none;margin:0;align-items:stretch}
+.onebar{display:flex;align-items:stretch;gap:8px}
+.onebar-nav{flex:1;min-width:0;display:grid;grid-template-columns:repeat(4,1fr);gap:2px;padding:4px;background:#fff;border:1px solid #dcdee2;border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.12),0 4px 12px rgba(0,0,0,.16)}
+.ob-btn{all:unset;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;height:56px;border-radius:10px;font:500 11.5px 'DM Sans',system-ui,sans-serif;color:#1d1f22;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .15s}
+.ob-btn:active{background:#f1f2f4}
+.ob-btn.on{background:#1d1f22;color:#fff;box-shadow:none}
+.ob-btn:disabled{opacity:.4;cursor:default}
+.ob-ico{display:grid;place-items:center;width:28px;height:24px;border-radius:7px}
+.ob-ico.ob-time.is-night{background:#1f2a44;color:#ffe08a}
+.ob-ico.ob-time.is-day{background:#ffc94a;color:#3a2a00}
+.ob-ico.ob-time svg{width:16px;height:16px}
+.ob-nate{flex:none;display:flex}
+.ob-nate .ai-wrap.is-fab{position:static}
+.ob-nate .ai-wrap.is-fab .ai-btn{width:66px;height:66px;border-radius:14px;padding:0}
+/* Nate always looks like Nate, even while the walkthrough keeps it from opening */
+.ob-nate .ai-wrap.is-locked .ai-btn{background:#e2673f!important;color:#fff;opacity:1}
+.hud-dock.is-onebar .sheet-interact{right:0}
+.fun-row.here{background:#f1f2f4}
+.fun-here{font:500 11px 'DM Sans',system-ui,sans-serif;color:#7a7f86}
+.office-hud.is-buttons .look-cue.is-touch.tour-cue{top:calc(78px + env(safe-area-inset-top));bottom:auto}
+/* the walkthrough points at the tab it's teaching */
+.ob-btn.teach{box-shadow:inset 0 0 0 1.5px #1d1f22}
+.settings-panel h4{margin:0 0 8px}
+.settings-panel .mode-switch{margin-top:14px;padding-top:12px;border-top:1px solid #eceef0}
+.ob-btn.on.teach{box-shadow:none}
+.settings-panel .mode-switch h4{font:700 12px 'DM Sans',system-ui,sans-serif;color:#1d1f22;letter-spacing:normal;margin:0}
+/* phones, joystick menu: Settings in place of the moon */
+.bottom-bar .settings-btn{gap:6px;padding:0 12px;justify-content:center}
+.bottom-bar .settings-btn svg{width:17px;height:17px}
+.bottom-bar .settings-btn.on{background:#1d1f22;color:#fff}
+.settings-panel .mode-switch{border:0;border-top:1px solid #eceef0;border-radius:0;background:none;box-shadow:none;padding:12px 0 0;margin-top:14px}
+/* time of day: icons under the slider instead of names */
+.time-ticks button{display:grid;place-items:center;width:26px;height:24px;padding:0;border-radius:6px;color:#80868e;transition:color .15s,background .15s}
+.time-ticks button.on{color:#1d1f22;background:#f1f2f4}
+@media (hover:hover){.time-ticks button:hover{color:#1d1f22}}
+/* phone settings: the setting names lead, the values follow */
+.settings-panel>h4,.settings-panel .mode-switch h4{font:700 15px 'DM Sans',system-ui,sans-serif;color:#1d1f22;letter-spacing:normal;margin:0}
+.settings-panel>h4{margin-bottom:10px}
+.settings-panel .panel-head b{font-size:13px;font-weight:500;color:#3c4043}
+.settings-panel .mode-switch .mood-seg button{font-size:12.5px;font-weight:500}
+/* the icons sit right under the slider's stops (same maths as the thumb) */
+.time-col{flex:1;min-width:0;display:flex;flex-direction:column}
+.time-col .tslider{width:100%}
+.time-ticks,.time-panel .time-ticks{position:relative;display:block;height:26px;margin:6px 0 0;padding:0!important}
+.time-ticks button{position:absolute;top:0;transform:translateX(-50%)}
+.time-row{align-items:flex-start}
+.time-col .tslider{height:28px;flex:none}
+.time-row .auto-btn{flex:none;margin-top:calc((28px - var(--auto-h, 28px)) / 2)}
+/* laptop walk cue: arrows or WASD */
+.cue-keys{display:flex;align-items:center;gap:10px}
+.cue-or{font:500 11px 'DM Sans',system-ui,sans-serif;color:#7a7f86}
+.cue-wasd i{font:600 11px 'DM Sans',system-ui,sans-serif;color:#1d1f22}
+.cue-wasd i:nth-child(1){animation-delay:.8s}.cue-wasd i:nth-child(2){animation-delay:1s}.cue-wasd i:nth-child(3){animation-delay:1.2s}.cue-wasd i:nth-child(4){animation-delay:1.4s}
+.help-panel .keys em{font:500 10px 'DM Sans',system-ui,sans-serif;font-style:normal;color:#9aa0a6;margin:0 3px}
+@media (pointer:fine){.help-panel .keys{min-width:126px;align-items:center}}
+
+/* ───── laptop bar: one centred row at every window width ─────
+   <1240px: the name moves to the top-left · <900px: the five shortcuts fold into Work
+   · <720px: undo the phone layout (that's keyed on width only) · <620px: Nate steps up above the bar */
+@media (max-width:720px) and (pointer:fine){
+  .hud-dock:not(.is-sheet){left:0;right:0;bottom:22px;width:max-content;max-width:calc(100vw - 24px);margin:0 auto}
+  .hud-dock:not(.is-sheet) .bottom-bar{display:flex;width:auto;gap:8px;overflow:visible}
+  .hud-dock:not(.is-sheet) .sec-spots{display:flex}
+  .hud-dock:not(.is-sheet) .bar-spots{display:flex;padding:0;border:0;box-shadow:none;background:none}
+  .hud-dock:not(.is-sheet) .bottom-bar button{height:32px;padding:0 10px}
+  .hud-dock:not(.is-sheet) .bottom-bar .bar-open{height:32px;padding:0 12px;box-shadow:none;border-radius:6px}
+  .hud-dock:not(.is-sheet) .sec-help .bar-btn{width:auto}
+  .hud-dock:not(.is-sheet) .bar-panel{width:min(430px,calc(100vw - 24px))}
+}
+@media (max-width:620px) and (pointer:fine){
+  .ai-dock{bottom:78px;right:16px}
+}
+/* laptop: panels float above the bar instead of widening the dock, so opening one never nudges the bar */
+.hud-dock:not(.is-sheet) .bar-panel{position:absolute;left:0;bottom:calc(100% + 8px);max-width:calc(100vw - 24px);box-sizing:border-box}
+@media (max-width:900px){.hud-dock:not(.is-sheet) .bar-panel{left:50%;transform:translateX(-50%)}}
+/* laptop walkthrough: the shortcut demo */
+.look-cue.demo-cue{max-width:min(420px,calc(100vw - 32px));text-align:center}
+.office-hud:has(.bar-panel) .look-cue.demo-cue{display:flex}
+/* laptop step cards: same spot for every step, lifted on short windows so the demo's Play menu never reaches them */
+.look-cue.tour-cue:not(.is-touch){top:min(58%,calc(100% - 400px));bottom:auto}
+.demo-pointer{position:fixed;left:0;top:0;z-index:30;pointer-events:none;margin:-3px 0 0 -5px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.3))}
+.office-hud.is-demo .hud-dock{pointer-events:none}
+/* phones, buttons mode: the intro card stays up while the menu it taught is open ("tap again to close") */
+.office-hud.is-buttons:has(.bar-panel) .look-cue.tour-cue.is-open{display:flex}
+/* phones, buttons mode: there's no menu button beside Nate, so the close-up controls move right into its place */
+body:has(.office-hud.is-buttons) .book-pageno{right:calc(204px + env(safe-area-inset-right))}
+body:has(.office-hud.is-buttons) .phone-overlay .book-nav.solo-nav.prev{right:calc(140px + env(safe-area-inset-right))}
+body:has(.office-hud.is-buttons) .phone-overlay .book-nav.solo-nav.next{right:calc(76px + env(safe-area-inset-right))}
+body:has(.office-hud.is-buttons) .rotate-hint{right:calc(76px + env(safe-area-inset-right))}
+/* close-ups with nothing in the bottom-left corner: BACK TO ROOM sits beside Nate instead of above him */
+body:not(:has(.book-pageno,.np-dock,.resume-actions,.cam-nav,.rotate-hint,.cert-next,.stack-nav,.book-nav)) .office-hud.is-buttons .touch-fabs{padding-bottom:0;padding-right:62px}
+/* phones, joystick menu: ⚙ (icon only) · Instructions · Play · Close, then the places */
+.hud-dock.is-sheet:not(.is-onebar) .bottom-bar{grid-template-columns:auto 1fr auto auto}
+.hud-dock.is-sheet:not(.is-onebar) .sec-fun{grid-row:1;grid-column:3}
+.hud-dock.is-sheet:not(.is-onebar) .bottom-bar .bar-open{grid-row:1;grid-column:4}
+.hud-dock.is-sheet:not(.is-onebar) .sec-fun .fun-btn{height:32px;padding:0 14px}
+.bottom-bar .settings-btn{width:36px;padding:0;gap:0}
+.bottom-bar .settings-btn svg{width:19px;height:19px}
+/* phones, joystick intro: a finger shows the menu; the card stays up while the menu is open */
+.demo-tap{display:block;width:34px;height:34px;margin:-17px 0 0 -12px;border-radius:50%;background:rgba(29,31,34,.28);border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.office-hud:has(.is-sheet) .look-cue.demo-cue{display:flex}
+.office-hud.is-demo .touch-fabs,.office-hud.is-demo .joystick{pointer-events:none}
+/* mode choice: the icons act out what they do — the stick circles, the buttons get tapped one after another */
+.mode-ico.joy i{animation:mode-joy 2.8s cubic-bezier(.45,0,.55,1) infinite}
+@keyframes mode-joy{0%,100%{transform:translate(0,0)}20%{transform:translate(0,-7px)}40%{transform:translate(7px,0)}60%{transform:translate(0,7px)}80%{transform:translate(-7px,0)}}
+.mode-ico.btns i,.mode-ico.btns i:nth-child(2),.mode-ico.btns i:nth-child(3){background:#dcdee2;animation:mode-tap 2.8s ease-in-out infinite}
+.mode-ico.btns i:nth-child(2){animation-delay:.7s}.mode-ico.btns i:nth-child(4){animation-delay:1.4s}.mode-ico.btns i:nth-child(3){animation-delay:2.1s}
+@keyframes mode-tap{0%,30%,100%{background:#dcdee2;transform:scale(1)}6%{background:#1d1f22;transform:scale(.86)}14%,24%{background:#1d1f22;transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.mode-ico.joy i,.mode-ico.btns i{animation:none}.mode-ico.btns i:nth-child(1),.mode-ico.btns i:nth-child(4){background:#1d1f22}}
+/* Work / Life menus: the menu's name leads, the places follow */
+.fun-panel h4{font:700 17px 'DM Sans',system-ui,sans-serif;color:#1d1f22;letter-spacing:-.01em;text-transform:none;margin:2px 8px 8px}
+.fun-text b{font-size:14px;font-weight:500}
