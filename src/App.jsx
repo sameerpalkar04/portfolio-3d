@@ -226,7 +226,7 @@ function AiButton({ compact, locked }) {
   const touch = isTouch()
   return <div className={`ai-wrap${compact ? ' is-fab' : ''}${open ? ' is-open' : ''}${locked ? ' is-locked' : ''}`}>
     <AnimatePresence>{open && <NatePanel key="nate" compact={compact} onClose={() => setOpen(false)}/>}</AnimatePresence>
-    <button className="ai-btn" disabled={locked} title={locked ? 'Finish the walkthrough first' : undefined} onClick={() => { if (locked) return; setOpen((o) => !o); setHover(false) }} aria-label={open ? 'Close Nate' : 'Ask Nate, my AI assistant'} aria-expanded={open}
+    <button className="ai-btn" disabled={locked} title={locked ? 'Finish the walkthrough first' : undefined} onClick={() => { if (locked) return; if (!open) window.dispatchEvent(new CustomEvent('bar-demo', { detail: null })) /* opening Nate closes any bar menu under it */; setOpen((o) => !o); setHover(false) }} aria-label={open ? 'Close Nate' : 'Ask Nate, my AI assistant'} aria-expanded={open}
       onPointerEnter={(e) => { if (!touch && !locked && e.pointerType === 'mouse') setHover(true) }} onPointerLeave={() => setHover(false)}>
       <AiIcon size={compact ? 34 : 32}/>
     </button>
@@ -268,6 +268,8 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot: hotspotNow, onGo: goNo
   // the camera sweeps past on the way), so only the button you chose turns black
   const [goingTo, setGoingTo] = useState(null)
   useEffect(() => { if (!goingTo) return undefined; const t = window.setTimeout(() => setGoingTo(null), 2200); return () => window.clearTimeout(t) }, [goingTo])
+  // the moment the camera settles on the chosen place, hand back to the live spot (INTERACT shows straight away)
+  useEffect(() => { if (goingTo && hotspotNow === goingTo) setGoingTo(null) }, [goingTo, hotspotNow])
   const onGo = (id) => { setGoingTo(id); goNow(id) }
   const hotspot = goingTo || hotspotNow
   const [panel, setPanel] = useState(null)
@@ -374,6 +376,11 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot: hotspotNow, onGo: goNo
 // First-time cue: "drag to look" on laptops (gone on hover), "use the arrows" on phones (gone on touch).
 const isTouch = () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
 // A cue for whatever the visitor is standing at: what it is and what it opens.
+// certificate close-up: skip ahead to the next one, or back to the whole wall (no more arrows)
+const CERT_ICONS = {
+  next: <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 5.5v13l9.5-6.5z" fill="currentColor"/><path d="M18.5 5.5v13"/></svg>,
+  all: <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>,
+}
 const SVG = (d) => <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{d}</svg>
 const CUES = {
   about: { name: 'the books', does: 'read about me', icon: SVG(<><path d="M4 5.5c2.5-1 5-1 8 1 3-2 5.5-2 8-1V19c-2.5-1-5-1-8 1-3-2-5.5-2-8-1z"/><path d="M12 6.5V20"/></>) },
@@ -488,7 +495,7 @@ function ExploreCue({ onDismiss, total = 3 }) {
 
 // First-visit walkthrough: walk → look around → see what's in the room → start exploring.
 // Each step waits for the visitor to actually do it.
-function TourCue({ step, onDone, moveMode }) {
+function TourCue({ step, onDone, moveMode, mini = false }) {
   const touch = isTouch(), buttons = touch && moveMode === 'buttons'
   // phones, buttons mode, once the menu being taught opens: 'ask' (tap Work) fades 'out', then ~1 s later
   // 'close' (tap again to close it) fades in
@@ -524,7 +531,7 @@ function TourCue({ step, onDone, moveMode }) {
   }, [step, onDone, buttons])
   const n = step === 'walk' ? 1 : step === 'play' ? 2 : buttons ? 3 : 2
   return <motion.div className={`look-cue tour-cue${touch ? ' is-touch' : ''}${phase !== 'ask' ? ' is-open' : ''}`} initial={{ opacity: 0, y: 10 }} animate={phase === 'out' ? { opacity: 0, y: 6 } : { opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .4, ease: 'easeOut' }}>
-    <span className="tour-step">Step {n} of 4</span>
+    <span className="tour-step">{mini ? (buttons ? `Buttons · ${n} of 2` : 'Joystick') : `Step ${n} of 4`}</span>
     {menuOpen
       ? <><span className="cue-tap">{OB_ICONS[step === 'walk' ? 'work' : 'play']}</span><b>Tap {step === 'walk' ? 'Work' : 'Life'} again to close it</b><small>Or pick one and you’ll walk straight there</small></>
       : step === 'play'
@@ -1236,8 +1243,8 @@ function AchievementsView({ certId, getRect, onNext, onBack }) {
     {certId && <motion.div className={`resume-actions cert-next${dock ? (dock.mode === 'above' ? ' row' : '') : ' stacked'}`} style={nextStyle}
       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .3 }}>
       {/* like the résumé: the dark button on top, the white one level with the bar */}
-      {ACHIEVEMENTS.length > 1 && <button className="resume-btn primary" onClick={onNext}>Next certificate <Arrow size={14}/></button>}
-      <button className="resume-btn" onClick={onBack}><Arrow dir="left" size={14}/> Back to certificates</button>
+      {ACHIEVEMENTS.length > 1 && <button className="resume-btn primary" onClick={onNext}>{CERT_ICONS.next} Next certificate</button>}
+      <button className="resume-btn" onClick={onBack}>{CERT_ICONS.all} Back to certificates</button>
     </motion.div>}
   </motion.div>
 }
@@ -1623,6 +1630,19 @@ export default function App() {
   // at the start of the walkthrough (null until then)
   const [moveMode, setMoveMode] = useState(null)
   const touchUI = isTouch(), buttonsMode = touchUI && moveMode === 'buttons'
+  // phones: each control style is taught once per visit. The one picked at the start is taught by the
+  // walkthrough; the first switch to the other one later shows just its own steps (never again after that)
+  const taught = useRef(new Set())
+  const [mini, setMini] = useState(null) // { mode, step } while a mini how-to is on screen
+  const tourDone = tourStep === 'done'
+  const changeMode = useCallback((m) => {
+    setMoveMode(m); if (!m) return
+    setMini(tourDone && !taught.current.has(m) ? { mode: m, step: 'walk' } : null)
+    taught.current.add(m)
+  }, [tourDone])
+  const miniDone = useCallback(() => setMini((x) => (!x ? null : x.mode === 'buttons' && x.step === 'walk' ? { ...x, step: 'swap' } : null)), [])
+  // a short breath between the two buttons steps
+  useEffect(() => { if (mini?.step !== 'swap') return undefined; const t = window.setTimeout(() => setMini((x) => (x?.step === 'swap' ? { ...x, step: 'play' } : x)), 350); return () => window.clearTimeout(t) }, [mini])
   const dismissCue = useCallback(() => {
     if (tourStep === 'walk' || tourStep === 'play') { const next = tourStep === 'walk' && buttonsMode ? 'play' : 'look'; setShowCue(false); window.setTimeout(() => { setTourStep(next); setShowCue(true) }, 350); return }
     if (tourStep === 'look' && (!touchUI || moveMode === 'joystick')) { setShowCue(false); window.setTimeout(() => { setTourStep('demo'); setShowCue(true) }, 350); return }
@@ -1697,16 +1717,17 @@ export default function App() {
           interacting={systemOpen} onBack={closeSystem} locked={tourStep !== 'done'}
           spotsLocked={tourStep !== 'done' && !(tourStep === 'demo' && !showExplore)} workLocked={tourStep !== 'done' && !(tourStep === 'demo' && !showExplore) && !(buttonsMode && tourStep === 'walk')} playLocked={tourStep !== 'done' && !(buttonsMode && tourStep === 'play')}
           teach={buttonsMode && showCue ? (tourStep === 'walk' ? 'work' : tourStep === 'play' ? 'play' : null) : null}
-          buttonsMode={buttonsMode} moveMode={moveMode} onMoveMode={setMoveMode}
+          buttonsMode={buttonsMode} moveMode={moveMode} onMoveMode={changeMode}
           showDisco={systemOpen && systemApp === 'music'} disco={disco} onDisco={() => setDisco((d) => !d)}/>
         {touchUI && moveMode === 'joystick' && !systemOpen && <Joystick onStick={setStick}/>}
       </>}
       <AnimatePresence>{showCue && introPhase === 'corner' && !systemOpen && (touchUI && !moveMode && tourStep === 'walk'
-        ? <ModeChoice key="mode" onPick={setMoveMode}/>
+        ? <ModeChoice key="mode" onPick={changeMode}/>
         : tourStep === 'demo' ? <BarDemo key="demo" sceneRef={sceneRef} startPose={startPose.current} onDone={dismissCue}/>
         : <TourCue key={tourStep + (moveMode || '')} step={tourStep} onDone={dismissCue} moveMode={moveMode}/>)}</AnimatePresence>
+      <AnimatePresence>{touchUI && mini && mini.step !== 'swap' && mini.mode === moveMode && tourDone && introPhase === 'corner' && !systemOpen && <TourCue key={'mini-' + mini.mode + mini.step} step={mini.step} onDone={miniDone} moveMode={mini.mode} mini/>}</AnimatePresence>
       <AnimatePresence>{showExplore && introPhase === 'corner' && !systemOpen && <ExploreCue key="explore" onDismiss={dismissExplore} total={4}/>}</AnimatePresence>
-      <AnimatePresence>{!showCue && !showExplore && tourStep === 'done' && introPhase === 'corner' && !systemOpen && (deskNear && !buttonsMode && (!hotspot || hotspot === 'projects' || hotspot === 'achievements')
+      <AnimatePresence>{!showCue && !showExplore && !mini && tourStep === 'done' && introPhase === 'corner' && !systemOpen && (deskNear && !buttonsMode && (!hotspot || hotspot === 'projects' || hotspot === 'achievements')
         ? <DeskCue key="desk" hotspot={hotspot}/>
         : hotspot && <SpotCue key={hotspot} id={hotspot}/>)}</AnimatePresence>
     </div>}

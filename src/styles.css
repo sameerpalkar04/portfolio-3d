@@ -1625,3 +1625,10 @@ body:not(:has(.book-pageno,.np-dock,.resume-actions,.cam-nav,.rotate-hint,.cert-
 /* Work / Life menus: the menu's name leads, the places follow */
 .fun-panel h4{font:700 17px 'DM Sans',system-ui,sans-serif;color:#1d1f22;letter-spacing:-.01em;text-transform:none;margin:2px 8px 8px}
 .fun-text b{font-size:14px;font-weight:500}
+
+/* ───── one corner radius for every floating box: the bottom bar's (10px on laptops, 14px on phones) ───── */
+:root{--box-r:10px}
+@media (pointer:coarse){:root{--box-r:14px}}
+.look-cue,.bar-panel,.bar-section,.onebar-nav,.fab-action,.fab-menu,.fab-disco,.ai-wrap.is-fab .ai-btn,.ai-dock .ai-btn,
+.nate-panel,.achv-card,.cert-card,.np-dock,.book-nav,.book-pageno,.cam-nav,.stack-nav,.rotate-hint,
+.resume-actions .resume-btn,.mode-opts button,.time-panel,.help-panel,.fun-panel,.rotate-back-card{border-radius:var(--box-r)!important}

@@ -24,6 +24,8 @@ const EYE_HEIGHT = 1.58         // metres above the floor (standing adult)
 const DEFAULT_FOV = 80          // opening view: fully zoomed out (the widest the scroll allows)
 const SUN_DAY = 4.6             // direct sunlight strength in day mode
 const WALK_SPEED = 1.9          // metres per second
+// laptops (mouse / trackpad): quicker walks to a spot and quicker zooms into things, so it feels snappy
+const SNAPPY = typeof window !== 'undefined' && !window.matchMedia?.('(pointer: coarse)').matches
 // Time of day → how dark it is outside (0 day … 1 night) and how warm/golden the light is.
 // Lamps follow the darkness, the sky passes through a golden dusk around sunrise and sunset.
 const DAY_KEYS = [ // [hour, night, warmth]
@@ -92,6 +94,9 @@ function createScene(canvas, handlers) {
   // being picked up), not on every frame
   renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true
   let pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5)
+  // Performance: lights that are switched off (intensity 0) are left out of the shaders until they come on,
+  // and while the camera is moving the room is drawn at a lighter resolution, back to full sharpness on stopping
+  let dynLights = [], drawPR = pixelRatio, lastMove = 0
   const scene = new THREE.Scene(), dayColor = new THREE.Color('#9ec7e2'), nightColor = new THREE.Color('#050b18')
   scene.background = nightColor.clone(); scene.fog = new THREE.Fog(dayColor, 48, 120)
   const camera = new THREE.PerspectiveCamera(DEFAULT_FOV, 1, .08, 180); camera.rotation.order = 'YXZ'
@@ -763,7 +768,8 @@ function createScene(canvas, handlers) {
       windowSun=new THREE.PointLight('#fff1d6',2.1,7,1.3);windowSun.position.set(windowCenter.x+inward.x*.45,windowCenter.y+.2,windowCenter.z+inward.z*.45);scene.add(windowSun)
     }
     handlers.onPosition?.({ x:state.x,z:state.z,minX:walkBounds.min.x,maxX:walkBounds.max.x,minZ:walkBounds.min.z,maxZ:walkBounds.max.z })
-    handlers.onReady?.(); if (import.meta.env.DEV && !disposed) window.__dbg = { scene, camera, state, THREE }
+    dynLights=[]; scene.traverse((o)=>{ if(o.isPointLight||o.isSpotLight||o.isRectAreaLight)dynLights.push(o) })
+    handlers.onReady?.(); if (import.meta.env.DEV && !disposed) window.__dbg = { scene, camera, state, THREE, renderer }
   }, (xhr) => { if (xhr.total) handlers.onProgress?.(xhr.loaded / xhr.total, xhr.loaded, xhr.total) }, (error) => { console.error('Unable to load the home-office model.',error); loadError=true; handlers.onReady?.() })
 
   // Phone close-up: the camera glides down to look straight onto the phone lying on the desk.
@@ -1117,7 +1123,8 @@ function createScene(canvas, handlers) {
     const view=spot.view, yaw=Math.atan2(-(spot.pos.x-view.x),-(spot.pos.z-view.z))
     const eyeY=floorY+EYE_HEIGHT, pitch=THREE.MathUtils.clamp(Math.atan2(spot.pos.y-eyeY,Math.hypot(spot.pos.x-view.x,spot.pos.z-view.z)),-.75,.5)
     const dYaw=Math.atan2(Math.sin(yaw-state.yaw),Math.cos(yaw-state.yaw))
-    travel={t:0,duration:Math.min(1.8,.7+Math.hypot(view.x-state.x,view.z-state.z)*.35),from:{x:state.x,z:state.z,yaw:state.yaw,pitch:state.pitch},to:{x:view.x,z:view.z,pitch},dYaw}
+    const far=Math.hypot(view.x-state.x,view.z-state.z)
+    travel={t:0,duration:SNAPPY?Math.min(1.25,.5+far*.26):Math.min(1.8,.7+far*.35),from:{x:state.x,z:state.z,yaw:state.yaw,pitch:state.pitch},to:{x:view.x,z:view.z,pitch},dYaw}
   }
   const exitSystem=(sequential=false)=>{
     if(!state.system)return
@@ -1188,7 +1195,7 @@ function createScene(canvas, handlers) {
       const [dx]=toLocal(event.clientX-pointer.x,event.clientY-pointer.y); pointer.x=event.clientX; pointer.y=event.clientY
       wallPan=THREE.MathUtils.clamp((wallPan??-wallPanMax)-dx/wallPxPerM,-wallPanMax,wallPanMax); return // swipe left → further right
     }
-    if(!pointer||pointer.id!==event.pointerId||state.system||state.allowLook===false)return; const [dx,dy]=toLocal(event.clientX-pointer.x,event.clientY-pointer.y); pointer.x=event.clientX;pointer.y=event.clientY;state.yaw-=dx*.003;state.pitch=THREE.MathUtils.clamp(state.pitch-dy*.002,-.75,.32) }
+    if(!pointer||pointer.id!==event.pointerId||state.system||state.allowLook===false)return; const [dx,dy]=toLocal(event.clientX-pointer.x,event.clientY-pointer.y); pointer.x=event.clientX;pointer.y=event.clientY; const k=event.pointerType==='touch'?2.2:1 /* phones: a short swipe turns further */; state.yaw-=dx*.003*k;state.pitch=THREE.MathUtils.clamp(state.pitch-dy*.002*k,-.75,.32) }
 
   canvas.addEventListener('pointerdown',pointerDown);canvas.addEventListener('pointermove',pointerMove);canvas.addEventListener('pointermove',hoverCert);canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',pointerUp)
   const onWheel=(event)=>{event.preventDefault();camera.fov=THREE.MathUtils.clamp(camera.fov+Math.sign(event.deltaY)*2,46,80);camera.updateProjectionMatrix()}
@@ -1210,7 +1217,7 @@ function createScene(canvas, handlers) {
     // busy: draw every frame the display gives us (a fixed 60 fps cap judders on 90/120 Hz phones); idle: ~30 fps
     if(!busy&&now-lastDraw<1000/30-2){frame=requestAnimationFrame(tick);return}
     const drawGap=now-lastDraw; lastDraw=now
-    if(busy&&drawGap<200){ slowFrames=drawGap>24?slowFrames+1:Math.max(0,slowFrames-1); if(slowFrames>90&&pixelRatio>1){pixelRatio=Math.max(1,pixelRatio-.25);renderer.setPixelRatio(pixelRatio);resize();slowFrames=0} }
+    if(busy&&drawGap<200){ slowFrames=drawGap>24?slowFrames+1:Math.max(0,slowFrames-1); if(slowFrames>45&&pixelRatio>1){pixelRatio=Math.max(1,pixelRatio-.25);slowFrames=0} }
     // shadows don't move with the camera, so skip re-rendering them while walking (that spike every 250 ms was a stutter)
     if(hold||folder||(now-lastShadow>250&&!smoothTurn&&!smoothFwd)){renderer.shadowMap.needsUpdate=true;lastShadow=now}
     const dt=Math.min((now-last)/1000,.04);last=now;uiTime+=dt
@@ -1261,11 +1268,11 @@ function createScene(canvas, handlers) {
     if (groundMaterial) groundMaterial.color.setRGB(1-.62*night,1-.58*night,1-.5*night)
     // keys, plus the phone's on-screen joystick (analog: a small push walks or turns slowly)
     const wantTurn=state.system?0:THREE.MathUtils.clamp(Number(keys.has('arrowright'))-Number(keys.has('arrowleft'))+stick.x,-1,1), wantFwd=state.system?0:THREE.MathUtils.clamp(Number(keys.has('arrowup'))-Number(keys.has('arrowdown'))+stick.y,-1,1)
-    const ease=1-Math.exp(-dt*9) // ~110 ms to catch up with the stick
+    const ease=1-Math.exp(-dt*(SNAPPY?13:9)) // ~110 ms to catch up with the stick (~75 ms for keys)
     smoothTurn+=(wantTurn-smoothTurn)*ease; smoothFwd+=(wantFwd-smoothFwd)*ease
     if(Math.abs(smoothTurn)<.004&&!wantTurn)smoothTurn=0; if(Math.abs(smoothFwd)<.004&&!wantFwd)smoothFwd=0
     const turn=smoothTurn, forward=smoothFwd
-    if(turn&&!state.system)state.yaw-=turn*1.6*dt
+    if(turn&&!state.system)state.yaw-=turn*(SNAPPY?1.9:1.6)*dt
     if(forward&&!state.system&&walkBounds){
       // forward = +1 walks ahead, -1 walks backwards.
       const step=WALK_SPEED*dt
@@ -1308,7 +1315,7 @@ function createScene(canvas, handlers) {
     if(active!==state.hotspot){state.hotspot=active;state.nearby=!!active;handlers.onHotspot?.(active?active.id:null);handlers.onNearby?.(!!active)}
     camera.position.set(state.x,roomBounds?floorY+EYE_HEIGHT:EYE_HEIGHT,state.z);camera.rotation.set(state.pitch,state.yaw,0)
     if(focus){
-      focus.t=Math.min(1,focus.t+dt/(focus.phase==='in'?1.15:.9))
+      focus.t=Math.min(1,focus.t+dt/(focus.phase==='in'?(SNAPPY?.85:1.15):(SNAPPY?.65:.9)))
       let e=focus.t<.5?4*focus.t**3:1-Math.pow(-2*focus.t+2,3)/2
       if(focus.phase==='in'){
         if(focus.t>=1){const v=focusView(focus.to.id);if(v)focus.to=v} // follow window resizes
@@ -1375,6 +1382,10 @@ function createScene(canvas, handlers) {
     if(pendingGo&&!folder&&!focus&&!hold&&!pendingOut&&!state.system){ const id=pendingGo; pendingGo=null; goTo(id) }
     // phones resize the page without always telling the observer (address bar, rotation)
     const size=renderer.getSize(tmpSize); if(Math.abs(size.x-canvas.clientWidth)>1||Math.abs(size.y-canvas.clientHeight)>1)resize()
+        if(travel||keys.size||stick.x||stick.y||smoothTurn||smoothFwd||pointer)lastMove=now
+        const wantPR=now-lastMove<220?Math.min(pixelRatio,1):pixelRatio
+        if(wantPR!==drawPR){drawPR=wantPR;renderer.setPixelRatio(drawPR);resize()}
+        for(const l of dynLights){const on=l.intensity>.001;if(l.visible!==on)l.visible=on}
         renderer.render(scene,camera);frame=requestAnimationFrame(tick)
   }
   frame=requestAnimationFrame(tick)
