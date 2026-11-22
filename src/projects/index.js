@@ -33,7 +33,7 @@ const LIST = [
     ],
     tools: ['Python', 'OpenCV', 'EasyOCR', 'Threading', 'Google Translate API', 'FFmpeg'],
     markdown: scriptsync,
-    links: { github: 'https://github.com/sameerpalkar04/scriptsync' },
+    links: { github: 'https://github.com/sameerpalkar04/scriptsync', demo: '/projects/scriptsync-demo.mp4' },
   },
   {
     id: 'mindgarden', file: 'Mindgarden.md', date: 'Today, 12:38 AM', size: '2 KB',

@@ -1093,7 +1093,10 @@ body.menu-open .ai-wrap{visibility:hidden}
 .fab-menu.is-locked{background:#cfe0d8;border-color:#cfe0d8;color:#fff}
 .ai-wrap.is-locked .ai-btn::after{display:none}
 /* phones: no cues while Nate is open */
-@media (pointer:coarse){body.nate-open .look-cue,body.nate-open .rotate-hint,body.nate-open .tour-card,body.nate-open .explore-card{display:none!important}}
+/* phones: Nate opens on top of whatever is on screen; nothing underneath is hidden */
+body.nate-open .office-hud{z-index:20}
+body.nate-open .ai-wrap.is-open{z-index:30}
+body.nate-open .nate-panel{z-index:31}
 /* disabled during the walkthrough: no shadow or glow either */
 .ai-wrap.is-locked .ai-btn,.bottom-bar .ai-wrap.is-locked .ai-btn,.ai-wrap.is-fab.is-locked .ai-btn,.fab-menu.is-locked{box-shadow:none!important;filter:none!important}
 .ai-wrap.is-locked .ai-btn::after,.ai-wrap.is-locked .ai-btn::before{display:none!important;box-shadow:none!important;animation:none!important}
@@ -1527,8 +1530,6 @@ body:has(.office-hud.is-buttons) .np-dock{right:calc(76px + env(safe-area-inset-
 .ob-nate{flex:none;display:flex}
 .ob-nate .ai-wrap.is-fab{position:static}
 .ob-nate .ai-wrap.is-fab .ai-btn{width:66px;height:66px;border-radius:14px;padding:0}
-/* Nate always looks like Nate, even while the walkthrough keeps it from opening */
-.ob-nate .ai-wrap.is-locked .ai-btn{background:#e2673f!important;color:#fff;opacity:1}
 .hud-dock.is-onebar .sheet-interact{right:0}
 .fun-row.here{background:#f1f2f4}
 .fun-here{font:500 11px 'DM Sans',system-ui,sans-serif;color:#7a7f86}
@@ -1602,8 +1603,6 @@ body:has(.office-hud.is-buttons) .book-pageno{right:calc(204px + env(safe-area-i
 body:has(.office-hud.is-buttons) .phone-overlay .book-nav.solo-nav.prev{right:calc(140px + env(safe-area-inset-right))}
 body:has(.office-hud.is-buttons) .phone-overlay .book-nav.solo-nav.next{right:calc(76px + env(safe-area-inset-right))}
 body:has(.office-hud.is-buttons) .rotate-hint{right:calc(76px + env(safe-area-inset-right))}
-/* close-ups with nothing in the bottom-left corner: BACK TO ROOM sits beside Nate instead of above him */
-body:not(:has(.book-pageno,.np-dock,.resume-actions,.cam-nav,.rotate-hint,.cert-next,.stack-nav,.book-nav)) .office-hud.is-buttons .touch-fabs{padding-bottom:0;padding-right:62px}
 /* phones, joystick menu: ⚙ (icon only) · Instructions · Play · Close, then the places */
 .hud-dock.is-sheet:not(.is-onebar) .bottom-bar{grid-template-columns:auto 1fr auto auto}
 .hud-dock.is-sheet:not(.is-onebar) .sec-fun{grid-row:1;grid-column:3}
@@ -1632,3 +1631,261 @@ body:not(:has(.book-pageno,.np-dock,.resume-actions,.cam-nav,.rotate-hint,.cert-
 .look-cue,.bar-panel,.bar-section,.onebar-nav,.fab-action,.fab-menu,.fab-disco,.ai-wrap.is-fab .ai-btn,.ai-dock .ai-btn,
 .nate-panel,.achv-card,.cert-card,.np-dock,.book-nav,.book-pageno,.cam-nav,.stack-nav,.rotate-hint,
 .resume-actions .resume-btn,.mode-opts button,.time-panel,.help-panel,.fun-panel,.rotate-back-card{border-radius:var(--box-r)!important}
+
+/* tour preview of the Work / Life menus: just a look, nothing to pick yet */
+.fun-row.is-preview{cursor:default}.fun-row.is-preview .arrow-icon{display:none}.fun-row.is-preview:active{background:none}
+/* while a close-up's camera is still moving, only BACK TO ROOM and Nate show; the rest appears as it lands */
+body.cam-moving .phone-overlay,body.cam-moving .fab-disco,body.cam-moving .bottom-bar .bar-open.is-disco{opacity:0!important;pointer-events:none!important;transition:none!important}
+/* …and when it lands they fade in together (quick, no added delay) */
+.phone-overlay,.fab-disco,.bottom-bar .bar-open.is-disco{transition:opacity .32s cubic-bezier(.2,.8,.2,1)}
+
+/* ───── phones, buttons mode, close-ups: same frame as the room's bar ─────
+   Nate stays 66px, where he sits on the bar; BACK TO ROOM sits exactly where INTERACT does (just above him);
+   the close-up's own controls line up with them: a 66px row along the bottom, a 46px row above it */
+.office-hud.is-buttons .touch-fabs{right:calc(12px + env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));padding:0 0 76px!important}
+.office-hud.is-buttons .touch-fabs .ai-wrap.is-fab{position:absolute;right:0;bottom:0}
+.office-hud.is-buttons .touch-fabs .ai-wrap.is-fab .ai-btn{width:66px;height:66px}
+.office-hud.is-buttons .touch-fabs .fab-action,.office-hud.is-buttons .touch-fabs .fab-disco{height:46px}
+.office-hud.is-buttons .touch-fabs .fab-disco{width:auto;padding:0 14px}
+body:has(.office-hud.is-buttons) .phone-overlay .book-nav.solo-nav{bottom:calc(10px + env(safe-area-inset-bottom));width:66px;height:66px}
+body:has(.office-hud.is-buttons) .phone-overlay .book-nav.solo-nav.next{right:calc(88px + env(safe-area-inset-right))}
+body:has(.office-hud.is-buttons) .phone-overlay .book-nav.solo-nav.prev{right:calc(162px + env(safe-area-inset-right))}
+body:has(.office-hud.is-buttons) .book-pageno{bottom:calc(10px + env(safe-area-inset-bottom));height:66px;right:calc(236px + env(safe-area-inset-right));box-sizing:border-box}
+body:has(.office-hud.is-buttons) .np-dock{bottom:calc(10px + env(safe-area-inset-bottom));height:66px;right:calc(88px + env(safe-area-inset-right))}
+body:has(.office-hud.is-buttons) .rotate-hint{bottom:calc(10px + env(safe-area-inset-bottom));height:66px;right:calc(88px + env(safe-area-inset-right))}
+body:has(.office-hud.is-buttons) .stack-nav{bottom:calc(10px + env(safe-area-inset-bottom));width:66px;height:66px}
+body:has(.office-hud.is-buttons) .stack-nav.up{bottom:calc(86px + env(safe-area-inset-bottom));height:66px}
+body:has(.office-hud.is-buttons) .stack-nav ~ .rotate-hint{left:calc(14px + 66px + 8px + env(safe-area-inset-left))}
+body:has(.office-hud.is-buttons) .resume-actions.stacked{bottom:calc(10px + env(safe-area-inset-bottom))}
+body:has(.office-hud.is-buttons) .resume-actions.stacked .resume-btn{height:66px}
+/* computer close-up (phones): one Zoom button, with a slider above it */
+.stack-nav.zoom-one{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font:600 10.5px 'DM Sans',system-ui,sans-serif;color:#1d1f22}
+.stack-nav.zoom-one.on{background:#1d1f22;color:#fff;border-color:#1d1f22}
+.zoom-pop{position:fixed;z-index:6;left:calc(14px + env(safe-area-inset-left));bottom:calc(78px + env(safe-area-inset-bottom));height:52px;width:min(210px,calc(100vw - 190px));box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:0 14px;background:#fff;border:1px solid #dcdee2;border-radius:var(--box-r);box-shadow:0 1px 2px rgba(0,0,0,.12),0 4px 12px rgba(0,0,0,.16)}
+.zoom-pop .tslider{flex:1;min-width:0;height:28px}
+.zoom-pop b{font:600 12px 'DM Sans',system-ui,sans-serif;color:#1d1f22;min-width:30px;text-align:right}
+body:has(.office-hud.is-buttons) .zoom-pop{bottom:calc(86px + env(safe-area-inset-bottom));height:66px}
+body.menu-open .zoom-pop{visibility:hidden}
+/* zoom slider: the box is the inner part; on a sideways screen it stands upright above the Zoom button */
+.zoom-pop{background:none;border:0;box-shadow:none;padding:0;display:block}
+.zoom-pop-in{width:100%;height:100%;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:0 14px;background:#fff;border:1px solid #dcdee2;border-radius:var(--box-r);box-shadow:0 1px 2px rgba(0,0,0,.12),0 4px 12px rgba(0,0,0,.16)}
+.zoom-pop-in .tslider{flex:1;min-width:0;height:28px}
+.zoom-pop-in b{font:600 12px 'DM Sans',system-ui,sans-serif;color:#1d1f22;min-width:30px;text-align:right}
+.zoom-pop.is-vertical{width:56px;height:220px}
+.zoom-pop.is-vertical .zoom-pop-in{position:absolute;left:50%;top:50%;width:220px;height:56px;transform:translate(-50%,-50%) rotate(90deg)}
+body:has(.office-hud.is-buttons) .zoom-pop.is-vertical{width:66px;height:220px}
+body:has(.office-hud.is-buttons) .zoom-pop.is-vertical .zoom-pop-in{height:66px}
+.zoom-face{display:flex;flex-direction:column;align-items:center;gap:2px}
+/* phones, buttons mode: INTERACT, BACK TO ROOM and DISCO are as tall as the bottom bar (66px) */
+.office-hud.is-buttons .sheet-interact,.office-hud.is-buttons .touch-fabs .fab-action,.office-hud.is-buttons .touch-fabs .fab-disco{height:66px}
+/* phones, buttons mode: the song list ends above the taller DISCO / BACK TO ROOM row (66 + 10 + 66 + 10 from the bottom) */
+body:has(.office-hud.is-buttons) .music-card{bottom:calc(164px + env(safe-area-inset-bottom))}
+/* phones, buttons mode: the 66px now-playing bar gets bigger cover art, text and buttons to fill it */
+body:has(.office-hud.is-buttons) .np-dock{grid-template-columns:48px minmax(0,1fr) auto auto;gap:12px;padding-left:9px;padding-right:9px}
+body:has(.office-hud.is-buttons) .np-dock img{width:48px;height:48px;border-radius:10px}
+body:has(.office-hud.is-buttons) .np-dock-text small{font-size:10.5px}
+body:has(.office-hud.is-buttons) .np-dock-text b{font-size:15px}
+body:has(.office-hud.is-buttons) .np-dock .np-btn{width:44px;height:44px}
+body:has(.office-hud.is-buttons) .np-dock .np-btn.primary{width:48px;height:48px}
+body:has(.office-hud.is-buttons) .np-dock .np-btn svg{width:18px;height:18px}
+/* close-up controls don't run their own staggered entrances: they all fade in together with the close-up */
+.phone-overlay .cam-nav,.phone-overlay .rotate-hint,.phone-overlay .book-nav,.phone-overlay .cam-controls,.cam-nav,.rotate-hint,.book-nav,.cam-controls{animation:none!important}
+/* laptop: the "Things to explore" card is centred when there's room, but never lower than just above the bottom bar;
+   on short windows it gets a bit tighter, and scrolls only if it still doesn't fit */
+.look-cue.explore-cue:not(.is-touch){top:auto;bottom:max(84px,calc(50% - 285px));max-height:calc(100% - 84px - 24px);overflow-y:auto;scrollbar-width:none}
+@media (max-height:860px) and (pointer:fine){
+  .look-cue.explore-cue:not(.is-touch){gap:6px;padding:12px 16px 12px}
+  .explore-cue ul.explore-rows li{padding-top:4px;padding-bottom:4px}
+  .explore-cue .explore-rows .cue-cam{width:26px;height:26px}
+}
+
+/* ───── Nate: the conversation ───── */
+.nate-body.has-chat{display:flex;flex-direction:column;gap:8px;overflow-y:auto;scrollbar-width:thin}
+.nate-hint{margin:6px 0 2px;font:400 13px 'DM Sans',system-ui,sans-serif;color:#7a7f86}
+.nate-msg{max-width:86%;display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.nate-msg p{margin:0;padding:9px 12px;border-radius:14px;font:400 14px/1.45 'DM Sans',system-ui,sans-serif;white-space:pre-wrap}
+.nate-msg.user{align-self:flex-end;align-items:flex-end}
+.nate-msg.user p{background:#1d1f22;color:#fff;border-bottom-right-radius:5px}
+.nate-msg.assistant{align-self:flex-start}
+.nate-msg.assistant p{background:#f1f2f4;color:#1d1f22;border-bottom-left-radius:5px}
+.nate-go{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;border:1px solid #e9b7a5;background:#fff4ef;color:#b5532f;font:600 12.5px 'DM Sans',system-ui,sans-serif}
+.nate-go:active{background:#fde6dc}
+.nate-msg.typing{flex-direction:row;gap:4px;padding:12px 14px;border-radius:14px;border-bottom-left-radius:5px;background:#f1f2f4}
+.nate-msg.typing i{width:6px;height:6px;border-radius:50%;background:#9aa0a6;animation:nate-dot 1s infinite ease-in-out}
+.nate-msg.typing i:nth-child(2){animation-delay:.15s}.nate-msg.typing i:nth-child(3){animation-delay:.3s}
+@keyframes nate-dot{0%,80%,100%{opacity:.35;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+
+/* ───── Nate's guided tour ───── */
+.nate-tour{position:fixed;inset:0;z-index:60}
+.nate-tour-block{position:absolute;inset:0}
+.nate-tour-ring{position:absolute;left:0;top:0;border-radius:var(--box-r);box-shadow:0 0 0 2px #e2673f,0 0 0 6px rgba(226,103,63,.25),0 0 0 9999px rgba(10,12,16,.38);pointer-events:none}
+.nate-tour-ring.is-round{border-radius:50%}
+.nate-tour-card{position:absolute;box-sizing:border-box;display:flex;flex-direction:column;gap:6px;padding:14px 16px 12px;background:#fff;border:1px solid #dcdee2;border-radius:var(--box-r);box-shadow:0 1px 2px rgba(0,0,0,.12),0 8px 24px rgba(0,0,0,.18);font-family:'DM Sans',system-ui,sans-serif;color:#1d1f22}
+.nate-tour-step{font:600 10.5px 'DM Sans',system-ui,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#b5532f}
+.nate-tour-card b{font:700 16px 'DM Sans',system-ui,sans-serif}
+.nate-tour-card p{margin:0;font:400 14px/1.45 'DM Sans',system-ui,sans-serif;color:#3c4043}
+.nate-tour-actions{display:flex;align-items:center;gap:8px;margin-top:6px}
+.nate-tour-actions span{flex:1}
+.nate-tour-actions button{all:unset;cursor:pointer;padding:8px 14px;border-radius:10px;font:600 13px 'DM Sans',system-ui,sans-serif}
+.nate-tour-actions .ghost{color:#5d6066}
+.nate-tour-actions .ghost:active,.nate-tour-actions .ghost:hover{background:#f1f2f4}
+.nate-tour-actions .primary{background:#1d1f22;color:#fff}
+.nate-body.has-chat{min-height:200px}
+/* phones: Nate's panel stops below the name tag (it never covers "software engineer · city") */
+.nate-panel.is-touch{max-height:calc(100dvh - 84px - 76px - env(safe-area-inset-bottom) - env(safe-area-inset-top))}
+/* Nate's answers: the evidence they're built on, and how they were made */
+.nate-msg.is-error p{background:#fff4ef;color:#8a3b1d}
+
+/* Nate: social links as buttons */
+.nate-socials{display:flex;flex-wrap:wrap;gap:6px}
+.nate-socials a{display:inline-flex;align-items:center;gap:7px;padding:5px 12px 5px 5px;border-radius:999px;background:#fff;border:1px solid #e3e4e6;color:#1f2124;text-decoration:none;font:600 12.5px 'DM Sans',system-ui,sans-serif}
+.nate-socials a:hover{border-color:#c9cbcf}
+.nate-socials a:active{background:#f3f4f5}
+.nate-socials a>span[aria-hidden]{color:#9aa0a6;font-size:11px}
+.nate-social-ico{display:grid;place-items:center;width:24px;height:24px;border-radius:999px;background:var(--tile)}
+.nate-social-ico svg{width:14px;height:14px}
+
+/* ── UI pass: consistent type, nested radii, feedback ─────────────────────────── */
+/* italics only where they mean something (the book's closing "fin" keeps its flourish) */
+.book-page dt,.book-page .aside,.edu-note,.book-langs em{font-style:normal}
+.cs-goals li>span,.cs-goals p,.cs-why p{font-style:normal}
+.cs-goals p{font-family:'DM Sans',system-ui,sans-serif;font-size:13.5px}
+.mac-desktop.is-touch .cs-goals p{font-size:16.5px}
+.cs-why p{font-family:'DM Sans',system-ui,sans-serif;font-size:15.5px;font-weight:500}
+.mac-desktop.is-touch .cs-why p{font-size:19px}
+/* mono only for keys, times, code and the camera's screen: labels are plain small caps */
+.book-page small,.book-index-title,.pcard-kicker,.cs-kicker,.cs-card small{font-family:'DM Sans',system-ui,sans-serif;font-weight:600;letter-spacing:.12em}
+.help-panel .keys.is-word{font-family:'DM Sans',system-ui,sans-serif;font-size:12px;color:#7a7f86}
+/* inner radius = outer radius − padding */
+.hud-dock:not(.is-sheet) .bar-section .bar-btn,.hud-dock:not(.is-sheet) .bar-section .bar-open,.hud-dock:not(.is-sheet) .bar-section .bar-icon{border-radius:4px}
+.fun-row{border-radius:17px}
+.pcard-art{border-radius:10px}
+.cs-seg button{border-radius:8px}
+/* loading */
+.spin{display:inline-block;width:14px;height:14px;margin-right:8px;vertical-align:-2px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;opacity:.6;animation:ui-spin .8s linear infinite}
+@keyframes ui-spin{to{transform:rotate(360deg)}}
+/* a small press so taps and clicks feel registered */
+.bar-btn:active,.bar-open:active,.bar-icon:active,.resume-btn:active,.cs-btn:active,.nate-go:active,.nate-socials a:active{transform:scale(.96)}
+.bottom-bar .bar-icon{transition:background .3s,color .3s,transform .15s}
+.resume-btn{transition:background .15s ease,transform .15s ease}
+.cs-btn{transition:background .15s,color .15s,border-color .15s,transform .15s}
+.nate-go,.nate-socials a{transition:background .15s,border-color .15s,transform .15s}
+body:has(.office-hud.is-buttons) .np-dock>img{border-radius:5px}
+/* project demo video, over the Mac window */
+.cs-demo{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(32,26,20,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.cs-demo-box{position:relative;width:min(92%,1100px);aspect-ratio:16/9;border-radius:16px;overflow:hidden;background:#f7f3ea;box-shadow:0 24px 60px rgba(20,14,8,.35)}
+.cs-demo-box video{display:block;width:100%;height:100%;object-fit:contain;background:#f7f3ea}
+.cs-demo-wait{position:absolute;inset:0;display:grid;place-content:center;grid-auto-flow:column;align-items:center;font:500 14px 'DM Sans',system-ui,sans-serif;color:#6b655c;pointer-events:none}
+.cs-demo-close{all:unset;cursor:pointer;position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:rgba(255,253,248,.92);color:#2b2622;box-shadow:0 2px 8px rgba(0,0,0,.18);transition:transform .15s}
+.cs-demo-close:active{transform:scale(.92)}
+.mac-desktop.is-touch .cs-demo-close{width:48px;height:48px;top:16px;right:16px}
+button.cs-btn{cursor:pointer}
+/* QuickTime-style player */
+.qt-win{position:relative;width:min(92%,1100px);aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#000;box-shadow:0 0 0 .5px rgba(255,255,255,.14),0 30px 70px rgba(0,0,0,.45);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','DM Sans',system-ui,sans-serif;color:#fff}
+.qt-win video{display:block;width:100%;height:100%;object-fit:contain;background:#000;cursor:default}
+.qt-win.qt-idle,.qt-win.qt-idle video{cursor:none}
+.qt-wait{position:absolute;inset:0;display:grid;grid-auto-flow:column;place-content:center;align-items:center;font-size:13px;color:rgba(255,255,255,.7);pointer-events:none}
+.qt-title,.qt-hud{transition:opacity .35s ease}
+.qt-idle .qt-title,.qt-idle .qt-hud{opacity:0;pointer-events:none}
+.qt-title{position:absolute;left:0;right:0;top:0;height:30px;display:flex;align-items:center;justify-content:center;background:linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,0))}
+.qt-name{font-size:12.5px;font-weight:600;color:rgba(255,255,255,.88);text-shadow:0 1px 2px rgba(0,0,0,.4)}
+.qt-lights{position:absolute;left:11px;top:9px;display:flex;gap:8px}
+.qt-lights>*{all:unset;width:12px;height:12px;border-radius:50%;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.25)}
+.qt-lights .r{background:#ff5f57;cursor:pointer}.qt-lights .y{background:#febc2e}.qt-lights .g{background:#28c840}
+.qt-lights .r:hover{background:#ff5f57 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3.6 3.6l4.8 4.8M8.4 3.6 3.6 8.4' stroke='%234d0000' stroke-width='1.2' stroke-linecap='round'/%3E%3C/svg%3E") center/12px no-repeat}
+.qt-hud{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);width:min(560px,calc(100% - 32px));box-sizing:border-box;padding:9px 16px 10px;border-radius:14px;background:rgba(32,32,34,.62);backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6);box-shadow:0 0 0 .5px rgba(255,255,255,.12),0 8px 24px rgba(0,0,0,.3)}
+.qt-row{display:grid;grid-template-columns:1fr auto 1fr;align-items:center}
+.qt-hud button{all:unset;cursor:pointer;display:grid;place-items:center;color:rgba(255,255,255,.9);border-radius:6px;transition:transform .12s,color .15s}
+.qt-hud button:hover{color:#fff}.qt-hud button:active{transform:scale(.9)}
+.qt-main{display:flex;align-items:center;gap:22px}
+.qt-play{width:34px;height:34px}
+.qt-vol{display:flex;align-items:center;gap:8px}
+.qt-end{display:flex;justify-content:flex-end}
+.qt-scrub{grid-template-columns:auto 1fr auto;gap:10px;margin-top:6px}
+.qt-scrub small{font-size:11px;font-variant-numeric:tabular-nums;color:rgba(255,255,255,.7);min-width:34px}
+.qt-scrub small:last-child{text-align:right}
+.qt-slider{position:relative;height:16px;display:flex;align-items:center;cursor:pointer;touch-action:none}
+.qt-slider.is-vol{width:76px}
+.qt-track{position:relative;display:block;width:100%;height:4px;border-radius:2px;background:rgba(255,255,255,.22);overflow:hidden;transition:height .12s}
+.qt-slider:hover .qt-track{height:6px;border-radius:3px}
+.qt-track i{position:absolute;left:0;top:0;bottom:0;background:rgba(255,255,255,.88)}
+.qt-win:fullscreen{width:100%;height:100%;aspect-ratio:auto;border-radius:0}
+.mac-desktop.is-touch .qt-hud{width:min(720px,calc(100% - 40px));padding:13px 22px 14px;border-radius:18px}
+.mac-desktop.is-touch .qt-main{gap:32px}
+.mac-desktop.is-touch .qt-scrub small{font-size:14px}
+.mac-desktop.is-touch .qt-lights>*{width:16px;height:16px}
+/* QuickTime player v2: a solid title bar like the other windows, the video below it */
+.qt-win{display:flex;flex-direction:column;aspect-ratio:auto;background:#000}
+.qt-title{position:relative;flex:none;height:38px;background:#f6f6f7;border-bottom:1px solid #e5e5ea;transition:none}
+.qt-idle .qt-title{opacity:1;pointer-events:auto}
+.qt-name{color:#4a4a4f;font-size:13px;font-weight:600;text-shadow:none}
+.qt-lights{left:14px;top:50%;transform:translateY(-50%);gap:8px;align-items:center}
+.qt-lights>*{display:grid;place-items:center;color:rgba(0,0,0,.55)}
+.qt-lights .r:hover{background:#ff5f57}
+.qt-lights .r svg{opacity:0;transition:opacity .15s}
+@media (hover:hover) and (pointer:fine){.qt-lights:hover .r svg{opacity:1}}
+.qt-stage{position:relative;aspect-ratio:16/9;background:#000}
+.qt-stage:fullscreen{aspect-ratio:auto}
+/* control bar: one inner edge for both rows, icons sit on it optically */
+.qt-hud{padding:10px 16px 11px;bottom:14px}
+.qt-row{column-gap:12px}
+.qt-hud button{width:28px;height:28px}
+.qt-hud .qt-play{width:36px;height:36px}
+.qt-vol{gap:6px;margin-left:-6px}
+.qt-end{margin-right:-6px}
+.qt-main{gap:18px}
+.qt-scrub{margin-top:4px;gap:12px}
+.qt-scrub small{min-width:32px;font-size:11px;line-height:16px}
+/* phones: the stage is drawn small, so the bar and the traffic lights are set bigger to stay tappable */
+.mac-desktop.is-touch .qt-title{height:72px}
+.mac-desktop.is-touch .qt-name{font-size:20px}
+.mac-desktop.is-touch .qt-lights{left:22px;gap:20px}
+.mac-desktop.is-touch .qt-lights>*{width:30px;height:30px}
+.mac-desktop.is-touch .qt-lights .r{position:relative}
+.mac-desktop.is-touch .qt-lights .r::after{content:'';position:absolute;inset:-18px}
+.mac-desktop.is-touch .qt-lights .r svg{opacity:1;width:14px;height:14px}
+.mac-desktop.is-touch .qt-hud button{width:44px;height:44px}
+.mac-desktop.is-touch .qt-hud .qt-play{width:52px;height:52px}
+.mac-desktop.is-touch .qt-hud svg{transform:scale(1.35)}
+.mac-desktop.is-touch .qt-vol{margin-left:-10px}.mac-desktop.is-touch .qt-end{margin-right:-10px}
+.mac-desktop.is-touch .qt-slider.is-vol{width:110px}
+.mac-desktop.is-touch .qt-scrub small{min-width:44px;font-size:15px}
+.mac-desktop.is-touch .qt-track{height:6px}
+/* the volume slider starts where the scrubber starts, so both rows share one left edge */
+.qt-vol{gap:22px}
+.qt-scrub small{width:32px;min-width:0;flex:none}
+.mac-desktop.is-touch .qt-scrub small{width:44px;min-width:0}
+.qt-row>*{min-width:0}
+/* QuickTime player on phones. The Mac screen is drawn at about 0.57×, so sizes here are roughly
+   1.75× what they look like: buttons land at ~44px on screen, the time labels at ~13px. The player
+   fills the whole screen, like a phone video player, and the volume slider is dropped (phones use
+   their own volume buttons; mute stays). */
+.mac-desktop.is-touch .cs-demo{background:#000;backdrop-filter:none;-webkit-backdrop-filter:none}
+.mac-desktop.is-touch .qt-win{width:100%;height:100%;border-radius:0;box-shadow:none}
+.mac-desktop.is-touch .qt-title{height:84px}
+.mac-desktop.is-touch .qt-name{font-size:26px}
+.mac-desktop.is-touch .qt-lights{left:26px;gap:24px}
+.mac-desktop.is-touch .qt-lights>*{width:40px;height:40px}
+.mac-desktop.is-touch .qt-lights .r::after{inset:-16px}
+.mac-desktop.is-touch .qt-lights .r svg{width:18px;height:18px}
+.mac-desktop.is-touch .qt-stage{flex:1;min-height:0;aspect-ratio:auto}
+.mac-desktop.is-touch .qt-hud{width:min(960px,calc(100% - 56px));bottom:24px;padding:14px 30px 18px;border-radius:28px}
+.mac-desktop.is-touch .qt-hud button{width:76px;height:76px;border-radius:14px}
+.mac-desktop.is-touch .qt-hud .qt-play{width:88px;height:88px}
+.mac-desktop.is-touch .qt-hud svg{transform:scale(2.1)}
+.mac-desktop.is-touch .qt-hud .qt-play svg{transform:scale(2.3)}
+.mac-desktop.is-touch .qt-main{gap:52px}
+.mac-desktop.is-touch .qt-vol{gap:0;margin-left:-20px}
+.mac-desktop.is-touch .qt-end{margin-right:-20px}
+.mac-desktop.is-touch .qt-slider.is-vol{display:none}
+.mac-desktop.is-touch .qt-scrub{margin-top:6px;gap:20px}
+.mac-desktop.is-touch .qt-scrub small{width:70px;font-size:23px;line-height:40px}
+.mac-desktop.is-touch .qt-slider{height:40px}
+.mac-desktop.is-touch .qt-track,.mac-desktop.is-touch .qt-slider:hover .qt-track{height:10px;border-radius:5px}
+.mac-desktop.is-touch .qt-wait{font-size:24px}
+/* certification topics are labels, not buttons: no border or fill, smaller and grey, # in front */
+.nd-chips:has(.nd-chip.plain){gap:4px 14px}
+.nd-chip.plain{padding:0;border:0;background:none;border-radius:0;font-size:12px;font-weight:500;color:#6e6e73;cursor:default}
+.nd-chip.plain::before{content:'#';margin-right:1px;color:#aeaeb2}
+.mac-desktop.is-touch .nd-chip.plain{padding:0;font-size:16px}
+.mac-desktop.is-touch .nd-chips:has(.nd-chip.plain){gap:6px 18px}

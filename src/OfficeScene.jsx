@@ -97,6 +97,7 @@ function createScene(canvas, handlers) {
   // Performance: lights that are switched off (intensity 0) are left out of the shaders until they come on,
   // and while the camera is moving the room is drawn at a lighter resolution, back to full sharpness on stopping
   let dynLights = [], drawPR = pixelRatio, lastMove = 0
+  let camLanded = false // a close-up's camera move has finished (the UI waits for this before showing its controls)
   const scene = new THREE.Scene(), dayColor = new THREE.Color('#9ec7e2'), nightColor = new THREE.Color('#050b18')
   scene.background = nightColor.clone(); scene.fog = new THREE.Fog(dayColor, 48, 120)
   const camera = new THREE.PerspectiveCamera(DEFAULT_FOV, 1, .08, 180); camera.rotation.order = 'YXZ'
@@ -499,6 +500,9 @@ function createScene(canvas, handlers) {
         coveLights.push({ strip, glow: mat, plane, glowMat, off: i * 2.4, h: i ? 1.0 : .9 })
       })
     }
+    // The short book at the far end of the lower wall shelf floats 5 cm above the shelf and sinks into the
+    // window wall; there's no room to stand it beside the others, so it goes (both its meshes).
+    for (const n of ['Line028', 'Object026']) { const m = find(n); if (m) m.visible = false }
     // Fill both wall shelves with books and box files, around what's already on them
     // (storage boxes, book stacks, magazines) and stopping at the window wall.
     {
@@ -1386,6 +1390,9 @@ function createScene(canvas, handlers) {
         const wantPR=now-lastMove<220?Math.min(pixelRatio,1):pixelRatio
         if(wantPR!==drawPR){drawPR=wantPR;renderer.setPixelRatio(drawPR);resize()}
         for(const l of dynLights){const on=l.intensity>.001;if(l.visible!==on)l.visible=on}
+        // a close-up has landed once every camera / object move into it has finished (zoom, picked-up camera, résumé folder)
+        const landed=state.system&&(!focus||(focus.phase==='in'&&focus.t>=1&&!focus.chain))&&(!hold||(hold.phase==='in'&&hold.t>=1))&&(!folder||(folder.dir>0&&folder.u>=1))
+        if(landed!==camLanded){camLanded=landed;handlers.onSettled?.(landed)}
         renderer.render(scene,camera);frame=requestAnimationFrame(tick)
   }
   frame=requestAnimationFrame(tick)
@@ -1399,6 +1406,21 @@ function createScene(canvas, handlers) {
     // from inside a close-up: close it (file back on the shelf, camera out) and only then walk to `id`
     switchTo(id){ if(!state.system){goTo(id);return} pendingGo=id; exitSystem(true) },
     openSpot(){ if(state.allowOpen!==false)enterSystem() },
+    // for Nate: is the camera still on the move, and which places are on screen right now (nearest first)
+    busy(){ return !!(travel||pendingGo||pendingOut||folder||(focus&&focus.phase==='out')||(hold&&hold.phase==='out')) },
+    hotspotId(){ return state.hotspot?.id||null },
+    inView(){
+      const out=[]
+      for(const h of hotspots){
+        if(!h.pos)continue
+        tmpV.copy(h.pos).project(camera)
+        if(tmpV.z<1&&tmpV.x>-.95&&tmpV.x<.95&&tmpV.y>-.95&&tmpV.y<.95){
+          const d=Math.hypot(h.pos.x-state.x,h.pos.z-state.z)
+          out.push({id:h.id,dist:d,x:(tmpV.x+1)/2*canvas.clientWidth,y:(1-tmpV.y)/2*canvas.clientHeight})
+        }
+      }
+      return out.sort((a,b)=>a.dist-b.dist)
+    },
     // first-visit walkthrough: which controls are live yet
     setControls({walk=true,look=true,open=true}={}){ state.allowWalk=walk; state.allowLook=look; state.allowOpen=open; if(!walk){keys.clear();stick.x=stick.y=0} },
     closeSystem(){ exitSystem() },
@@ -1497,8 +1519,8 @@ function createScene(canvas, handlers) {
   }
 }
 
-export default function OfficeScene({sceneRef,onPosition,onNearby,onHotspot,onDeskNear,onSystem,onReady,onProgress,onCert}){
-  const canvasRef=useRef(null)
-  useEffect(()=>{if(!canvasRef.current)return undefined;const office=createScene(canvasRef.current,{onPosition,onNearby,onHotspot,onDeskNear,onSystem,onReady,onProgress,onCert});sceneRef.current=office;return()=>{office.dispose();if(sceneRef.current===office)sceneRef.current=null}},[sceneRef,onPosition,onNearby,onHotspot,onDeskNear,onSystem,onReady,onProgress,onCert])
+export default function OfficeScene({sceneRef,onPosition,onNearby,onHotspot,onDeskNear,onSystem,onReady,onProgress,onCert,onSettled}){
+  const canvasRef=useRef(null), settledRef=useRef(onSettled); settledRef.current=onSettled
+  useEffect(()=>{if(!canvasRef.current)return undefined;const office=createScene(canvasRef.current,{onPosition,onNearby,onHotspot,onDeskNear,onSystem,onReady,onProgress,onCert,onSettled:(v)=>settledRef.current?.(v)});sceneRef.current=office;return()=>{office.dispose();if(sceneRef.current===office)sceneRef.current=null}},[sceneRef,onPosition,onNearby,onHotspot,onDeskNear,onSystem,onReady,onProgress,onCert])
   return <canvas ref={canvasRef} className="office-canvas" aria-label="First-person walkthrough of the home office. Use arrow keys to move, drag to look, and press Enter at the work desk." />
 }

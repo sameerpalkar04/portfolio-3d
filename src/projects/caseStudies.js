@@ -7,7 +7,7 @@ export const CASE = {
     tagline: 'Mapping how land changes over time, pixel by pixel, from paired satellite images.',
     category: 'Deep learning · Research',
     color: '#1f5a46', tint: '#dcebe2', ink: '#f4f1e8', accent: '#e8c35a',
-    stats: [['4,662', 'image pairs'], ['512²', 'pixels per image'], ['7', 'land classes'], ['IEEE', 'Xplore paper']],
+    stats: [['4,662', 'image pairs'], ['512²', 'pixels per image'], ['7', 'land classes']],
     objectives: [
       ['See change, not just land', 'How might two images of the same place show exactly what changed between them?'],
       ['Handle uneven classes', 'How might a model stay accurate when some land classes are much rarer than others?'],
@@ -100,7 +100,7 @@ export const CASE = {
     tagline: 'A calm, private place to capture notes and watch your ideas connect.',
     category: 'Full stack · Knowledge graph',
     color: '#5b4bb7', tint: '#e6e1f7', ink: '#f7f4ff', accent: '#b8e986',
-    stats: [['3', 'import & export formats'], ['0', 'external AI services'], ['Offline', 'drafts that sync']],
+    stats: [['3', 'import & export formats'], ['0', 'external AI services']],
     objectives: [
       ['Capture without friction', 'How might writing a note feel as quick as having the thought?'],
       ['Make connections visible', 'How might related notes find each other?'],
@@ -145,7 +145,6 @@ export const CASE = {
     tagline: 'Catch up on any episode in a minute: pick a show, choose an episode, read a short recap.',
     category: 'Full stack · Generative AI',
     color: '#24283b', tint: '#e3e5ee', ink: '#f6f1e7', accent: '#f2b84b',
-    stats: [['Gemini', 'writes the recaps'], ['3+', 'API containers'], ['Redis', 'shared cache']],
     objectives: [
       ['A recap for any episode', 'How might a short recap be ready for any show, season and episode?'],
       ['Fast the second time', 'How might popular recaps avoid being regenerated for every user?'],

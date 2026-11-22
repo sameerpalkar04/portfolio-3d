@@ -260,13 +260,13 @@ function Markdown({ text, skipTitle }) {
   }
   return <>{blocks}</>
 }
-const LinkIcon = { github: ico(<path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12 12 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/>, 15), ieee: ico(<><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></>, 15), view: ico(<><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></>, 15), down: ico(<><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></>, 15) }
+const LinkIcon = { play: ico(<path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/>, 14, 1.6), github: ico(<path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12 12 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/>, 15), ieee: ico(<><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></>, 15), view: ico(<><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></>, 15), down: ico(<><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></>, 15) }
 // A project's card in the Projects app: its illustration, then the name, a one-line description and
 // its tools, so you know what a project is before opening it. Styled like the rest of the portfolio:
 // warm paper, the book's serif, small mono labels and the orange accent.
 function ProjectCover({ p, sel, onSel, onOpen }) {
   return <button className={`pcard${sel ? ' sel' : ''}`} onClick={onSel} onDoubleClick={onOpen} style={{ '--pc': p.color, '--pt': p.tint }}>
-    <span className="pcard-art"><ProjectVisual id={p.id}/><i className="pcard-no">{p.fig}</i></span>
+    <span className="pcard-art"><ProjectVisual id={p.id}/></span>
     <span className="pcard-body">
       <span className="pcard-kicker">{p.category}</span>
       <b className="pcard-name">{p.name}</b>
@@ -284,7 +284,6 @@ function ProjectsApp({ onOpen }) {
   const [sel, setSel] = useState(null)
   return <div className="papp">
     <header className="papp-head">
-      <small>Projects · {PROJECTS.length}</small>
       <h1>Things I’ve built</h1>
       <p>From deep-learning research to full-stack apps. Open one to see how it came together.</p>
     </header>
@@ -294,15 +293,100 @@ function ProjectsApp({ onOpen }) {
   </div>
 }
 
-const SecHead = ({ n, label, title }) => <div className="cs-head"><small>{n} — {label}</small><h2>{title}</h2></div>
+const SecHead = ({ title }) => <div className="cs-head"><h2>{title}</h2></div>
+
+// A project's demo video, in a QuickTime-style window: traffic lights and title on top, a floating
+// translucent control bar (volume · back 15 / play / forward 15 · full screen, then the scrubber).
+// The bars fade out while it plays and the pointer is still; a spinner shows until it can play.
+const qtTime = (t) => { t = Math.max(0, Math.floor(t || 0)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}` }
+const QT = {
+  play: <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M7 4.8v14.4c0 .8.9 1.3 1.6.8l11-7.2a1 1 0 0 0 0-1.6l-11-7.2C7.9 3.5 7 4 7 4.8z"/></svg>,
+  pause: <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1.2"/><rect x="14" y="4.5" width="4" height="15" rx="1.2"/></svg>,
+  // like SF Symbols' gobackward.15 / goforward.15: an open ring, a solid arrowhead at the top, 15 centred inside
+  back: <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M12 5.2A7.8 7.8 0 1 1 5.25 9.1" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/><path d="M8.6 5.2 12.6 2.6v5.2z" fill="currentColor"/><text x="12" y="15.7" fontSize="7.4" fontWeight="600" textAnchor="middle" fill="currentColor" fontFamily="-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif">15</text></svg>,
+  fwd: <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M12 5.2A7.8 7.8 0 1 0 18.75 9.1" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/><path d="M15.4 5.2 11.4 2.6v5.2z" fill="currentColor"/><text x="12" y="15.7" fontSize="7.4" fontWeight="600" textAnchor="middle" fill="currentColor" fontFamily="-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif">15</text></svg>,
+  vol: <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M4 9.5h3.2L11.5 6v12l-4.3-3.5H4z"/><path d="M15 9.2a4 4 0 0 1 0 5.6M17.6 6.8a7.4 7.4 0 0 1 0 10.4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>,
+  mute: <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M4 9.5h3.2L11.5 6v12l-4.3-3.5H4z"/><path d="m15.5 9.5 5 5m0-5-5 5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>,
+  full: <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5"/></svg>,
+}
+function QtSlider({ value, onChange, className = '' }) {
+  const ref = useRef(null)
+  const set = (x) => { const r = ref.current.getBoundingClientRect(); onChange(Math.min(1, Math.max(0, (x - r.left) / r.width))) }
+  return <div ref={ref} className={`qt-slider ${className}`} role="slider" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(value * 100)} tabIndex={-1}
+    onPointerDown={(e) => { e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); set(e.clientX) }}
+    onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) set(e.clientX) }}>
+    <span className="qt-track"><i style={{ width: `${value * 100}%` }}/></span>
+  </div>
+}
+function DemoPlayer({ src, title, onClose }) {
+  const vid = useRef(null), box = useRef(null), idle = useRef(0)
+  const [ready, setReady] = useState(false), [playing, setPlaying] = useState(false)
+  const [t, setT] = useState(0), [dur, setDur] = useState(0), [vol, setVol] = useState(1), [muted, setMuted] = useState(false), [shown, setShown] = useState(true)
+  // laptop: the bar stays put. Phones: tapping the video shows / hides it (no play-pause on tap there).
+  const onPhone = touch()
+  const poke = () => {}
+  useEffect(() => {
+    const k = (e) => {
+      if (e.key === 'Escape' || e.key === 'Backspace') { e.stopImmediatePropagation(); onClose() }
+      else if (e.key === ' ') { e.preventDefault(); e.stopImmediatePropagation(); toggle() }
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); e.stopImmediatePropagation(); skip(e.key === 'ArrowLeft' ? -5 : 5) }
+    }
+    window.addEventListener('keydown', k, true); poke()
+    return () => { window.removeEventListener('keydown', k, true); window.clearTimeout(idle.current) }
+  }, [onClose])
+  const toggle = () => { const v = vid.current; if (!v) return; v.paused ? v.play() : v.pause() }
+  const skip = (d) => { const v = vid.current; if (v) v.currentTime = Math.min(v.duration || 0, Math.max(0, v.currentTime + d)); poke() }
+  const seek = (f) => { const v = vid.current; if (v && v.duration) { v.currentTime = f * v.duration; setT(v.currentTime) } }
+  const setVolume = (f) => { const v = vid.current; if (v) { v.volume = f; v.muted = f === 0 }; setVol(f); setMuted(f === 0) }
+  const full = () => { const el = box.current?.querySelector('.qt-stage'); if (!el) return; document.fullscreenElement ? document.exitFullscreen?.() : (el.requestFullscreen?.() || vid.current?.webkitEnterFullscreen?.()) }
+  const bars = !onPhone || shown || !ready
+  return <motion.div className="cs-demo" onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
+    <motion.div ref={box} className={`qt-win${bars ? "" : " qt-idle"}`} onClick={(e) => e.stopPropagation()}
+      initial={{ scale: .96, y: 8 }} animate={{ scale: 1, y: 0 }} exit={{ scale: .97, y: 4 }} transition={{ duration: .25, ease: [.2, .8, .2, 1] }}>
+      <div className="qt-title">
+        <span className="qt-lights">
+          <button type="button" className="r" onClick={onClose} aria-label="Close">{ico(<path d="M7 7l10 10M17 7 7 17"/>, 8, 3)}</button>
+          <i className="y"/><i className="g"/>
+        </span>
+        <span className="qt-name">{title}</span>
+      </div>
+      <div className="qt-stage">
+        <video ref={vid} src={src} autoPlay playsInline preload="auto" aria-label={title} onClick={onPhone ? () => setShown((v) => !v) : toggle}
+          onCanPlay={() => setReady(true)} onPlay={() => { setPlaying(true); poke() }} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)}
+          onTimeUpdate={(e) => setT(e.currentTarget.currentTime)} onLoadedMetadata={(e) => setDur(e.currentTarget.duration)}/>
+        {!ready && <span className="qt-wait"><i className="spin" aria-hidden="true"/>Loading…</span>}
+      <div className="qt-hud" onClick={(e) => e.stopPropagation()}>
+        <div className="qt-row">
+          <span className="qt-vol">
+            <button type="button" onClick={() => setVolume(muted || vol === 0 ? 1 : 0)} aria-label={muted ? 'Unmute' : 'Mute'}>{muted || vol === 0 ? QT.mute : QT.vol}</button>
+            <QtSlider value={muted ? 0 : vol} onChange={setVolume} className="is-vol"/>
+          </span>
+          <span className="qt-main">
+            <button type="button" onClick={() => skip(-15)} aria-label="Back 15 seconds">{QT.back}</button>
+            <button type="button" className="qt-play" onClick={toggle} aria-label={playing ? 'Pause' : 'Play'}>{playing ? QT.pause : QT.play}</button>
+            <button type="button" onClick={() => skip(15)} aria-label="Forward 15 seconds">{QT.fwd}</button>
+          </span>
+          <span className="qt-end"><button type="button" onClick={full} aria-label="Full screen">{QT.full}</button></span>
+        </div>
+        <div className="qt-row qt-scrub">
+          <small>{qtTime(t)}</small>
+          <QtSlider value={dur ? t / dur : 0} onChange={seek}/>
+          <small>-{qtTime(dur - t)}</small>
+        </div>
+      </div>
+      </div>
+    </motion.div>
+  </motion.div>
+}
 
 // The page a project opens: intro, numbers, overview, tools, goals, how it works and the full write-up.
 function Reader({ project: p, onBack }) {
-  const [hasPdf, setHasPdf] = useState(null), [feat, setFeat] = useState(0)
+  const [hasPdf, setHasPdf] = useState(null), [feat, setFeat] = useState(0), [demo, setDemo] = useState(false)
   useEffect(() => { if (!p.links.pdf) return; fetch(p.links.pdf, { method: 'HEAD' }).then((r) => setHasPdf(r.ok && !/text\/html/.test(r.headers.get('content-type') || ''))).catch(() => setHasPdf(false)) }, [p])
   const pdfOff = hasPdf === false
   const f = p.features?.[feat]
   return <div className="reader cs" style={{ '--pc': p.color, '--pt': p.tint }}>
+    <AnimatePresence>{demo && <DemoPlayer src={p.links.demo} title={`${p.name} Demo.mp4`} onClose={() => setDemo(false)}/>}</AnimatePresence>
     {onBack && <button className="cs-back" onClick={onBack}>{ico(<path d="M19 12H5M11 6l-6 6 6 6"/>, 15, 2)}All projects</button>}
     <header className="cs-hero">
       <div className="cs-hero-text">
@@ -312,6 +396,7 @@ function Reader({ project: p, onBack }) {
         <p className="cs-tagline">{p.tagline}</p>
         <div className="cs-links">
           {p.links.github && <a className="cs-btn dark" href={p.links.github} target="_blank" rel="noreferrer">{LinkIcon.github}GitHub</a>}
+          {p.links.demo && <button type="button" className="cs-btn" onClick={() => setDemo(true)}>{LinkIcon.play}Demo</button>}
           {p.links.ieee && <a className="cs-btn" href={p.links.ieee} target="_blank" rel="noreferrer">{LinkIcon.ieee}IEEE Xplore</a>}
           {p.links.pdf && <a className={`cs-btn${pdfOff ? ' off' : ''}`} href={pdfOff ? undefined : p.links.pdf} target="_blank" rel="noreferrer">{LinkIcon.view}View PDF</a>}
           {p.links.pdf && <a className={`cs-btn${pdfOff ? ' off' : ''}`} href={pdfOff ? undefined : p.links.pdf} download={pdfOff ? undefined : (p.links.pdfName || `${p.id}.pdf`)}>{LinkIcon.down}Download PDF</a>}
@@ -322,16 +407,16 @@ function Reader({ project: p, onBack }) {
     {p.stats?.length > 0 && <div className="cs-stats">{p.stats.map(([n, l]) => <div key={l}><b>{n}</b><span>{l}</span></div>)}</div>}
     <div className="cs-body">
       <section className="cs-sec">
-        <SecHead n="01" label="Overview" title="The short version"/>
+        <SecHead n="01" label="Overview" title="Description"/>
         {p.summary && <p className="cs-lede">{p.summary}</p>}
         {p.points?.length > 0 && <ul className="cs-points">{p.points.map((t) => <li key={t}>{t}</li>)}</ul>}
       </section>
       <section className="cs-sec">
-        <SecHead n="02" label="Tools" title="What it’s built with"/>
+        <SecHead n="02" label="Tools" title="Tools"/>
         <div className="nd-chips">{p.tools.map((n) => <span key={n} className="nd-chip"><i><SkillLogo name={n}/></i>{n}</span>)}</div>
       </section>
       {p.objectives && <section className="cs-sec">
-        <SecHead n="03" label="Goals" title={`What ${p.team ? 'we' : 'I'} set out to solve`}/>
+        <SecHead n="03" label="Goals" title="Problem statement"/>
         <ol className="cs-goals">{p.objectives.map(([t, q], i) => <li key={t}><span>{String(i + 1).padStart(2, '0')}</span><div><b>{t}</b><p>{q}</p></div></li>)}</ol>
       </section>}
       {f && <section className="cs-sec">
@@ -357,7 +442,7 @@ function PdfPreview() {
     {doc ? <div className="pdf-page" style={{ aspectRatio: `1 / ${doc.aspect}` }}>
       <img src={doc.url} alt="Sameer Palkar's résumé" draggable="false"/>
       {doc.links.map((l, i) => <a key={i} href={l.href} target="_blank" rel="noreferrer" style={{ left: `${l.left}%`, top: `${l.top}%`, width: `${l.width}%`, height: `${l.height}%` }} aria-label={l.href}/>)}
-    </div> : <p className="pdf-wait">{failed ? 'Couldn’t load the résumé. Use the download button above.' : 'Opening…'}</p>}
+    </div> : <p className="pdf-wait">{failed ? 'Couldn’t load the résumé. Use the download button above.' : <><i className="spin" aria-hidden="true"/>Opening…</>}</p>}
   </div>
 }
 

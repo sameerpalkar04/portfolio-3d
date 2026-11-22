@@ -3,3 +3,8 @@ dist/
 .DS_Store
 
 _to_delete/
+
+# secrets (Nate's GEMINI_API_KEY lives here locally)
+.env
+.env.*
+!.env.example

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import OfficeScene from './OfficeScene'
@@ -7,6 +7,9 @@ import { viewW, viewH, fracAlong, phoneLandscape, setPortraitLock } from './orie
 import { ACHIEVEMENTS } from './achievements'
 import { DesktopOS } from './MacOS'
 import { RESUME_URL, RESUME_VIEW, RESUME_DOWNLOAD, RESUME_NAME, loadResume } from './resume'
+import { PLACES as NATE_PLACES } from './nate/places'
+import { describeScreen } from './nate/screen'
+import NateTour from './nate/NateTour'
 
 // Songs on the speaker: add your picks here as { title, artist, link? }.
 const songs = []
@@ -119,10 +122,10 @@ const ALL_SPOTS = [...SPOTS, { id: 'music', object: 'Speaker', opens: 'Song pick
 
 // A slider built from plain elements so dragging works the same with a mouse, a finger or a pen
 // (the native range input fights with touch scrolling on phones). Arrow keys also work.
-function TimeSlider({ value, onChange }) {
+function TimeSlider({ value, onChange, label = 'Time of day', vertical = false }) {
   const track = useRef(null)
-  const set = (clientX, clientY) => { const r = track.current.getBoundingClientRect(); onChange(Math.min(5, Math.max(0, fracAlong(r, clientX, clientY) * 5))) }
-  return <div ref={track} className="tslider" role="slider" tabIndex={0} aria-label="Time of day" aria-valuemin={0} aria-valuemax={5} aria-valuenow={+value.toFixed(2)}
+  const set = (clientX, clientY) => { const r = track.current.getBoundingClientRect(); onChange(Math.min(5, Math.max(0, (vertical ? (clientY - r.top) / r.height : fracAlong(r, clientX, clientY)) * 5))) }
+  return <div ref={track} className="tslider" role="slider" tabIndex={0} aria-label={label} aria-valuemin={0} aria-valuemax={5} aria-valuenow={+value.toFixed(2)}
     onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); set(e.clientX, e.clientY) }}
     onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) set(e.clientX, e.clientY) }}
     onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); onChange(Math.min(5, Math.max(0, value + (e.key === 'ArrowRight' ? .1 : -.1)))) } }}>
@@ -140,7 +143,7 @@ function TimePanel({ hour, auto, onHour, onAuto, children, label = 'Time of day'
   const phase = PHASES[Math.min(5, Math.round(value))][0]
   return <div className={`bar-panel time-panel${children ? ' settings-panel' : ''}`} role="dialog" aria-label={label}>
     {children && <h4>Time of day</h4>}
-    <div className="panel-head"><b>{phase}</b><span>{auto ? `auto · ${systemTime}` : clock(hour)}</span></div>
+    <div className="panel-head"><b>{phase}</b><span>{auto ? systemTime : clock(hour)}</span></div>
     <div className="time-row">
       <div className="time-col">
         <TimeSlider value={value} onChange={(v) => onHour(sliderToHour(v))}/>
@@ -169,7 +172,7 @@ function HelpPanel({ moveMode }) {
       ? moveMode === 'buttons'
         ? <ul><li><span className="keys">Work</span>books, computer, files and more</li><li><span className="keys">Life</span>camera, speaker and the dogs</li><li><span className="keys">drag</span>look around</li><li><span className="keys">pinch</span>zoom</li></ul>
         : <ul><li><span className="keys">joystick</span>push up / down to walk</li><li><span className="keys">joystick</span>push left / right to turn</li><li><span className="keys">drag</span>look around</li><li><span className="keys">pinch</span>zoom</li></ul>
-      : <ul><li><span className="keys"><kbd><Arrow dir="up" size={12}/></kbd><kbd><Arrow dir="down" size={12}/></kbd><em>or</em><kbd>W</kbd><kbd>S</kbd></span>walk forward / back</li><li><span className="keys"><kbd><Arrow dir="left" size={12}/></kbd><kbd><Arrow dir="right" size={12}/></kbd><em>or</em><kbd>A</kbd><kbd>D</kbd></span>turn left / right</li><li><span className="keys">drag</span>look around</li><li><span className="keys">scroll</span>zoom in / out</li><li><span className="keys"><kbd>↵</kbd></span>open what you're facing</li><li><span className="keys"><kbd>⌫</kbd></span>close it again</li></ul>}
+      : <ul><li><span className="keys"><kbd><Arrow dir="up" size={12}/></kbd><kbd><Arrow dir="down" size={12}/></kbd><em>or</em><kbd>W</kbd><kbd>S</kbd></span>walk forward / back</li><li><span className="keys"><kbd><Arrow dir="left" size={12}/></kbd><kbd><Arrow dir="right" size={12}/></kbd><em>or</em><kbd>A</kbd><kbd>D</kbd></span>turn left / right</li><li><span className="keys is-word">Drag</span>look around</li><li><span className="keys is-word">Scroll</span>zoom in / out</li><li><span className="keys"><kbd>↵</kbd></span>open what you're facing</li><li><span className="keys"><kbd>⌫</kbd></span>close it again</li></ul>}
     <h4>Things to explore</h4>
     <ul className="explore">{ALL_SPOTS.map((s) => <li key={s.id}><b>{s.object}</b><span>{s.opens}</span></li>)}</ul>
     <p>{touch && moveMode === 'buttons' ? 'Open Work or Life and pick one to go straight there.' : 'Walk up to one of them, or use the shortcuts in the bar to go straight there.'}</p>
@@ -196,10 +199,19 @@ const AiIcon = ({ size = 24 }) => <svg className="ai-mark" viewBox="71 65 620 62
   <path d="M529.346 571.521C532.15 571.736 533.834 571.65 536.4 572.862C538.059 575.997 533.087 578.447 533.044 584.276C533.001 590.387 537.649 591.348 537.808 594.875L535.652 595.842C517.228 598.396 517.853 576.248 529.346 571.521Z"/>
 </svg>
 // Nate's chat panel (UI only for now): opens above his button on the right, styled like the room's cues.
+// Nate: Sameer's assistant. The App holds the conversation (it survives closing the panel) and what Nate
+// can do (describe the screen, walk you somewhere, the tour); the panel just shows it.
+const NateCtx = createContext(null)
 const NATE_ASKS = ['What projects has he built?', 'What’s his tech stack?', 'Where has he worked and studied?']
 function NatePanel({ onClose, compact }) {
+  const nate = useContext(NateCtx)
   const [text, setText] = useState('')
+  const body = useRef(null), input = useRef(null)
   useEffect(() => { const k = (e) => { if (e.key === 'Escape') onClose() }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k) }, [onClose])
+  useEffect(() => { if (!compact) input.current?.focus() }, [compact])
+  useEffect(() => { const b = body.current; if (b) b.scrollTo({ top: b.scrollHeight, behavior: 'smooth' }) }, [nate?.messages.length, nate?.busy])
+  const submit = (t) => { const v = (t ?? text).trim(); if (!v || nate?.busy) return; setText(''); nate?.send(v) }
+  const empty = !nate?.messages.length
   return <motion.section className={`nate-panel${compact ? ' is-touch' : ''}`} role="dialog" aria-label="Nate, Sameer’s assistant"
     initial={{ opacity: 0, y: 14, scale: .96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: .97 }} transition={{ duration: .26, ease: [.2, .8, .2, 1] }}>
     <header className="nate-head">
@@ -207,20 +219,33 @@ function NatePanel({ onClose, compact }) {
       <span className="nate-id"><b className="nate-title">Meet Nate</b><small>Yeah, the one from the Uncharted games.</small></span>
       <button className="nate-close" onClick={onClose} aria-label="Close Nate"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </header>
-    <div className="nate-body">
-      <h3>Ask anything about <em>Sameer!</em></h3>
-      <div className="nate-chips">{NATE_ASKS.map((q) => <button key={q} type="button">{q}</button>)}</div>
+    <div className={`nate-body${empty ? '' : ' has-chat'}`} ref={body} aria-live="polite">
+      {empty
+        ? <><h3>Ask anything about <em>Sameer!</em></h3><p className="nate-hint">Or tell me where to go, like “take me to his projects”.</p></>
+        : nate.messages.map((m, i) => <div key={i} className={`nate-msg ${m.role}${m.error ? ' is-error' : ''}`}>
+            <p>{m.content}</p>
+            {m.role === 'assistant' && !m.error && (() => {
+              const links = socialsFor(m.content, nate.messages[i - 1]?.content)
+              return links.length > 0 && <div className="nate-socials">{links.map((c) =>
+                <a key={c.app} href={c.href} target={c.href.startsWith('http') ? '_blank' : undefined} rel="noreferrer" style={{ '--tile': c.tile }}>
+                  <span className="nate-social-ico">{c.icon}</span>{c.app === 'Mail' ? 'Email him' : `Open ${c.app}`}<span aria-hidden="true">↗</span></a>)}</div>
+            })()}
+            {m.place && <button className="nate-go" onClick={() => nate.go(m.place)}>Take me to {NATE_PLACES[m.place].short} <Arrow size={13}/></button>}
+          </div>)}
+      {nate?.busy && <div className="nate-msg assistant typing" aria-label="Nate is typing"><i/><i/><i/></div>}
+      {empty && <div className="nate-chips">{NATE_ASKS.map((q) => <button key={q} type="button" onClick={() => submit(q)}>{q}</button>)}</div>}
     </div>
-    <form className="nate-input" onSubmit={(e) => e.preventDefault()}>
-      <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask anything about Sameer…" aria-label="Ask Nate"/>
-      <button type="submit" disabled={!text.trim()} aria-label="Send"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+    <form className="nate-input" onSubmit={(e) => { e.preventDefault(); submit() }}>
+      <input ref={input} value={text} onChange={(e) => setText(e.target.value)} placeholder="Type a question…" aria-label="Ask Nate" enterKeyHint="send" autoComplete="off"/>
+      <button type="submit" disabled={!text.trim() || nate?.busy} aria-label="Send"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
     </form>
   </motion.section>
 }
 function AiButton({ compact, locked }) {
   const [open, setOpen] = useState(false)
   useEffect(() => { if (locked) setOpen(false) }, [locked])
-  // phones: the room's cues step aside while Nate is open
+  useEffect(() => { const c = () => setOpen(false); window.addEventListener('nate-close', c); return () => window.removeEventListener('nate-close', c) }, [])
+  // marks Nate as open, so his panel is lifted above everything else on screen
   useEffect(() => { document.body.classList.toggle('nate-open', open); return () => document.body.classList.remove('nate-open') }, [open])
   const [hover, setHover] = useState(false) // laptop only: "Ask Nate" on hover
   const touch = isTouch()
@@ -238,9 +263,9 @@ function AiButton({ compact, locked }) {
 const DiscoIcon = ({ s = 18 }) => <svg viewBox="0 0 24 24" width={s} height={s} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5v17M5 7.5h14M5 16.5h14M8.4 4.3c-1.6 4.9-1.6 10.5 0 15.4M15.6 4.3c1.6 4.9 1.6 10.5 0 15.4"/></svg>
 // Phones in "buttons" mode: a menu of the fun corners (camera, speaker, the dogs)
 const FUN_SPOTS = [
-  { id: 'photos', label: 'Camera', sub: 'Through my lens', icon: <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg> },
-  { id: 'music', label: 'Speaker', sub: 'Songs on repeat', icon: <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><rect x="6" y="3" width="12" height="18" rx="2.5"/><circle cx="12" cy="14" r="3.2"/><circle cx="12" cy="7.5" r="1" fill="currentColor"/></svg> },
-  { id: 'pets', label: 'Rio & Bruno', sub: 'Pet them', icon: <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><circle cx="7" cy="9" r="2"/><circle cx="17" cy="9" r="2"/><circle cx="10" cy="5.5" r="1.8"/><circle cx="14" cy="5.5" r="1.8"/><path d="M12 11.5c-2.6 0-5 3-5 5.3 0 1.7 1.4 2.5 2.8 2.2 1-.2 1.4-.6 2.2-.6s1.2.4 2.2.6c1.4.3 2.8-.5 2.8-2.2 0-2.3-2.4-5.3-5-5.3z"/></svg> },
+  { id: 'photos', label: 'Camera', sub: 'Through my lens' },
+  { id: 'music', label: 'Speaker', sub: 'Songs on repeat' },
+  { id: 'pets', label: 'Rio & Bruno', sub: 'Pet them' },
 ]
 const OB = (d) => <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{d}</svg>
 const OB_ICONS = {
@@ -250,16 +275,16 @@ const OB_ICONS = {
   help: OB(<><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17.2h.01"/></>),
 }
 // phones, buttons mode: every work spot in one list, opened from Places
-function PlacesPanel({ hotspot, onGo }) {
+function PlacesPanel({ hotspot, onGo, preview = false }) {
   return <div className="bar-panel fun-panel" role="dialog" aria-label="Places">
     <h4>Work</h4>
-    {SPOTS.map((s) => <button key={s.id} className={`fun-row${hotspot === s.id ? ' here' : ''}`} onClick={() => onGo(s.id)}><span className="fun-ico">{CUES[s.id]?.icon}</span><span className="fun-text"><b>{s.object}</b><small>{s.opens}</small></span>{hotspot === s.id ? <small className="fun-here">You’re here</small> : <Arrow size={14}/>}</button>)}
+    {SPOTS.map((s) => <button key={s.id} className={`fun-row${hotspot === s.id ? ' here' : ''}${preview ? ' is-preview' : ''}`} disabled={preview} onClick={() => onGo(s.id)}><span className="fun-ico">{CUES[s.id]?.icon}</span><span className="fun-text"><b>{s.object}</b><small>{s.opens}</small></span>{hotspot === s.id ? <small className="fun-here">You’re here</small> : <Arrow size={14}/>}</button>)}
   </div>
 }
-function FunPanel({ onGo }) {
+function FunPanel({ onGo, preview = false }) {
   return <div className="bar-panel fun-panel" role="dialog" aria-label="Fun stuff">
     <h4>Off the clock</h4>
-    {FUN_SPOTS.map((f) => <button key={f.id} className="fun-row" onClick={() => onGo(f.id)}><span className="fun-ico">{f.icon}</span><span className="fun-text"><b>{f.label}</b><small>{f.sub}</small></span><Arrow size={14}/></button>)}
+    {FUN_SPOTS.map((f) => <button key={f.id} className={`fun-row${preview ? ' is-preview' : ''}`} disabled={preview} onClick={() => onGo(f.id)}><span className="fun-ico">{CUES[f.id]?.icon}</span><span className="fun-text"><b>{f.label}</b><small>{f.sub}</small></span><Arrow size={14}/></button>)}
   </div>
 }
 const BAR_FOLD = 900 // px: below this the laptop bar folds the five shortcuts into Work (keeps clear of Nate)
@@ -305,11 +330,11 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot: hotspotNow, onGo: goNo
   if (compact && !sheet) return <motion.div key="fabs" className="touch-fabs" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4 }}>
     <AnimatePresence>
       {interacting
-        ? <motion.div key="back" className="fab-row" initial={{ opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }}>
+        ? <motion.div key="back" className="fab-row" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .18 }}>
             {showDisco && <button className={`fab-disco${disco ? ' on' : ''}`} onClick={onDisco} aria-pressed={disco} aria-label={disco ? 'Turn off disco lights' : 'Turn on disco lights'}><DiscoIcon s={20}/>DISCO</button>}
             <button className="fab-action" onClick={onBack}><Arrow dir="left"/> BACK TO ROOM</button>
           </motion.div>
-        : here && <motion.button key="interact" className="fab-action" onClick={onOpen} initial={{ opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .9 }}>INTERACT <Arrow/></motion.button>}
+        : here && <motion.button key="interact" className="fab-action" onClick={onOpen} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .18 }}>INTERACT <Arrow/></motion.button>}
     </AnimatePresence>
     <AiButton compact locked={locked}/>
     {!buttonsMode && <button className={`fab-menu${spotsLocked ? ' is-locked' : ''}`} disabled={spotsLocked} onClick={() => setOpen(true)} aria-label={locked ? 'Menu (available after the walkthrough)' : 'Open menu'}>
@@ -323,8 +348,8 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot: hotspotNow, onGo: goNo
   if (keepOpen) return <motion.div key="onebar" ref={ref} className="hud-dock is-sheet is-buttons is-onebar" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .45, ease: [.2, .8, .2, 1] }}>
     {panel === 'settings' && <SettingsPanel hour={hour} auto={auto} onHour={onHour} onAuto={onAuto} moveMode={moveMode} onMoveMode={(m) => { onMoveMode?.(m); setPanel(null) }}/>}
     {panel === 'help' && <HelpPanel moveMode={moveMode}/>}
-    {panel === 'work' && <PlacesPanel hotspot={locked ? null : hotspot} onGo={(id) => { setPanel(null); onGo(id) }}/>}
-    {panel === 'play' && <FunPanel onGo={(id) => { setPanel(null); onGo(id) }}/>}
+    {panel === 'work' && <PlacesPanel preview={!!teach} hotspot={locked ? null : hotspot} onGo={(id) => { setPanel(null); onGo(id) }}/>}
+    {panel === 'play' && <FunPanel preview={!!teach} onGo={(id) => { setPanel(null); onGo(id) }}/>}
     <AnimatePresence>{here && !panel && <motion.button key="sheet-interact" className="fab-action sheet-interact" onClick={onOpen} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .2 }}>INTERACT <Arrow/></motion.button>}</AnimatePresence>
     <div className="onebar">
       <nav className="onebar-nav" aria-label="Controls">
@@ -378,7 +403,7 @@ const isTouch = () => typeof window !== 'undefined' && window.matchMedia?.('(poi
 // A cue for whatever the visitor is standing at: what it is and what it opens.
 // certificate close-up: skip ahead to the next one, or back to the whole wall (no more arrows)
 const CERT_ICONS = {
-  next: <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 5.5v13l9.5-6.5z" fill="currentColor"/><path d="M18.5 5.5v13"/></svg>,
+  next: <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4.5 12h14M13 6.5l5.5 5.5-5.5 5.5"/></svg>,
   all: <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>,
 }
 const SVG = (d) => <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{d}</svg>
@@ -424,7 +449,7 @@ function SpotCue({ id }) {
 // Laptop walkthrough, step 3: a pointer shows the bar at work (~9 s) — Life opens its menu, a place
 // shortcut walks you there — then the camera glides back to where the walkthrough started.
 const DemoPointer = () => <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M5 3l14 8.5-6.2 1.4L9.6 19z" fill="#1d1f22" stroke="#fff" strokeWidth="1.6" strokeLinejoin="round"/></svg>
-const DEMO_PACE = 1 // the timeline below is already ~9 s; raise to stretch it further
+const DEMO_PACE = .6 // the whole timeline (and the pointer glides) runs at 60% of the original timings
 function BarDemo({ sceneRef, startPose, onDone }) {
   const [ptr, setPtr] = useState(null) // {x, y, click}
   const touch = isTouch()
@@ -452,20 +477,20 @@ function BarDemo({ sceneRef, startPose, onDone }) {
     at(1300, click)
     at(1450, () => panel('fun'))
     at(2900, () => panel(null))
-    let t
+    // then the places: shown, not visited (no walk to the books and back)
     if (folded) { // narrow window: the places live under Work
       at(3100, () => moveTo('.sec-work .bar-btn'))
       at(4200, click); at(4350, () => panel('work'))
-      at(4700, () => moveTo('.fun-row'))
-      at(5800, click); t = 5950
-    } else {
-      at(3100, () => moveTo('.bar-spots button'))
-      at(4200, click); t = 4350
+      at(4500, () => moveTo('.fun-row:last-child'))
+      at(6400, () => panel(null))
+      at(6600, () => setPtr(null))
+      at(7000, onDone)
+    } else { // wide window: glide along the places in the bar
+      at(3100, () => moveTo('.bar-spots button:first-child'))
+      at(4300, () => moveTo('.bar-spots button:last-child'))
+      at(5600, () => setPtr(null))
+      at(6000, onDone)
     }
-    at(t, () => { panel(null); sceneRef.current?.demoGo?.('about', 2) })
-    at(t + 500, () => setPtr(null))
-    at(t + 2500, () => sceneRef.current?.goPose?.(startPose, 2))
-    at(t + 4800, onDone)
     return () => { alive = false; timers.forEach(window.clearTimeout); panel(null) }
   }, [sceneRef, startPose, onDone, touch])
   return <>
@@ -475,7 +500,7 @@ function BarDemo({ sceneRef, startPose, onDone }) {
         ? <><b>Quick access is in the menu</b><small>Tap ☰ for every spot, Life, settings and help</small></>
         : <><b>The bar takes you anywhere</b><small>Life opens the camera, speaker and dogs · the others walk you straight there</small></>}
     </motion.div>
-    <AnimatePresence>{ptr && <motion.div key="ptr" className="demo-pointer" initial={{ opacity: 0, x: ptr.x, y: ptr.y }} animate={{ opacity: 1, x: ptr.x, y: ptr.y, scale: ptr.click ? .82 : 1 }} exit={{ opacity: 0 }} transition={{ x: { duration: 1.05, ease: [.45, 0, .2, 1] }, y: { duration: 1.05, ease: [.45, 0, .2, 1] }, scale: { duration: .22, ease: 'easeOut' }, opacity: { duration: .35 } }}>{touch ? <span className="demo-tap"/> : <DemoPointer/>}</motion.div>}</AnimatePresence>
+    <AnimatePresence>{ptr && <motion.div key="ptr" className="demo-pointer" initial={{ opacity: 0, x: ptr.x, y: ptr.y }} animate={{ opacity: 1, x: ptr.x, y: ptr.y, scale: ptr.click ? .82 : 1 }} exit={{ opacity: 0 }} transition={{ x: { duration: 1.05 * DEMO_PACE, ease: [.45, 0, .2, 1] }, y: { duration: 1.05 * DEMO_PACE, ease: [.45, 0, .2, 1] }, scale: { duration: .22, ease: 'easeOut' }, opacity: { duration: .35 } }}>{touch ? <span className="demo-tap"/> : <DemoPointer/>}</motion.div>}</AnimatePresence>
   </>
 }
 
@@ -533,12 +558,12 @@ function TourCue({ step, onDone, moveMode, mini = false }) {
   return <motion.div className={`look-cue tour-cue${touch ? ' is-touch' : ''}${phase !== 'ask' ? ' is-open' : ''}`} initial={{ opacity: 0, y: 10 }} animate={phase === 'out' ? { opacity: 0, y: 6 } : { opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .4, ease: 'easeOut' }}>
     <span className="tour-step">{mini ? (buttons ? `Buttons · ${n} of 2` : 'Joystick') : `Step ${n} of 4`}</span>
     {menuOpen
-      ? <><span className="cue-tap">{OB_ICONS[step === 'walk' ? 'work' : 'play']}</span><b>Tap {step === 'walk' ? 'Work' : 'Life'} again to close it</b><small>Or pick one and you’ll walk straight there</small></>
+      ? <><span className="cue-tap">{OB_ICONS[step === 'walk' ? 'work' : 'play']}</span><b>Tap {step === 'walk' ? 'Work' : 'Life'} again to close it</b><small>{step === 'walk' ? 'These are the places you can visit' : 'A few things from outside work'}</small></>
       : step === 'play'
       ? <><span className="cue-tap">{OB_ICONS.play}</span><b>Now tap Life</b><small>The camera, the speaker and my dogs</small></>
       : step === 'walk'
       ? buttons
-        ? <><span className="cue-tap">{OB_ICONS.work}</span><b>Tap Work below</b><small>Books, computer, files and more · pick one to go there</small></>
+        ? <><span className="cue-tap">{OB_ICONS.work}</span><b>Tap Work below</b><small>See the places you can visit</small></>
         : touch
         ? <><span className="cue-joy"><i/></span><b>Use the joystick to walk</b><small>Try it now: drag the joystick</small></>
         : <><span className="cue-keys"><span className="cue-arrows"><i><Arrow dir="up" size={12}/></i><i><Arrow dir="left" size={12}/></i><i><Arrow dir="down" size={12}/></i><i><Arrow dir="right" size={12}/></i></span><span className="cue-or">or</span><span className="cue-arrows cue-wasd"><i>W</i><i>A</i><i>S</i><i>D</i></span></span><b>Use the arrow keys or WASD to walk</b><small>Try it now: press any of them</small></>
@@ -566,6 +591,13 @@ const CONTACTS = [
   { app: 'GitHub', href: 'https://github.com/sameerpalkar04', title: 'sameerpalkar04', body: 'See what I’m building on GitHub', tile: '#1b1f24',
     icon: <svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M12 2.5a9.6 9.6 0 0 0-3 18.7c.5.1.7-.2.7-.5v-1.7c-2.7.6-3.2-1.2-3.2-1.2-.4-1.1-1.1-1.4-1.1-1.4-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.9.8.1-.6.3-1.1.6-1.3-2.1-.2-4.4-1.1-4.4-4.8 0-1 .4-1.9 1-2.6-.1-.3-.4-1.2.1-2.6 0 0 .8-.3 2.6 1a9 9 0 0 1 4.8 0c1.8-1.3 2.6-1 2.6-1 .5 1.4.2 2.3.1 2.6.6.7 1 1.6 1 2.6 0 3.7-2.3 4.6-4.4 4.8.3.3.7.9.7 1.8v2.6c0 .3.2.6.7.5A9.6 9.6 0 0 0 12 2.5z"/></svg> },
 ]
+// Socials Nate mentions (or the visitor asks for) become tappable buttons under his reply.
+const SOCIAL_WORDS = { Mail: /\b(e-?mail|gmail|mail)\b/i, LinkedIn: /linked\s?in/i, GitHub: /git\s?hub/i }
+function socialsFor(reply = '', question = '') {
+  const picked = CONTACTS.filter((c) => SOCIAL_WORDS[c.app].test(reply) || SOCIAL_WORDS[c.app].test(question))
+  if (picked.length) return picked
+  return /\b(socials?|contact|reach|connect|get in touch|handles?)\b/i.test(question) ? CONTACTS : []
+}
 function PhoneScreen({ onClose, getRect }) {
   const [now, setNow] = useState(new Date())
   const [rect, setRect] = useState(null)
@@ -1027,8 +1059,10 @@ function ComputerView({ onClose, getRect }) {
   const long = rect ? (rect.rotated ? rect.height : rect.width) : 0, short = rect ? (rect.rotated ? rect.width : rect.height) : 0
   const DW = isTouch() ? 680 : 1180, scale = long / DW, DH = short / scale
   // phones: zoom buttons enlarge the screen; when zoomed in it scrolls, so you can look around
-  const ZOOMS = [1, 1.5, 2, 2.5]
-  const [zi, setZi] = useState(0), zoom = ZOOMS[zi]
+  // phones: one Zoom button opens a slider, from the normal size up to 2.5×
+  const ZMAX = 2.5
+  const [zoom, setZoomV] = useState(1), zi = zoom > 1.001 ? 1 : 0
+  const [zoomOpen, setZoomOpen] = useState(false)
   const disp = useRef(null), centre = useRef([.5, .5])
   // phones: a tip about the zoom buttons on the lock screen; the screen stays locked a little longer so
   // the tip is gone before the desktop appears
@@ -1038,11 +1072,11 @@ function ComputerView({ onClose, getRect }) {
   // a short "drag to look around" cue each time you zoom in from the normal size
   const [dragCue, setDragCue] = useState(false)
   useEffect(() => { if (zi === 0) { setDragCue(false); return undefined } const t = setTimeout(() => setDragCue(false), 5000); return () => clearTimeout(t) }, [zi, dragCue])
-  const zoomBy = (d) => {
-    if (d > 0 && zi === 0) setDragCue(true)
+  const setZoom = (v) => {
+    v = Math.min(ZMAX, Math.max(1, v)); if (v > 1.001 && zoom <= 1.001) setDragCue(true)
     const el = disp.current
     if (el && el.scrollWidth) centre.current = [(el.scrollLeft + el.clientWidth / 2) / el.scrollWidth, (el.scrollTop + el.clientHeight / 2) / el.scrollHeight]
-    setZi((i) => Math.max(0, Math.min(ZOOMS.length - 1, i + d)))
+    setZoomV(v)
   }
   // zoomed in: drag to move around the screen. A drag scrolls whatever it starts on (a window's page)
   // first, then the screen itself; a drag never counts as a tap.
@@ -1079,14 +1113,14 @@ function ComputerView({ onClose, getRect }) {
     const el = disp.current; if (!el) return
     const [cx, cy] = centre.current
     el.scrollLeft = cx * el.scrollWidth - el.clientWidth / 2; el.scrollTop = cy * el.scrollHeight - el.clientHeight / 2
-  }, [zi])
+  }, [zoom])
   return <motion.div className="phone-overlay mac-overlay" onClick={onClose} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
     {rect && <>
       <motion.div ref={disp} className={`mac-display${zoom > 1 ? ' is-zoomed' : ''}`} onClick={(e) => e.stopPropagation()} onPointerDownCapture={panDown}
         style={rect.rotated
           ? { left: rect.left + rect.width / 2 - long / 2, top: rect.top + rect.height / 2 - short / 2, width: long, height: short, rotate: 90 }
           : { left: rect.left, top: rect.top, width: long, height: short }}
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .4 }}>
+        initial={false} animate={{ opacity: 1 }}>
         <div className="mac-zoom" style={{ width: long * zoom, height: short * zoom }}>
           <div className="mac-frame" style={{ width: STAGE_W, height: DH * STAGE_W / DW, transform: `scale(${scale * zoom * DW / STAGE_W})` }}><PortfolioSystem onClose={onClose} stageH={DH * STAGE_W / DW} lockDelay={LOCK_DELAY}/></div>
         </div>
@@ -1095,8 +1129,8 @@ function ComputerView({ onClose, getRect }) {
         style={rect.rotated
           ? { left: rect.left + rect.width / 2 - long / 2, top: rect.top + rect.height / 2 - short / 2, width: long, height: short, rotate: 90 }
           : { left: rect.left, top: rect.top, width: long, height: short }}
-        initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { delay: .3, duration: .3 } }} exit={{ opacity: 0, transition: { duration: .3 } }}>
-        <span className="mac-drag-cue"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5M10.5 7.5v6M7.5 10.5h6"/></svg>Text too small? Use the zoom buttons</span>
+        initial={false} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: .3 } }}>
+        <span className="mac-drag-cue"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5M10.5 7.5v6M7.5 10.5h6"/></svg>Text too small? Tap Zoom and slide to enlarge</span>
       </motion.div>}</AnimatePresence>
       <AnimatePresence>{dragCue && <motion.div key="drag-cue" className="mac-drag-cue-wrap"
         style={rect.rotated
@@ -1106,8 +1140,14 @@ function ComputerView({ onClose, getRect }) {
         <span className="mac-drag-cue"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/></svg>Drag to look around</span>
       </motion.div>}</AnimatePresence>
       {isTouch() && <>
-        <button className="cam-nav stack-nav up zoom-btn" onClick={(e) => { e.stopPropagation(); zoomBy(1) }} disabled={zi === ZOOMS.length - 1} aria-label="Zoom in"><svg style={rect.rotated ? { transform: 'rotate(90deg)' } : undefined} viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5M10.5 7.5v6M7.5 10.5h6"/></svg></button>
-        <button className="cam-nav stack-nav down zoom-btn" onClick={(e) => { e.stopPropagation(); zoomBy(-1) }} disabled={zi === 0} aria-label="Zoom out"><svg style={rect.rotated ? { transform: 'rotate(90deg)' } : undefined} viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5M7.5 10.5h6"/></svg></button>
+        <button className={`cam-nav stack-nav down zoom-btn zoom-one${zoomOpen ? ' on' : ''}`} onClick={(e) => { e.stopPropagation(); setZoomOpen((o) => !o) }} aria-expanded={zoomOpen} aria-label="Zoom"><span className="zoom-face" style={rect.rotated ? { transform: 'rotate(90deg)' } : undefined}><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5M10.5 7.5v6M7.5 10.5h6"/></svg><span>Zoom</span></span></button>
+        <AnimatePresence>{zoomOpen && <motion.div key="zoom-pop" className="zoom-pop" onClick={(e) => e.stopPropagation()} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .18 }}>
+          {/* the screen is shown sideways on an upright phone, so the zoom amount reads sideways with it */}
+          <div className="zoom-pop-in">
+            <TimeSlider label="Zoom" value={(zoom - 1) / (ZMAX - 1) * 5} onChange={(v) => setZoom(1 + v / 5 * (ZMAX - 1))}/>
+            <b style={rect.rotated ? { transform: 'rotate(90deg)' } : undefined}>{zoom.toFixed(1)}×</b>
+          </div>
+        </motion.div>}</AnimatePresence>
       </>}
       {rect.rotated && <div className="rotate-hint"><RotateIcon/>Rotate your phone for a bigger view</div>}
     </>}
@@ -1235,7 +1275,7 @@ function AchievementsView({ certId, getRect, onNext, onBack }) {
       // laptop: the certificate on the left, this card on the right
       : <div key={shown.id} className="cert-card-wrap" style={{ left: rect.left + rect.width * 1.11 + 24 }}>
           <motion.i className="cert-scrim" aria-hidden="true" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .35 }}/>
-          <motion.article className="cert-card" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} transition={{ duration: .35, ease: [.2, .8, .2, 1] }}>
+          <motion.article className="cert-card" initial={false} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} transition={{ duration: .35, ease: [.2, .8, .2, 1] }}>
             <CertDetails a={shown}/>
           </motion.article>
         </div>)}</AnimatePresence>
@@ -1337,14 +1377,14 @@ function MusicPanel({ onClose, onMusic }) {
   const stop = (e) => e.stopPropagation()
   const phone = isTouch()
   return <motion.div className="phone-overlay music-overlay" onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
-    <motion.article ref={card} className="music-card" onClick={stop} initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 10, opacity: 0 }} transition={{ delay: .75, duration: .4, ease: [.2, .8, .2, 1] }}>
-      <header><h3>On my speaker</h3><span className="music-sub">Songs on repeat</span></header>
+    <motion.article ref={card} className="music-card" onClick={stop} initial={false} animate={{ y: 0, opacity: 1 }} exit={{ y: 10, opacity: 0 }} transition={{ delay: .75, duration: .4, ease: [.2, .8, .2, 1] }}>
+      <header><h3>On my speaker</h3></header>
       <p className="music-tag">The songs that keep me going.</p>
       {/* now playing (phones: it sits beside the buttons at the bottom instead) */}
       {!phone && <div className={`np${playing ? ' is-playing' : ''}`}>
         <img src={song.art} alt="" width="64" height="64"/>
         <div className="np-text">
-          <small>{missing ? 'No preview for this one' : loading ? 'Loading…' : playing ? 'Now playing' : 'Tap play to listen'}</small>
+          <small>{missing ? 'No preview for this one' : loading ? 'Loading…' : playing ? 'Now playing' : isTouch() ? 'Tap play to listen' : 'Click play to listen'}</small>
           <b>{song.title}</b><span>{song.by}</span>
           <div className="np-bar"><i style={{ width: `${prog * 100}%` }}/></div>
         </div>
@@ -1362,7 +1402,7 @@ function MusicPanel({ onClose, onMusic }) {
         </div>
       </li>)}</ol>
     </motion.article>
-    {phone && <motion.div className={`np-dock${playing ? ' is-playing' : ''}`} onClick={stop} initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 8, opacity: 0 }} transition={{ delay: .85, duration: .35 }}>
+    {phone && <motion.div className={`np-dock${playing ? ' is-playing' : ''}`} onClick={stop} initial={false} animate={{ y: 0, opacity: 1 }} exit={{ y: 8, opacity: 0 }} transition={{ delay: .85, duration: .35 }}>
       <img src={song.art} alt="" width="38" height="38"/>
       <div className="np-dock-text">
         <small>{missing ? 'No preview' : loading ? 'Loading…' : playing ? 'Now playing' : 'Tap play'}</small>
@@ -1630,6 +1670,13 @@ export default function App() {
   // at the start of the walkthrough (null until then)
   const [moveMode, setMoveMode] = useState(null)
   const touchUI = isTouch(), buttonsMode = touchUI && moveMode === 'buttons'
+  // a close-up's camera move: until it lands, only BACK TO ROOM and Nate are on screen; the rest appears the moment it does
+  const [camLanded, setCamLanded] = useState(false)
+  // only the first move into a close-up hides the controls: once it has landed they stay put (page turns,
+  // next certificate…) until you go back to the room
+  const onCamSettled = useCallback((v) => { if (v) setCamLanded(true) }, [])
+  useEffect(() => { if (!systemOpen) setCamLanded(false) }, [systemOpen])
+  useEffect(() => { document.body.classList.toggle('cam-moving', systemOpen && !camLanded); return () => document.body.classList.remove('cam-moving') }, [systemOpen, camLanded])
   // phones: each control style is taught once per visit. The one picked at the start is taught by the
   // walkthrough; the first switch to the other one later shows just its own steps (never again after that)
   const taught = useRef(new Set())
@@ -1671,6 +1718,51 @@ export default function App() {
     if (disco) { setDisco(false); window.setTimeout(() => sceneRef.current?.closeSystem(), 1300); return }
     sceneRef.current?.closeSystem()
   }
+  // ── Nate ──
+  const [nateMsgs, setNateMsgs] = useState([]), [nateBusy, setNateBusy] = useState(false), [tourOn, setTourOn] = useState(false)
+  const nateNow = useRef({}); nateNow.current = { msgs: nateMsgs, systemOpen, systemApp, buttonsMode, closeSystem }
+  const screenNow = useCallback(() => describeScreen({ scene: sceneRef.current, systemOpen: nateNow.current.systemOpen, systemApp: nateNow.current.systemApp, touch: touchUI, buttonsMode: nateNow.current.buttonsMode }), [touchUI])
+  // walk to a place and open it (leaving any close-up first)
+  const nateGo = useCallback((place) => {
+    window.dispatchEvent(new CustomEvent('nate-close'))
+    const sc = sceneRef.current, { systemOpen: open, systemApp: app } = nateNow.current; if (!sc) return
+    if (open && app === place) return
+    if (open) sc.switchTo(place); else sc.goTo(place)
+    const t0 = Date.now()
+    const wait = () => {
+      if (Date.now() - t0 > 8000) return
+      if (!nateNow.current.systemOpen && !sc.busy() && sc.hotspotId() === place) { sc.openSpot(); return }
+      window.setTimeout(wait, 120)
+    }
+    window.setTimeout(wait, 350)
+  }, [])
+  const startTour = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('nate-close'))
+    if (nateNow.current.systemOpen) { nateNow.current.closeSystem(); window.setTimeout(() => setTourOn(true), 1100) } else setTourOn(true)
+  }, [])
+  // every message goes to the agent (api/nate.js): it searches his content, answers with citations, and may act
+  const nateSend = useCallback(async (text) => {
+    const history = [...nateNow.current.msgs, { role: 'user', content: text }]
+    setNateMsgs(history)
+    const say = (content, extra = {}) => setNateMsgs((m) => [...m, { role: 'assistant', content, ...extra }])
+    setNateBusy(true)
+    try {
+      const r = await fetch('/api/nate', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: history.filter((m) => !m.error).map(({ role, content }) => ({ role, content })), screen: screenNow() }) })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        const why = { 'no-key': 'I’m offline right now: my AI isn’t connected yet.', quota: 'I’ve hit my free limit for the moment. Give me a minute and ask again.', 'slow-down': 'Easy, one at a time! Give me a few seconds.' }[d.error]
+        say(why || 'Something went wrong on my end. Try asking again?', { error: true }); return
+      }
+      const a = d.action
+      say(d.reply, { ...(a?.type === 'suggest' ? { place: a.place } : {}) })
+      if (a?.type === 'go') window.setTimeout(() => nateGo(a.place), 1100)
+      if (a?.type === 'tour') window.setTimeout(startTour, 1100)
+    } catch {
+      say('I can’t reach my brain right now. Check your connection and try again?', { error: true })
+    } finally { setNateBusy(false) }
+  }, [nateGo, screenNow, startTour])
+  const nateCtx = { messages: nateMsgs, busy: nateBusy, send: nateSend, go: nateGo }
+  const getTourSpot = useCallback(() => sceneRef.current?.inView?.()[0] || null, [])
   const getPhoneRect = useCallback(() => sceneRef.current?.phoneScreenRect() ?? null, [])
   const getCameraRect = useCallback(() => sceneRef.current?.cameraScreenRect() ?? null, [])
   const setMusic = useCallback((m) => sceneRef.current?.setMusic?.(m), [])
@@ -1688,7 +1780,7 @@ export default function App() {
   }, [sceneReady])
   useEffect(() => { sceneRef.current?.setTimeOfDay(hour) }, [hour, sceneReady])
   useEffect(() => { const timer = window.setInterval(() => setClockHour(systemHour()), 60000); return () => window.clearInterval(timer) }, [])
-  return <main className="app-shell"><OfficeScene sceneRef={sceneRef} onHotspot={updateHotspot} onDeskNear={updateDeskNear} onSystem={updateSystem} onReady={updateReady} onProgress={updateProgress} onCert={updateCert}/>
+  return <NateCtx.Provider value={nateCtx}><main className="app-shell"><OfficeScene sceneRef={sceneRef} onHotspot={updateHotspot} onDeskNear={updateDeskNear} onSystem={updateSystem} onReady={updateReady} onProgress={updateProgress} onCert={updateCert} onSettled={onCamSettled}/>
     <div className="ambient-vignette"/>
     <AnimatePresence>{loading && <Loader progress={load.progress} loaded={load.loaded} total={load.total} ready={sceneReady} onEnter={finishLoading}/>}</AnimatePresence>
     <AnimatePresence>{land && !landOK && <RotateBack key="rotate-back"/>}</AnimatePresence>
@@ -1726,10 +1818,11 @@ export default function App() {
         : tourStep === 'demo' ? <BarDemo key="demo" sceneRef={sceneRef} startPose={startPose.current} onDone={dismissCue}/>
         : <TourCue key={tourStep + (moveMode || '')} step={tourStep} onDone={dismissCue} moveMode={moveMode}/>)}</AnimatePresence>
       <AnimatePresence>{touchUI && mini && mini.step !== 'swap' && mini.mode === moveMode && tourDone && introPhase === 'corner' && !systemOpen && <TourCue key={'mini-' + mini.mode + mini.step} step={mini.step} onDone={miniDone} moveMode={mini.mode} mini/>}</AnimatePresence>
+      {tourOn && <NateTour mode={touchUI ? (buttonsMode ? 'buttons' : 'joystick') : 'laptop'} getSpot={getTourSpot} onEnd={() => setTourOn(false)}/>}
       <AnimatePresence>{showExplore && introPhase === 'corner' && !systemOpen && <ExploreCue key="explore" onDismiss={dismissExplore} total={4}/>}</AnimatePresence>
       <AnimatePresence>{!showCue && !showExplore && !mini && tourStep === 'done' && introPhase === 'corner' && !systemOpen && (deskNear && !buttonsMode && (!hotspot || hotspot === 'projects' || hotspot === 'achievements')
         ? <DeskCue key="desk" hotspot={hotspot}/>
         : hotspot && <SpotCue key={hotspot} id={hotspot}/>)}</AnimatePresence>
     </div>}
-  </main>
+  </main></NateCtx.Provider>
 }
