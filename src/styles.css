@@ -1635,7 +1635,7 @@ body:has(.office-hud.is-buttons) .rotate-hint{right:calc(76px + env(safe-area-in
 /* tour preview of the Work / Life menus: just a look, nothing to pick yet */
 .fun-row.is-preview{cursor:default}.fun-row.is-preview .arrow-icon{display:none}.fun-row.is-preview:active{background:none}
 /* while a close-up's camera is still moving, only BACK TO ROOM and Nate show; the rest appears as it lands */
-body.cam-moving .phone-overlay,body.cam-moving .fab-disco,body.cam-moving .bottom-bar .bar-open.is-disco{opacity:0!important;pointer-events:none!important;transition:none!important}
+body.cam-moving .phone-overlay{opacity:0!important;pointer-events:none!important;transition:none!important}
 /* …and when it lands they fade in together (quick, no added delay) */
 .phone-overlay,.fab-disco,.bottom-bar .bar-open.is-disco{transition:opacity .32s cubic-bezier(.2,.8,.2,1)}
 
@@ -1889,3 +1889,5 @@ button.cs-btn{cursor:pointer}
 .nd-chip.plain::before{content:'#';margin-right:1px;color:#aeaeb2}
 .mac-desktop.is-touch .nd-chip.plain{padding:0;font-size:16px}
 .mac-desktop.is-touch .nd-chips:has(.nd-chip.plain){gap:6px 18px}
+/* Instructions: wide enough that each row fits on one line */
+.hud-dock:not(.is-sheet) .help-panel{width:min(460px,calc(100vw - 24px))}

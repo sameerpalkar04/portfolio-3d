@@ -489,8 +489,19 @@ export function DesktopOS({ stageH }) {
       return null
     })}</AnimatePresence>
     {/* the dock's Finder and Notes open their apps */}
+    <NateHooks onOpen={(x) => x.note ? open({ kind: 'Note', id: x.note }) : x.project && open({ project: PROJECTS.find((p) => p.id === x.project) })}/>
     <DockHooks onFinder={() => finderAt('desktop')} onNotes={() => open({ app: 'notes' })} onPreview={() => {}} onProjects={() => open({ app: 'projects' })}/>
   </>
+}
+// Nate's "Take me to …" can ask for a note or a project: picked up when the computer opens
+// (window.__macOpen, if recent) or straight away if it's already open (the mac-open event)
+function NateHooks({ onOpen }) {
+  const ref = useRef(onOpen); ref.current = onOpen
+  useEffect(() => {
+    const take = () => { const x = window.__macOpen; if (!x) return; window.__macOpen = null; if (Date.now() - (x.at || 0) < 30000) window.setTimeout(() => ref.current(x), 250) }
+    take(); window.addEventListener('mac-open', take); return () => window.removeEventListener('mac-open', take)
+  }, [])
+  return null
 }
 // the dock lives in App; it calls these through a window event so the dock markup can stay there
 function DockHooks({ onFinder, onNotes, onPreview, onProjects }) {

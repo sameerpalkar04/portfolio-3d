@@ -49,8 +49,11 @@ async function embed(text, key) {
 }
 const cos = (a, b) => { let d = 0, x = 0, y = 0; for (let i = 0; i < a.length; i++) { d += a[i] * b[i]; x += a[i] * a[i]; y += b[i] * b[i] } return d / Math.sqrt(x * y) }
 const norm = (s) => { const m = Math.max(...s); return m > 0 ? s.map((v) => v / m) : s }
-async function search(query, key, k = 5) {
-  const kw = norm(bm25(query)), qv = await embed(query, key).catch(() => null)
+// fast: keyword-only unless the passage embeddings are already in memory (they're fetched in the
+// background, so a cold start doesn't wait on them)
+async function search(query, key, k = 5, { fast = false } = {}) {
+  if (fast && !docVecs) ensureDocVecs(key)
+  const kw = norm(bm25(query)), qv = fast && !docVecs ? null : await embed(query, key).catch(() => null)
   const sem = qv && docVecs ? docVecs.map((v) => (v ? Math.max(0, cos(qv, v)) : 0)) : null
   const score = INDEX.chunks.map((_, i) => (sem ? .65 * sem[i] + .35 * kw[i] : kw[i]))
   return score.map((s, i) => [s, i]).filter(([s]) => s > 0).sort((a, b) => b[0] - a[0]).slice(0, k)
@@ -58,25 +61,35 @@ async function search(query, key, k = 5) {
 }
 
 // ── the agent ──
-const SYSTEM = (screen) => `You are Nate — named after Nathan Drake from the Uncharted games — the AI agent on Sameer Palkar's portfolio, a 3D model of his home office. Visitors (often recruiters) ask you about Sameer. Talk about him in the third person.
+const SYSTEM = (screen, pre) => `You are Nate — named after Nathan Drake from the Uncharted games — the AI agent on Sameer Palkar's portfolio, a 3D model of his home office. Visitors (often recruiters) ask you about Sameer. Talk about him in the third person.
 
 How you work:
-- For ANY question about Sameer (work, projects, skills, education, achievements, contact, interests, fit for a role…), first call search_portfolio. Search more than once with different wording if the first results don't cover it.
-- Answer ONLY from what search_portfolio returns. Never invent employers, dates, numbers, skills, roles or opinions, and don't characterise him beyond what the passages say (no "he leans towards X" unless a passage says so). If the results don't say, say you don't know and suggest emailing him (palkarsameer04@gmail.com).
-- Cite every fact with the source id in square brackets right after it, e.g. "He studied at VIT [edu-vit]." Only cite ids that search returned.
+- Passages already found for this question are listed at the end. If they answer it, reply straight away from them; only call search_portfolio when they don't cover the question (you may search more than once with different wording).
+- Answer ONLY from those passages, what search_portfolio returns, and the screen description. Never invent employers, dates, numbers, skills, roles or opinions, and don't characterise him beyond what the passages say (no "he leans towards X" unless a passage says so). If the results don't say, say you don't know and suggest emailing him (palkarsameer04@gmail.com).
+- Cite every fact with the source id in square brackets right after it, e.g. "He studied at VIT [edu-vit]." Only cite ids from the passages or search results.
 - For LinkedIn, GitHub or email, just name them ("he's on LinkedIn and GitHub") and never write out the URL: the visitor gets a button for each under your reply. You may give the email address itself.
 - If asked whether he fits a role, give an honest verdict first (fit / partial fit / not a fit) with the reasons, then the evidence.
-- Style: warm, a little witty, never cheesy. Short: 1–3 sentences, or a few tight bullet points ("- ") when listing. Plain text, no markdown headings or bold. Reply in the visitor's language. Understand typos and loose phrasing.
+- Voice: a light touch of Nathan Drake. Casual, quick and self-aware, a relatable hero rather than a smooth salesman. His kind of humour, used lightly:
+  · deadpan understatement: treat something impressive as no big deal
+  · self-deprecation about yourself (Nate), never about Sameer
+  · a mundane little grumble in a grand moment
+  · a sarcastic silver-lining spin when the answer is "not much" or "I don't know"
+  · the odd groan-worthy pun on names or tech, or a treasure / map / climbing image
+  Invent a fresh line each time that fits the specific question. Write your own lines in that spirit; never quote or closely echo actual lines from the games. About one quip per reply, often at the start or end, and none when the answer is serious (role fit, contact details), where you're simply clear and helpful. A joke never replaces, bends or adds to a fact (no made-up details like when or how something happened). Never claim to be Nathan Drake himself (you're Nate, Sameer's guide, named after him).
+- Length: short, 1–3 sentences, or a few tight bullet points ("- ") when listing. Plain text, no markdown headings or bold. Reply in the visitor's language. Understand typos and loose phrasing.
 - Stay on Sameer and this website; steer anything else back politely.
 
 Tools that act in the room:
 - go_to(place): when the visitor wants to see, open or go somewhere ("take me to his projects", "I want to contact him", "show me the dogs"). It walks them there and opens it. Still reply with one short line.
 - suggest_place(place): after answering a question, offer the one place that shows more (they get a "Take me there" button).
 - start_tour(): when they ask how to use the site, how it works, or for a tour.
-Places: about (the books: about him, experience, education, extracurriculars), projects (the iMac: projects, skills), achievements (certificate wall), resume (the files), contact (the phone: email, LinkedIn, GitHub), music (the speaker), photos (the camera), pets (his dogs Rio & Bruno).
-For "what's on my screen" / "what am I looking at", answer from the screen description below (no search needed).
+Places: about (the books: about him, experience, education, extracurriculars), projects (the iMac: projects, skills, certifications), achievements (the awards wall: hackathon wins), resume (the files), contact (the phone: email, LinkedIn, GitHub), music (the speaker), photos (the camera), pets (his dogs Rio & Bruno).
+For "what's on my screen" / "what am I looking at" / "explain this", give a detailed walkthrough from the screen description (no search needed): first what this place is, then what's showing right now in specifics (e.g. on a project page: what the project is, what it does, key numbers, tools, the problem it solves and how it works; on a book page: the roles, places and dates on it; on a certificate: what it was for), then what they can do here next. Use 4–8 short bullet points; this is the one answer allowed to run longer. The voice still applies, lightly.
 
-What the visitor sees right now: ${screen}`
+What the visitor sees right now: ${screen}
+
+Passages already found for this question:
+${pre}`
 
 const TOOLS = [{ functionDeclarations: [
   { name: 'search_portfolio', description: 'Search Sameer\'s portfolio content (experience, education, projects, achievements, skills, contact, interests, the website). Returns passages with ids to cite.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING', description: 'What to look for, in plain words' } }, required: ['query'] } },
@@ -91,6 +104,14 @@ async function callModel(key, body) {
     const r = await fetch(`${API}/${model}:generateContent`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body) })
     const d = await r.json().catch(() => ({}))
     if (r.ok) return { d, model: d.modelVersion || model }
+    // a model that doesn't take the "no thinking" setting: same model again without it
+    if (r.status === 400 && body.generationConfig?.thinkingConfig) {
+      const { thinkingConfig, ...gen } = body.generationConfig; body = { ...body, generationConfig: gen }
+      const r2 = await fetch(`${API}/${model}:generateContent`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body) })
+      const d2 = await r2.json().catch(() => ({}))
+      if (r2.ok) return { d: d2, model: d2.modelVersion || model }
+      last = { status: r2.status, msg: d2?.error?.message }; if (r2.status !== 404 && r2.status !== 400) break; continue
+    }
     last = { status: r.status, msg: d?.error?.message }
     if (r.status !== 404 && r.status !== 400) break // only try the next model when this one doesn't exist
   }
@@ -117,13 +138,19 @@ export default async function handler(req, res) {
     .map((m) => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content.slice(0, 1200) }] }))
   while (contents.length && contents[0].role !== 'user') contents.shift()
   if (!contents.length || contents[contents.length - 1].role !== 'user') return send(res, 400, { error: 'no question' })
-  const screen = String(body.screen || 'the office').slice(0, 800)
+  const screen = String(body.screen || 'the office').slice(0, 3200)
 
   const found = new Map() // passages the agent has seen, by id (for citations)
   let action = null, reply = '', tokens = 0, calls = 0, model = MODELS[0]
   try {
+    // speed: retrieve for the question up front and hand the passages to the model with it, so most answers
+    // take one model call instead of two (search, then answer). The last two user turns make follow-ups work.
+    const asked = body.messages.filter((m) => m.role === 'user').slice(-2).map((m) => String(m.content)).join(' ')
+    const pre = await search(asked, key, 6, { fast: true })
+    pre.forEach((h) => found.set(h.id, h))
+    const preText = pre.map((h) => `[${h.id}] ${h.title}: ${h.text}`).join('\n') || '(none)'
     while (calls < MAX_CALLS) {
-      const { d, model: used } = await callModel(key, { systemInstruction: { parts: [{ text: SYSTEM(screen) }] }, contents, tools: TOOLS, generationConfig: { temperature: .2, maxOutputTokens: 500 } })
+      const { d, model: used } = await callModel(key, { systemInstruction: { parts: [{ text: SYSTEM(screen, preText) }] }, contents, tools: TOOLS, generationConfig: { temperature: .2, maxOutputTokens: 900, thinkingConfig: { thinkingBudget: 0 } } })
       calls++; model = used; tokens += d.usageMetadata?.totalTokenCount || 0
       const parts = d.candidates?.[0]?.content?.parts || []
       const text = parts.filter((p) => p.text).map((p) => p.text).join('').trim()
@@ -150,7 +177,7 @@ export default async function handler(req, res) {
       if (action && reply && fns.every((f) => f.name !== 'search_portfolio')) break
     }
   } catch (e) {
-    console.error('nate:', e.status, e.message)
+    console.error('nate:', e.status, e.message); if (process.env.NATE_DEBUG) return send(res, 502, { error: 'ai-failed', detail: e.message })
     return send(res, e.status === 429 ? 429 : 502, { error: e.status === 429 ? 'quota' : 'ai-failed' })
   }
   // citations: the [ids] the answer used, in order; markers come out of the text

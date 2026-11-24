@@ -112,8 +112,8 @@ const MoonIcon = () => <svg viewBox="0 0 24 24" width="18" height="18" fill="non
 // Explorable spots in the room and what each one opens.
 export const SPOTS = [
   { id: 'about', object: 'Books', opens: 'About me' },
-  { id: 'projects', object: 'Computer', opens: 'Projects' },
-  { id: 'achievements', object: 'Achievements', opens: 'Certificates' },
+  { id: 'projects', object: 'Computer', opens: 'Projects & Certifications' },
+  { id: 'achievements', object: 'Achievements', opens: 'Awards & hackathons' },
   { id: 'resume', object: 'Files', opens: 'Résumé' },
   { id: 'contact', object: 'Phone', opens: 'Contact' },
 ]
@@ -202,12 +202,35 @@ const AiIcon = ({ size = 24 }) => <svg className="ai-mark" viewBox="71 65 620 62
 // Nate: Sameer's assistant. The App holds the conversation (it survives closing the panel) and what Nate
 // can do (describe the screen, walk you somewhere, the tour); the panel just shows it.
 const NateCtx = createContext(null)
+// Where an answer's sources live: skills → the Skills note on the computer, a project → its page,
+// an award → its certificate, anything else → its place in the room.
+const PROJECT_NAMES = { 'geospatial-segmentation': 'Geospatial Segmentation', scriptsync: 'ScriptSync', mindgarden: 'Mindgarden', afterword: 'Afterword' }
+function nateTarget(cites = []) {
+  for (const c of cites || []) {
+    const id = c.id || ''
+    if (id.startsWith('skills-')) return { place: 'projects', open: { note: 'skills' }, label: 'Skills' }
+    const pm = id.match(/^proj-(.+?)(?:-how|-\d+)?$/)
+    if (pm) { const pid = pm[1] === 'ieee' ? 'geospatial-segmentation' : pm[1]; return PROJECT_NAMES[pid] ? { place: 'projects', open: { project: pid }, label: PROJECT_NAMES[pid] } : { place: 'projects' } }
+    if (id.startsWith('award-')) { const cert = id.slice(6); return { place: 'achievements', open: { cert }, label: ACHIEVEMENTS.find((x) => x.id === cert)?.title || 'Achievements' } }
+    if (c.place && NATE_PLACES[c.place]) return { place: c.place }
+  }
+  return null
+}
+// while Nate's chat is open (or a text field has focus) the keyboard is his: close-ups ignore it
+const natesKeys = (e) => document.body.classList.contains('nate-open') || !!e.target?.closest?.('input,textarea,[contenteditable="true"]')
 const NATE_ASKS = ['What projects has he built?', 'What’s his tech stack?', 'Where has he worked and studied?']
 function NatePanel({ onClose, compact }) {
   const nate = useContext(NateCtx)
   const [text, setText] = useState('')
   const body = useRef(null), input = useRef(null)
-  useEffect(() => { const k = (e) => { if (e.key === 'Escape') onClose() }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k) }, [onClose])
+  // Esc closes; Enter anywhere goes to Nate too (focus the box and send what's typed there), never to the room
+  useEffect(() => {
+    const k = (e) => {
+      if (e.key === 'Escape') { onClose(); return }
+      if (e.key === 'Enter' && e.target !== input.current && !e.target?.closest?.('button,a')) { e.preventDefault(); input.current?.focus(); input.current?.form?.requestSubmit() }
+    }
+    window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k)
+  }, [onClose])
   useEffect(() => { if (!compact) input.current?.focus() }, [compact])
   useEffect(() => { const b = body.current; if (b) b.scrollTo({ top: b.scrollHeight, behavior: 'smooth' }) }, [nate?.messages.length, nate?.busy])
   const submit = (t) => { const v = (t ?? text).trim(); if (!v || nate?.busy) return; setText(''); nate?.send(v) }
@@ -230,7 +253,7 @@ function NatePanel({ onClose, compact }) {
                 <a key={c.app} href={c.href} target={c.href.startsWith('http') ? '_blank' : undefined} rel="noreferrer" style={{ '--tile': c.tile }}>
                   <span className="nate-social-ico">{c.icon}</span>{c.app === 'Mail' ? 'Email him' : `Open ${c.app}`}<span aria-hidden="true">↗</span></a>)}</div>
             })()}
-            {m.place && <button className="nate-go" onClick={() => nate.go(m.place)}>Take me to {NATE_PLACES[m.place].short} <Arrow size={13}/></button>}
+            {m.place && <button className="nate-go" onClick={() => nate.go(m.place, m.open)}>Take me to {m.label || NATE_PLACES[m.place].short} <Arrow size={13}/></button>}
           </div>)}
       {nate?.busy && <div className="nate-msg assistant typing" aria-label="Nate is typing"><i/><i/><i/></div>}
       {empty && <div className="nate-chips">{NATE_ASKS.map((q) => <button key={q} type="button" onClick={() => submit(q)}>{q}</button>)}</div>}
@@ -831,7 +854,7 @@ function BookPages({ onClose, getRect, setSide }) {
   const goTo = (sp, n) => show(solo && n ? n - 1 : sp * 2)
   useEffect(() => { if (solo) setSide?.(idx % 2 ? 1 : -1) }, [idx, solo, setSide])
   useEffect(() => {
-    const key = (e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); step(e.key === 'ArrowRight' ? 1 : -1) } }
+    const key = (e) => { if (natesKeys(e)) return; if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); step(e.key === 'ArrowRight' ? 1 : -1) } }
     window.addEventListener('keydown', key, true); return () => window.removeEventListener('keydown', key, true)
   })
   // phones: swipe left for the next page, right for the previous one
@@ -1566,7 +1589,7 @@ function CameraView({ onClose, getRect }) {
   const [hint, setHint] = useState(true)
   const step = (d) => { setHint(false); n && setI((v) => (v + d + n) % n) }
   useEffect(() => {
-    const key = (e) => { if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); step(-1) } if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); step(1) } }
+    const key = (e) => { if (natesKeys(e)) return; if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); step(-1) } if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); step(1) } }
     window.addEventListener('keydown', key, true); return () => window.removeEventListener('keydown', key, true)
   })
   return <motion.div className="phone-overlay" onClick={onClose} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
@@ -1723,19 +1746,30 @@ export default function App() {
   const nateNow = useRef({}); nateNow.current = { msgs: nateMsgs, systemOpen, systemApp, buttonsMode, closeSystem }
   const screenNow = useCallback(() => describeScreen({ scene: sceneRef.current, systemOpen: nateNow.current.systemOpen, systemApp: nateNow.current.systemApp, touch: touchUI, buttonsMode: nateNow.current.buttonsMode }), [touchUI])
   // walk to a place and open it (leaving any close-up first)
-  const nateGo = useCallback((place) => {
+  // `inside` goes one step further once the close-up is open: a note or project on the computer,
+  // or one certificate on the awards wall
+  const nateInside = useCallback((inside) => {
+    if (!inside) return
+    if (inside.note || inside.project) { window.__macOpen = { ...inside, at: Date.now() }; window.dispatchEvent(new CustomEvent('mac-open', { detail: inside })); return }
+    if (inside.cert) {
+      const t0 = Date.now()
+      const wait = () => { if (Date.now() - t0 > 20000) return; if (nateNow.current.systemOpen && !sceneRef.current?.busy()) { sceneRef.current?.openCert?.(inside.cert); return } window.setTimeout(wait, 150) }
+      window.setTimeout(wait, 600)
+    }
+  }, [])
+  const nateGo = useCallback((place, inside) => {
     window.dispatchEvent(new CustomEvent('nate-close'))
     const sc = sceneRef.current, { systemOpen: open, systemApp: app } = nateNow.current; if (!sc) return
-    if (open && app === place) return
+    if (open && app === place) { nateInside(inside); return }
     if (open) sc.switchTo(place); else sc.goTo(place)
     const t0 = Date.now()
     const wait = () => {
-      if (Date.now() - t0 > 8000) return
-      if (!nateNow.current.systemOpen && !sc.busy() && sc.hotspotId() === place) { sc.openSpot(); return }
+      if (Date.now() - t0 > 20000) return
+      if (!nateNow.current.systemOpen && !sc.busy() && sc.hotspotId() === place) { sc.openSpot(); nateInside(inside); return }
       window.setTimeout(wait, 120)
     }
     window.setTimeout(wait, 350)
-  }, [])
+  }, [nateInside])
   const startTour = useCallback(() => {
     window.dispatchEvent(new CustomEvent('nate-close'))
     if (nateNow.current.systemOpen) { nateNow.current.closeSystem(); window.setTimeout(() => setTourOn(true), 1100) } else setTourOn(true)
@@ -1754,8 +1788,12 @@ export default function App() {
         say(why || 'Something went wrong on my end. Try asking again?', { error: true }); return
       }
       const a = d.action
-      say(d.reply, { ...(a?.type === 'suggest' ? { place: a.place } : {}) })
-      if (a?.type === 'go') window.setTimeout(() => nateGo(a.place), 1100)
+      // every grounded answer gets a "Take me to …" button: to what it cited (down to the note,
+      // project or certificate), else to the place Nate suggested
+      const t = nateTarget(d.citations) || (a?.type === 'suggest' || a?.type === 'go' ? { place: a.place } : null)
+      const target = t && a?.type === 'go' && a.place !== t.place ? { place: a.place } : t
+      say(d.reply, target ? { place: target.place, open: target.open, label: target.label } : {})
+      if (a?.type === 'go') window.setTimeout(() => nateGo(target?.place || a.place, target?.open), 1100)
       if (a?.type === 'tour') window.setTimeout(startTour, 1100)
     } catch {
       say('I can’t reach my brain right now. Check your connection and try again?', { error: true })

@@ -786,6 +786,21 @@ function createScene(canvas, handlers) {
   }
   // Speaker close-up: a three-quarter view from the room side, the speaker on the left of the screen
   // (laptop) or in the top half (phone) so the song card has the rest.
+  // A glide that keeps its subject in frame: instead of sliding the position and turning the head
+  // separately (which, for a small object off to the side, swings it out of view mid-way and dips the
+  // camera through whatever is in between), the camera eases along a gentle upward arc while its aim point
+  // travels from where you were looking to the subject.
+  const aimV=new THREE.Vector3(), aimQ=new THREE.Quaternion(), aimA=new THREE.Vector3(), aimB=new THREE.Vector3(), aimF=new THREE.Vector3()
+  const aimPath=(p0,q0,p1,q1,pivot,e)=>{
+    const d0=p0.distanceTo(pivot), d1=p1.distanceTo(pivot)
+    aimA.copy(p0).add(aimF.set(0,0,-1).applyQuaternion(q0).multiplyScalar(d0))
+    aimB.copy(p1).add(aimF.set(0,0,-1).applyQuaternion(q1).multiplyScalar(d1))
+    // the aim point leads the position a little, so the subject comes into frame early and stays there
+    const ea=Math.min(1,e*1.25)
+    camera.position.lerpVectors(p0,p1,e); camera.position.y+=Math.sin(Math.PI*e)*Math.min(.18,p0.distanceTo(p1)*.12)
+    aimF.lerpVectors(aimA,aimB,ea); camera.up.set(0,1,0); camera.lookAt(aimF)
+    if(e>=1)camera.quaternion.copy(q1)
+  }
   const speakerView=()=>{
     const obj=scene.getObjectByName('cabinet-speaker'); if(!obj)return null
     obj.updateWorldMatrix(true,false)
@@ -804,7 +819,7 @@ function createScene(canvas, handlers) {
     // move the camera so the speaker lands at x≈26% (laptop) or y≈25% from the top (phone)
     if(portrait) pos.addScaledVector(up,-(.5-.17)*2*t*dist)
     else pos.addScaledVector(right,(.5-.26)*2*t*aspect*dist)
-    return {pos,quat,fov,id:'music'}
+    return {pos,quat,fov,id:'music',pivot:target}
   }
   // phones: how far along the wall the view has been swiped (m from the centre; null = start at the left end)
   let wallPan=null, wallPanMax=0, wallPxPerM=1000
@@ -1145,7 +1160,11 @@ function createScene(canvas, handlers) {
   const WASD={w:'arrowup',a:'arrowleft',s:'arrowdown',d:'arrowright'}
   const typing=(event)=>!!event.target?.closest?.('input,textarea,[contenteditable="true"]')
   const keyOf=(event)=>{ const k=event.key.toLowerCase(); return WASD[k]&&!event.metaKey&&!event.ctrlKey&&!event.altKey&&!typing(event)?WASD[k]:k }
+  // keys belong to Nate while his chat is open (or to any text field being typed in): Enter sends the
+  // message instead of opening what's nearby, and arrows / WASD move the caret instead of walking
+  const natesKeys=(event)=>document.body.classList.contains('nate-open')||typing(event)
   const onDown = (event) => {
+    if (natesKeys(event)) return
     const key=keyOf(event)
     if (state.system && ['backspace','delete','escape'].includes(key)) { event.preventDefault(); exitSystem(); return }
     if (!state.system && key==='enter' && state.hotspot && state.allowOpen!==false) { event.preventDefault(); enterSystem(); return }
@@ -1319,17 +1338,20 @@ function createScene(canvas, handlers) {
     if(active!==state.hotspot){state.hotspot=active;state.nearby=!!active;handlers.onHotspot?.(active?active.id:null);handlers.onNearby?.(!!active)}
     camera.position.set(state.x,roomBounds?floorY+EYE_HEIGHT:EYE_HEIGHT,state.z);camera.rotation.set(state.pitch,state.yaw,0)
     if(focus){
-      focus.t=Math.min(1,focus.t+dt/(focus.phase==='in'?(SNAPPY?.85:1.15):(SNAPPY?.65:.9)))
+      const slow=focus.to.pivot?1.3:1 // the aimed glide (speaker) takes a little longer so it reads as one smooth move
+      focus.t=Math.min(1,focus.t+dt/((focus.phase==='in'?(SNAPPY?.85:1.15):(SNAPPY?.65:.9))*slow))
       let e=focus.t<.5?4*focus.t**3:1-Math.pow(-2*focus.t+2,3)/2
       if(focus.phase==='in'){
         if(focus.t>=1){const v=focusView(focus.to.id);if(v)focus.to=v} // follow window resizes
         // the next leg (Next certificate: wall → next one) starts here, from where this one ended
         if(focus.t>=1&&focus.chain){const c=focusView(focus.chain.id)||focus.chain; focus={...focus,t:0,from:{pos:focus.to.pos.clone(),quat:focus.to.quat.clone(),fov:focus.to.fov},to:c,chain:null}; e=0}
-        camera.position.lerpVectors(focus.from.pos,focus.to.pos,e); tmpQ.copy(focus.from.quat).slerp(focus.to.quat,e); camera.quaternion.copy(tmpQ)
+        if(focus.to.pivot)aimPath(focus.from.pos,focus.from.quat,focus.to.pos,focus.to.quat,focus.to.pivot,e)
+        else{ camera.position.lerpVectors(focus.from.pos,focus.to.pos,e); tmpQ.copy(focus.from.quat).slerp(focus.to.quat,e); camera.quaternion.copy(tmpQ) }
         camera.fov=THREE.MathUtils.lerp(focus.from.fov,focus.to.fov,e)
       }else{
         tmpV.copy(camera.position); tmpQ.copy(camera.quaternion) // the normal walking view
-        camera.position.lerpVectors(focus.from.pos,tmpV,e); camera.quaternion.copy(focus.from.quat).slerp(tmpQ,e)
+        if(focus.to.pivot)aimPath(focus.from.pos,focus.from.quat,aimV.copy(tmpV),aimQ.copy(tmpQ),focus.to.pivot,e)
+        else{ camera.position.lerpVectors(focus.from.pos,tmpV,e); camera.quaternion.copy(focus.from.quat).slerp(tmpQ,e) }
         camera.fov=THREE.MathUtils.lerp(focus.from.fov,focus.savedFov,e)
         if(focus.t>=1){camera.fov=focus.savedFov;focus=null}
       }
