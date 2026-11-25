@@ -472,47 +472,43 @@ function SpotCue({ id }) {
 // Laptop walkthrough, step 3: a pointer shows the bar at work (~9 s) — Life opens its menu, a place
 // shortcut walks you there — then the camera glides back to where the walkthrough started.
 const DemoPointer = () => <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M5 3l14 8.5-6.2 1.4L9.6 19z" fill="#1d1f22" stroke="#fff" strokeWidth="1.6" strokeLinejoin="round"/></svg>
-const DEMO_PACE = .6 // the whole timeline (and the pointer glides) runs at 60% of the original timings
 function BarDemo({ sceneRef, startPose, onDone }) {
   const [ptr, setPtr] = useState(null) // {x, y, click}
   const touch = isTouch()
   useEffect(() => {
     let alive = true; const timers = []
-    const at = (ms, fn) => timers.push(window.setTimeout(() => { if (alive) fn() }, ms * DEMO_PACE))
-    const centre = (sel) => { const el = document.querySelector(sel); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left + r.width * .55, y: r.top + r.height * .6 } }
-    const moveTo = (sel) => { const c = centre(sel); if (c) setPtr({ ...c, click: false }) }
-    const click = () => setPtr((p) => p && { ...p, click: true })
+    // times are real milliseconds: a quick, continuous sweep across the shortcuts, no stops on any of them
+    const at = (ms, fn) => timers.push(window.setTimeout(() => { if (alive) fn() }, ms))
+    const centre = (sel, nth) => { const all = document.querySelectorAll(sel), el = nth === 'last' ? all[all.length - 1] : all[0]; if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left + r.width * .55, y: r.top + r.height * .6 } }
+    // d: glide time in s; lin: constant speed (the sweep), else eased; jump: appear there without gliding
+    const moveTo = (sel, { nth, d = .35, lin = false, jump = false } = {}) => { const c = centre(sel, nth); if (c) setPtr({ ...c, click: false, d: jump ? 0 : d, lin }) }
+    const click = () => setPtr((p) => p && { ...p, click: true, d: 0 })
     const panel = (name) => window.dispatchEvent(new CustomEvent('bar-demo', { detail: name }))
-    setPtr({ x: window.innerWidth / 2, y: window.innerHeight * .62, click: false })
-    if (touch) { // phones (joystick): tap the menu, it opens to show the shortcuts, tap CLOSE (~5.5 s, slow glides)
+    if (touch) { // phones (joystick): tap ☰, sweep across the shortcuts it shows, tap CLOSE (~3 s)
       const menu = (v) => window.dispatchEvent(new CustomEvent('menu-demo', { detail: v }))
-      at(150, () => moveTo('.fab-menu'))
-      at(1350, click); at(1500, () => menu(true))
-      at(2300, () => moveTo('.bar-spots'))
-      at(3500, () => moveTo('.bar-open.is-close'))
-      at(4650, click); at(4800, () => menu(false))
-      at(5050, () => setPtr(null))
-      at(5600, onDone)
+      moveTo('.fab-menu', { jump: true })
+      at(300, click); at(420, () => menu(true))
+      at(650, () => moveTo('.bar-spots button', { d: .3 }))
+      at(1000, () => moveTo('.bar-spots button', { nth: 'last', d: .9, lin: true }))
+      at(1950, () => moveTo('.bar-open.is-close', { d: .3 }))
+      at(2300, click); at(2420, () => menu(false))
+      at(2600, () => setPtr(null))
+      at(2900, onDone)
       return () => { alive = false; timers.forEach(window.clearTimeout); menu(false) }
     }
     const folded = !document.querySelector('.bar-spots button')
-    at(200, () => moveTo('.sec-fun .bar-btn'))
-    at(1300, click)
-    at(1450, () => panel('fun'))
-    at(2900, () => panel(null))
-    // then the places: shown, not visited (no walk to the books and back)
-    if (folded) { // narrow window: the places live under Work
-      at(3100, () => moveTo('.sec-work .bar-btn'))
-      at(4200, click); at(4350, () => panel('work'))
-      at(4500, () => moveTo('.fun-row:last-child'))
-      at(6400, () => panel(null))
-      at(6600, () => setPtr(null))
-      at(7000, onDone)
-    } else { // wide window: glide along the places in the bar
-      at(3100, () => moveTo('.bar-spots button:first-child'))
-      at(4300, () => moveTo('.bar-spots button:last-child'))
-      at(5600, () => setPtr(null))
-      at(6000, onDone)
+    if (folded) { // narrow window: the places live under Work, so open it and sweep down the list (~2.2 s)
+      moveTo('.sec-work .bar-btn', { jump: true })
+      at(300, click); at(400, () => panel('work'))
+      at(550, () => moveTo('.fun-row', { d: .3 }))
+      at(900, () => moveTo('.fun-row', { nth: 'last', d: .9, lin: true }))
+      at(1900, () => { panel(null); setPtr(null) })
+      at(2200, onDone)
+    } else { // wide window: one sweep along the bar, Books to Phone (~1.8 s)
+      moveTo('.bar-spots button', { jump: true })
+      at(250, () => moveTo('.bar-spots button', { nth: 'last', d: 1.1, lin: true }))
+      at(1500, () => setPtr(null))
+      at(1800, onDone)
     }
     return () => { alive = false; timers.forEach(window.clearTimeout); panel(null) }
   }, [sceneRef, startPose, onDone, touch])
@@ -523,7 +519,7 @@ function BarDemo({ sceneRef, startPose, onDone }) {
         ? <><b>Quick access is in the menu</b><small>Tap ☰ for every spot, Life, settings and help</small></>
         : <><b>The bar takes you anywhere</b><small>Life opens the camera, speaker and dogs · the others walk you straight there</small></>}
     </motion.div>
-    <AnimatePresence>{ptr && <motion.div key="ptr" className="demo-pointer" initial={{ opacity: 0, x: ptr.x, y: ptr.y }} animate={{ opacity: 1, x: ptr.x, y: ptr.y, scale: ptr.click ? .82 : 1 }} exit={{ opacity: 0 }} transition={{ x: { duration: 1.05 * DEMO_PACE, ease: [.45, 0, .2, 1] }, y: { duration: 1.05 * DEMO_PACE, ease: [.45, 0, .2, 1] }, scale: { duration: .22, ease: 'easeOut' }, opacity: { duration: .35 } }}>{touch ? <span className="demo-tap"/> : <DemoPointer/>}</motion.div>}</AnimatePresence>
+    <AnimatePresence>{ptr && <motion.div key="ptr" className="demo-pointer" initial={{ opacity: 0, x: ptr.x, y: ptr.y }} animate={{ opacity: 1, x: ptr.x, y: ptr.y, scale: ptr.click ? .82 : 1 }} exit={{ opacity: 0 }} transition={{ x: { duration: ptr.d ?? .35, ease: ptr.lin ? 'linear' : [.45, 0, .2, 1] }, y: { duration: ptr.d ?? .35, ease: ptr.lin ? 'linear' : [.45, 0, .2, 1] }, scale: { duration: .22, ease: 'easeOut' }, opacity: { duration: .35 } }}>{touch ? <span className="demo-tap"/> : <DemoPointer/>}</motion.div>}</AnimatePresence>
   </>
 }
 

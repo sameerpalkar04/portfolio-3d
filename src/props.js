@@ -901,11 +901,13 @@ export function createFileFolder({ color = '#2f4a6b', thickness = .065, height =
 // origin at the floor centre.
 export const DOG_COATS = {
   // [body, head, muzzle, ears, legs, tail, eye rims, nose, tongue, lips/mouth, bandana] — from photos of Rio and Bruno
-  white: ['#f1ebe1', '#eadbc4', '#e6e0d6', '#c79c68', '#f3eee6', '#efe5d4', '#3a2c26', '#141111', '#e8818c', '#1c1615', '#3a3d42'],
-  bruno: ['#8a6546', '#5f4737', '#2c2420', '#5b4435', '#a27b58', '#98734f', '#1c1411', '#141111', '#e8818c', '#1d1512', '#26282c'],
+  // Rio: cream all over, with light brown ears
+  white: ['#eee5d5', '#ebe1cf', '#e8dfd1', '#b48c62', '#f1eadf', '#ece2d1', '#3a2c26', '#141111', '#e8818c', '#1c1615', '#141414'],
+  // Bruno: warm chestnut body, a near-black face and head with golden-brown tips through it
+  bruno: ['#6f4b31', '#3b2b21', '#1e1814', '#4a3527', '#7c573a', '#6b4830', '#1c1411', '#141111', '#e8818c', '#1d1512', '#141414'],
 }
 const GLOSSY = new Set([6, 7, 8])
-export function createShihTzu(srcMesh, { coat = DOG_COATS.white, height = .27, frost = null } = {}) {
+export function createShihTzu(srcMesh, { coat = DOG_COATS.white, height = .27, frost = null, sheen = coat === DOG_COATS.bruno ? '#b88a5c' : '#fff4e2' } = {}) {
   // plain float geometry in model space (the file's positions/normals are quantized)
   srcMesh.updateWorldMatrix(true, false)
   const src = srcMesh.geometry, n = src.attributes.position.count, M = srcMesh.matrixWorld, NM = new THREE.Matrix3().getNormalMatrix(M)
@@ -917,7 +919,10 @@ export function createShihTzu(srcMesh, { coat = DOG_COATS.white, height = .27, f
     const r = Math.min(10, Math.round(src.attributes.color.getX(i) * 255 / 16)); region[i] = r
     // a little variation through the coat so it doesn't read as plastic
     const px = pos[i * 3], py = pos[i * 3 + 1], pz = pos[i * 3 + 2]
-    const j = GLOSSY.has(r) || r === 10 ? 1 : .94 + .06 * Math.sin(px * .9 + py * .37) * Math.sin(pz * .73 - py * .21)
+    // hair runs downwards, so the variation is long vertical streaks plus finer strand-to-strand noise
+    const streak = Math.sin(px * 1.7 + Math.sin(py * .11) * 3) * Math.sin(pz * 1.3 + Math.cos(py * .09) * 2.4)
+    const fine = Math.sin(px * 7.1 + pz * 5.3 + py * .6) * Math.sin(px * 4.3 - pz * 6.7)
+    const j = GLOSSY.has(r) || r === 10 ? 1 : .94 + .04 * streak + .02 * fine
     c.copy(pal[r]).multiplyScalar(j); col.set([c.r, c.g, c.b], i * 3)
   }
   // the mouth: only a thin, soft black lip line right along the edge of the (tucked-away) tongue; the
@@ -950,21 +955,24 @@ export function createShihTzu(srcMesh, { coat = DOG_COATS.white, height = .27, f
     }
   }
   // fur first, then the glossy bits (eye rims, nose), then the tongue on its own (it pokes out when petted)
-  const idx = src.index.array, fur = [], gloss = [], tongue = []
+  const idx = src.index.array, fur = [], gloss = [], tongue = [], scarf = []
   for (let f = 0; f < idx.length; f += 3) {
     const r0 = region[idx[f]], r1 = region[idx[f + 1]]
-    ;(r0 === 8 && r1 === 8 ? tongue : GLOSSY.has(r0) && GLOSSY.has(r1) ? gloss : fur).push(idx[f], idx[f + 1], idx[f + 2])
+    ;(r0 === 8 && r1 === 8 ? tongue : r0 === 10 && r1 === 10 ? scarf : GLOSSY.has(r0) && GLOSSY.has(r1) ? gloss : fur).push(idx[f], idx[f + 1], idx[f + 2])
   }
   const g = new THREE.BufferGeometry()
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3))
-  g.setIndex(new (n > 65535 ? THREE.Uint32BufferAttribute : THREE.Uint16BufferAttribute)([...fur, ...gloss, ...tongue], 1))
-  g.addGroup(0, fur.length, 0); g.addGroup(fur.length, gloss.length, 1); g.addGroup(fur.length + gloss.length, tongue.length, 2)
+  g.setIndex(new (n > 65535 ? THREE.Uint32BufferAttribute : THREE.Uint16BufferAttribute)([...fur, ...gloss, ...tongue, ...scarf], 1))
+  g.addGroup(0, fur.length, 0); g.addGroup(fur.length, gloss.length, 1); g.addGroup(fur.length + gloss.length, tongue.length, 2); g.addGroup(fur.length + gloss.length + tongue.length, scarf.length, 3)
   g.computeBoundingBox()
   const mats = [
-    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .82, metalness: 0, side: THREE.DoubleSide }),
+    // soft, velvety fur: a sheen lobe gives the bright rim real fur has instead of a plastic highlight
+    new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: .92, metalness: 0, side: THREE.DoubleSide, sheen: 1, sheenRoughness: .55, sheenColor: new THREE.Color(sheen) }),
     new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: .18, clearcoat: 1, clearcoatRoughness: .08 }),
     // resting: the tongue is tucked away, showing as glossy black lips; petting turns it pink as it comes out
     new THREE.MeshPhysicalMaterial({ color: coat[9], roughness: .8, clearcoat: 0, clearcoatRoughness: .25 }),
+    // the bandana: plain matte black cloth, no fur sheen or colour variation
+    new THREE.MeshStandardMaterial({ color: coat[10], roughness: .9, metalness: 0, side: THREE.DoubleSide }),
   ]
   // a two-bone rig so only the head turns: everything of the head (and the ears hanging off it) follows a
   // head bone pivoting at the neck, blended over the neck so nothing tears

@@ -1891,3 +1891,114 @@ button.cs-btn{cursor:pointer}
 .mac-desktop.is-touch .nd-chips:has(.nd-chip.plain){gap:6px 18px}
 /* Instructions: wide enough that each row fits on one line */
 .hud-dock:not(.is-sheet) .help-panel{width:min(460px,calc(100vw - 24px))}
+/* ── loading screen v2: the office's floor plan drawn on the book's paper ── */
+.loader{background:#f4efe6;color:#2b2622}
+.loader-wrap{position:relative;display:flex;align-items:center;gap:clamp(32px,6vw,88px);padding:0 24px}
+.loader-plan{width:clamp(300px,34vw,440px);height:auto;color:#2b2622;overflow:visible;flex:none}
+.loader-plan .plan-label{font:500 8.5px 'JetBrains Mono',monospace;letter-spacing:.08em;fill:#2b2622}
+.loader-plan .plan-lead{color:#c8432f}
+.loader-plan .plan-dot{fill:#c8432f}
+.loader-plan .plan-title text{font:500 7px 'JetBrains Mono',monospace;letter-spacing:.12em;fill:#8a8073}
+.loader-plan .plan-title line{color:#cfc5b5}
+.loader-plan .plan-glow{fill:#f3b85a;opacity:0;filter:blur(10px);transition:opacity 1.2s ease}
+.loader-plan .plan-day{fill:#bfe0ef;opacity:0;transition:opacity 1.2s ease}
+.loader-plan.is-lit .plan-glow{opacity:.45}
+.loader-plan.is-lit .plan-day{opacity:.55}
+.loader-inner{width:min(380px,calc(100vw - 48px))}
+.loader-name{color:#2b2622}.loader-name span{color:#8a8073}
+.loader-pct span{color:#8a8073}
+.loader-bar{background:#e2d9ca}.loader-bar i{background:#c8432f}
+.loader.is-done .loader-bar i{background:#c8432f}
+.loader-status{color:#6b655c}.loader-status .ok{color:#c8432f}
+.loader-caret{background:#6b655c}
+.loader-enter{border-color:#2b2622;background:#2b2622;color:#f4efe6;border-radius:10px}
+.loader-enter:hover{background:transparent;color:#2b2622}
+.loader-cta small{color:#8a8073}
+/* phones and narrow windows: the plan on top, smaller, the text under it */
+@media (max-width:820px){
+  .loader-wrap{flex-direction:column;align-items:flex-start;gap:18px}
+  .loader-plan{width:min(78vw,330px);align-self:center}
+  .loader-pct{font-size:clamp(56px,16vw,80px)}
+}
+@media (max-height:560px) and (max-width:820px){.loader-plan{width:min(48vw,220px)}}
+/* ── loading screen v3: a CAD workspace drafting the office (dark, like before) ── */
+.loader.cad{display:flex;flex-direction:column;place-items:stretch;background:#0d0f12;color:#e8eaed}
+.cad-top{flex:none;height:34px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:0 14px;border-bottom:1px solid #1d2127;background:#111418;font-size:11px;color:#8a919c}
+.cad-lights{display:flex;gap:7px}.cad-lights i{width:10px;height:10px;border-radius:50%;background:#2a2f37}
+.cad-file{color:#c9ced6;letter-spacing:.02em}
+.cad-size{justify-self:end;font-variant-numeric:tabular-nums}
+.cad-view{position:relative;flex:1;min-height:0;display:grid;place-items:center;overflow:hidden;
+  background-color:#0d0f12;
+  background-image:linear-gradient(rgba(255,255,255,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.055) 1px,transparent 1px),
+    linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px);
+  background-size:100px 100px,100px 100px,20px 20px,20px 20px;background-position:center}
+.cad-name{position:absolute;left:18px;top:14px;font-size:12px;letter-spacing:.02em}.cad-name b{font-weight:500;color:#e8eaed}.cad-name span{color:#5f6672;margin-left:8px}
+.cad-coords{position:absolute;right:18px;bottom:12px;font-size:11px;color:#5f6672;font-variant-numeric:tabular-nums;white-space:pre}
+.cad-plan{width:auto;height:min(100%,640px);max-width:min(92vw,620px);padding:28px 0;box-sizing:border-box;overflow:visible}
+.cad-wall{stroke:#e8eaed}
+.cad-furn{stroke:#8fb3c4}
+.cad-obj{stroke:#c9ced6}
+.cad-label{stroke:#e2673f;fill:none}.cad-label path{stroke-width:.6}.cad-label circle{fill:#e2673f;stroke:none}
+.cad-label text{fill:#e8eaed;stroke:none;font:500 8.5px 'JetBrains Mono',monospace;letter-spacing:.08em}
+.cad-cursor line{stroke:#7ee2a8;stroke-width:.5;opacity:.55}.cad-cursor rect{fill:none;stroke:#7ee2a8;stroke-width:.8}
+.cad-cursor-wrap{transition:opacity .5s}
+.cad-titleblock line{stroke:#2a2f37;stroke-width:.6}.cad-titleblock text{fill:#5f6672;font:500 7px 'JetBrains Mono',monospace;letter-spacing:.12em}
+.cad-glow{fill:#f3b85a;opacity:0;filter:blur(12px);transition:opacity 1.2s ease}
+.cad-day{fill:#7fb6d6;opacity:0;transition:opacity 1.2s ease}
+.cad-plan.is-done .cad-glow{opacity:.35}.cad-plan.is-done .cad-day{opacity:.28}
+.cad-cmd{flex:none;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:22px;padding:14px 22px 16px;border-top:1px solid #1d2127;background:#111418}
+.cad-pct{font-size:clamp(40px,6vw,64px);font-weight:500;line-height:1;letter-spacing:-.04em;font-variant-numeric:tabular-nums;min-width:3.1ch}
+.cad-pct span{font-size:.38em;color:#5f6672;margin-left:3px;letter-spacing:0}
+.cad-cmd-main{min-width:0}
+.cad-bar{height:2px;background:#1f2329;overflow:hidden;margin-bottom:10px}.cad-bar i{display:block;height:100%;background:#e8eaed;transform-origin:left;transition:background .4s}
+.loader.cad.is-done .cad-bar i{background:#7ee2a8}
+.cad-line{margin:0;font-size:12px;color:#8a919c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px}
+.cad-prompt{color:#5f6672}.cad-line b{color:#e8eaed;font-weight:500}.cad-ok{color:#7ee2a8}
+.cad-caret{display:inline-block;width:7px;height:13px;background:#8a919c;animation:loaderCaret 1s steps(2) infinite}
+.cad-cta{display:flex;align-items:center;gap:12px;min-height:42px}
+.cad-enter{display:inline-flex;align-items:center;gap:10px;padding:11px 20px;border:1px solid #e8eaed;border-radius:10px;background:#e8eaed;color:#0d0f12;font:500 13px 'JetBrains Mono',monospace;cursor:pointer;transition:background .15s,color .15s,transform .15s}
+.cad-enter:hover{background:transparent;color:#e8eaed}.cad-enter:active{transform:scale(.96)}
+.cad-cta small{font-size:11px;color:#5f6672}
+@media (max-width:700px){
+  .cad-cmd{grid-template-columns:auto 1fr;gap:10px 16px;padding:12px 16px 18px}
+  .cad-cta{grid-column:1 / -1}
+  .cad-cta:empty{display:none}
+  .cad-plan{max-width:94vw;padding:44px 0 10px}
+  .cad-coords{display:none}
+}
+/* CAD chrome: a menu bar and a tool ribbon instead of window dots; the name set large */
+.cad-top{display:block;height:auto;padding:0;grid-template-columns:none}
+.cad-menubar{display:flex;align-items:center;gap:16px;height:28px;padding:0 14px;font-size:11.5px;color:#9aa1ab;border-bottom:1px solid #1a1e23}
+.cad-app{display:grid;place-items:center;width:20px;height:20px;border-radius:5px;background:#e2673f;color:#0d0f12}
+.cad-menu{white-space:nowrap;cursor:default}
+.cad-menubar .cad-size{margin-left:auto;color:#5f6672;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cad-ribbon{display:flex;align-items:stretch;gap:2px;height:46px;padding:4px 10px;background:#14171c}
+.cad-tool{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:56px;padding:0 6px;border-radius:6px;color:#8a919c;transition:background .25s,color .25s}
+.cad-tool small{font-size:9.5px;letter-spacing:.02em}
+.cad-tool.on{background:#23303a;color:#e8eaed;box-shadow:inset 0 0 0 1px #3c5a6b}
+.cad-tab{margin-left:auto;align-self:flex-end;display:flex;align-items:center;gap:10px;height:30px;padding:0 12px;border-radius:6px 6px 0 0;background:#0d0f12;color:#c9ced6;font-size:11px;margin-bottom:-4px}
+.cad-tab i{font-style:normal;color:#5f6672}
+.cad-name{top:22px;left:26px;display:flex;flex-direction:column;gap:6px}
+.cad-name b{font-size:clamp(28px,3.4vw,44px);font-weight:500;letter-spacing:-.02em;line-height:1}
+.cad-name span{margin-left:0;font-size:clamp(12px,1.2vw,15px);color:#8a919c;letter-spacing:.04em}
+@media (max-width:700px){
+  .cad-menu:nth-of-type(n+5){display:none}
+  .cad-ribbon{overflow:hidden;padding:4px 6px}
+  .cad-tool{min-width:38px}.cad-tool small{display:none}
+  .cad-tab{display:none}
+  .cad-name{top:14px;left:16px}.cad-name b{font-size:26px}
+}
+/* name on one line; the command bar keeps one size before and after Enter appears */
+.cad-name{flex-direction:row;align-items:baseline;gap:14px;white-space:nowrap;max-width:calc(100% - 40px)}
+.cad-name span{font-size:clamp(13px,1.4vw,18px)}
+@media (max-width:700px){
+  .cad-name{gap:8px}.cad-name b{font-size:26px}.cad-name span{font-size:12px}
+  .cad-cta:empty{display:flex}
+  .cad-cta{min-height:44px}
+}
+/* the name back to the original loader's size and style: one small mono line */
+.cad-name,.cad-name b,.cad-name span{font-size:13px!important;letter-spacing:.02em!important;line-height:1.4}
+.cad-name{gap:8px!important}.cad-name b{font-weight:400;color:#e8eaed}.cad-name span{color:#5f6672}
+/* no Enter button: the command bar is just the percentage and the command line */
+.cad-cmd{grid-template-columns:auto 1fr;gap:22px}
+@media (max-width:700px){.cad-cmd{grid-template-columns:auto 1fr;gap:14px;padding:14px 16px 18px}}

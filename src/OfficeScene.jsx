@@ -86,6 +86,7 @@ function createDoorTexture() {
 }
 
 function createScene(canvas, handlers) {
+  let sceneBuilt = false, loaderDraw = 0
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = .9
@@ -576,7 +577,7 @@ function createScene(canvas, handlers) {
           let src = null; gltf.scene.traverse((o) => { if (o.isMesh && !src) src = o })
           if (!src) return
           for (const s of seats) {
-            const d = createShihTzu(src, { coat: s.coat, height: s.height, frost: null }); d.name = s.name
+            const d = createShihTzu(src, { coat: s.coat, height: s.height, frost: s.coat === DOG_COATS.bruno ? '#6a4e37' : null }); d.name = s.name
             d.position.copy(s.p); d.rotation.y = face + side * s.turn
             d.userData.base = { y: s.p.y, ry: d.rotation.y, h: s.height }
             petGroup.add(d)
@@ -773,6 +774,7 @@ function createScene(canvas, handlers) {
     }
     handlers.onPosition?.({ x:state.x,z:state.z,minX:walkBounds.min.x,maxX:walkBounds.max.x,minZ:walkBounds.min.z,maxZ:walkBounds.max.z })
     dynLights=[]; scene.traverse((o)=>{ if(o.isPointLight||o.isSpotLight||o.isRectAreaLight)dynLights.push(o) })
+    sceneBuilt = true; window.__sceneWarm = 0; loaderDraw = 0
     handlers.onReady?.(); if (import.meta.env.DEV && !disposed) window.__dbg = { scene, camera, state, THREE, renderer }
   }, (xhr) => { if (xhr.total) handlers.onProgress?.(xhr.loaded / xhr.total, xhr.loaded, xhr.total) }, (error) => { console.error('Unable to load the home-office model.',error); loadError=true; handlers.onReady?.() })
 
@@ -1236,6 +1238,10 @@ function createScene(canvas, handlers) {
   const poke=()=>{lastInput=performance.now()}
   ;['pointermove','pointerdown','keydown','wheel','touchmove'].forEach((e)=>window.addEventListener(e,poke,{passive:true}))
   const tick=(now)=>{
+    // while the loading screen covers the room, draw it only twice a second (enough to get its shaders
+    // compiled and textures uploaded early) so the loader's animation has the frame budget to itself
+    // once it's been drawn a first time (shaders compiled), not at all until the loader goes
+    if(window.__loaderUp){ if(window.__sceneWarm||now-loaderDraw<500){frame=requestAnimationFrame(tick);return} loaderDraw=now }
     const busy=now-lastInput<3000||travel||focus||hold||folder||keys.size||stick.x||stick.y||smoothTurn||smoothFwd||disco>.001||musicOn
     // busy: draw every frame the display gives us (a fixed 60 fps cap judders on 90/120 Hz phones); idle: ~30 fps
     if(!busy&&now-lastDraw<1000/30-2){frame=requestAnimationFrame(tick);return}
@@ -1415,7 +1421,8 @@ function createScene(canvas, handlers) {
         // a close-up has landed once every camera / object move into it has finished (zoom, picked-up camera, résumé folder)
         const landed=state.system&&(!focus||(focus.phase==='in'&&focus.t>=1&&!focus.chain))&&(!hold||(hold.phase==='in'&&hold.t>=1))&&(!folder||(folder.dir>0&&folder.u>=1))
         if(landed!==camLanded){camLanded=landed;handlers.onSettled?.(landed)}
-        renderer.render(scene,camera);frame=requestAnimationFrame(tick)
+        renderer.render(scene,camera); if(sceneBuilt&&!window.__sceneWarm)window.__sceneWarm=performance.now() // first full draw done (shaders compiled)
+        frame=requestAnimationFrame(tick)
   }
   frame=requestAnimationFrame(tick)
   return {
