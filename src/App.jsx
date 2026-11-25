@@ -10,6 +10,7 @@ import { RESUME_URL, RESUME_VIEW, RESUME_DOWNLOAD, RESUME_NAME, loadResume } fro
 import { PLACES as NATE_PLACES } from './nate/places'
 import { describeScreen } from './nate/screen'
 import NateTour from './nate/NateTour'
+import { ClassicSite, SwitchLoader } from './Classic'
 
 // Songs on the speaker: add your picks here as { title, artist, link? }.
 const songs = []
@@ -156,11 +157,16 @@ function TimePanel({ hour, auto, onHour, onAuto, children, label = 'Time of day'
   </div>
 }
 
-function SettingsPanel({ moveMode, onMoveMode, ...time }) {
+function SettingsPanel({ moveMode, onMoveMode, onView, controls = true, ...time }) {
   return <TimePanel {...time} label="Settings">
-    <div className="mode-switch"><h4>Controls</h4><div className="mood-seg">
+    {controls && <div className="mode-switch"><h4>Controls</h4><div className="mood-seg">
       <button className={moveMode === 'joystick' ? 'on' : ''} onClick={() => onMoveMode('joystick')}>Joystick</button>
       <button className={moveMode === 'buttons' ? 'on' : ''} onClick={() => onMoveMode('buttons')}>Buttons</button>
+    </div></div>}
+    {/* the two ways to see the portfolio: this room, or the classic one-page version */}
+    <div className="mode-switch view-switch"><h4>Version</h4><div className="mood-seg">
+      <button className="on">Interactive</button>
+      <button onClick={() => onView?.('classic')}>Classic</button>
     </div></div>
   </TimePanel>
 }
@@ -311,7 +317,7 @@ function FunPanel({ onGo, preview = false }) {
   </div>
 }
 const BAR_FOLD = 900 // px: below this the laptop bar folds the five shortcuts into Work (keeps clear of Nate)
-function BottomBar({ hour, auto, onHour, onAuto, hotspot: hotspotNow, onGo: goNow, onOpen, interacting, onBack, locked, spotsLocked = locked, workLocked = spotsLocked, playLocked = spotsLocked, teach, showDisco, disco, onDisco, buttonsMode, moveMode, onMoveMode }) {
+function BottomBar({ hour, auto, onHour, onAuto, hotspot: hotspotNow, onGo: goNow, onOpen, interacting, onBack, locked, spotsLocked = locked, workLocked = spotsLocked, playLocked = spotsLocked, teach, showDisco, disco, onDisco, buttonsMode, moveMode, onMoveMode, onView }) {
   // picking a place from the bar: until the camera gets there, the bar shows that place (not whatever
   // the camera sweeps past on the way), so only the button you chose turns black
   const [goingTo, setGoingTo] = useState(null)
@@ -369,7 +375,7 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot: hotspotNow, onGo: goNo
   // which tab the place you're at belongs to (it stays black while you're there)
   const atGroup = locked ? null : SPOTS.some((x) => x.id === hotspot) ? 'work' : FUN_SPOTS.some((x) => x.id === hotspot) ? 'play' : null
   if (keepOpen) return <motion.div key="onebar" ref={ref} className="hud-dock is-sheet is-buttons is-onebar" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .45, ease: [.2, .8, .2, 1] }}>
-    {panel === 'settings' && <SettingsPanel hour={hour} auto={auto} onHour={onHour} onAuto={onAuto} moveMode={moveMode} onMoveMode={(m) => { onMoveMode?.(m); setPanel(null) }}/>}
+    {panel === 'settings' && <SettingsPanel hour={hour} auto={auto} onHour={onHour} onAuto={onAuto} moveMode={moveMode} onMoveMode={(m) => { onMoveMode?.(m); setPanel(null) }} onView={(v) => { setPanel(null); onView?.(v) }}/>}
     {panel === 'help' && <HelpPanel moveMode={moveMode}/>}
     {panel === 'work' && <PlacesPanel preview={!!teach} hotspot={locked ? null : hotspot} onGo={(id) => { setPanel(null); onGo(id) }}/>}
     {panel === 'play' && <FunPanel preview={!!teach} onGo={(id) => { setPanel(null); onGo(id) }}/>}
@@ -383,7 +389,7 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot: hotspotNow, onGo: goNo
     </div>
   </motion.div>
   return <motion.div key="dock" ref={ref} className={`hud-dock${compact ? ' is-sheet' : ''}${keepOpen ? ' is-buttons' : ''}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .45, ease: [.2, .8, .2, 1] }}>
-    {panel === 'time' && (compact ? <SettingsPanel hour={hour} auto={auto} onHour={onHour} onAuto={onAuto} moveMode={moveMode} onMoveMode={(m) => { onMoveMode?.(m); setPanel(null) }}/> : <TimePanel hour={hour} auto={auto} onHour={onHour} onAuto={onAuto}/>)}
+    {panel === 'time' && <SettingsPanel hour={hour} auto={auto} onHour={onHour} onAuto={onAuto} controls={compact} moveMode={moveMode} onMoveMode={(m) => { onMoveMode?.(m); setPanel(null) }} onView={(v) => { setPanel(null); setOpen(false); onView?.(v) }}/>}
     {panel === 'help' && <HelpPanel moveMode={moveMode}/>}
     {panel === 'fun' && <FunPanel onGo={(id) => { setPanel(null); setOpen(false); onGo(id) }}/>}
     {panel === 'work' && <PlacesPanel hotspot={locked ? null : hotspot} onGo={(id) => { setPanel(null); setOpen(false); onGo(id) }}/>}
@@ -393,7 +399,7 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot: hotspotNow, onGo: goNo
       <div className="bar-section sec-time">
         {compact
           ? <button className={`bar-btn settings-btn${panel === 'time' ? ' on' : ''}`} onClick={() => toggle('time')} disabled={locked} aria-expanded={panel === 'time'} aria-label="Settings" title="Settings">{OB_ICONS.settings}</button>
-          : <button className={`bar-icon ${isDark(hour) ? 'is-night' : 'is-day'}${panel === 'time' ? ' open' : ''}`} onClick={() => toggle('time')} disabled={locked} aria-expanded={panel === 'time'} title={locked ? 'Finish the walkthrough first' : 'Time of day'}>{isDark(hour) ? <MoonIcon/> : <SunIcon/>}</button>}
+          : <button className={`bar-icon is-gear${panel === 'time' ? ' open' : ''}`} onClick={() => toggle('time')} disabled={locked} aria-expanded={panel === 'time'} aria-label="Settings" title={locked ? 'Finish the walkthrough first' : 'Settings'}>{OB_ICONS.settings}</button>}
       </div>
       <div className="bar-section sec-help">
         <button className={`bar-btn${panel === 'help' ? ' on' : ''}`} onClick={() => toggle('help')} aria-expanded={panel === 'help'}>Instructions</button>
@@ -1708,7 +1714,8 @@ export default function App() {
   const [systemApp, setSystemApp] = useState('about')
   const [certId, setCertId] = useState(null) // the certificate open on the achievements wall
   const landOK = systemOpen && ['photos', 'projects'].includes(systemApp) // (the book and the achievements wall are portrait only on phones) // (the achievements wall is portrait only on phones)
-  const lockOn = land // the computer too: same portrait layout, turned back, as the book and the camera
+  const [view, setView] = useState('interactive'), [switching, setSwitching] = useState(null)
+  const lockOn = land && view !== 'classic' // the classic page works sideways; in the room, the computer too: same portrait layout, turned back, as the book and the camera
   useLayoutEffect(() => { setPortraitLock(lockOn); window.dispatchEvent(new Event('portrait-lock')) }, [lockOn, land])
   const sceneRef = useRef(null)
   const updateHotspot = useCallback((v) => setHotspot(v), [])
@@ -1732,6 +1739,13 @@ export default function App() {
   // phones: 'joystick' (walk freely) or 'buttons' (the full bar stays open; tap a place to go there), picked
   // at the start of the walkthrough (null until then)
   const [moveMode, setMoveMode] = useState(null)
+  // which version is on screen: the 3D room ('interactive') or the one-page résumé ('classic'); a short
+  // drafting animation covers the swap
+  const requestView = useCallback((v) => { if (v !== view && !switching) setSwitching(v) }, [view, switching])
+  const swapView = useCallback(() => { setView(switching); window.__classicView = switching === 'classic' }, [switching])
+  const requestViewRef = useRef(requestView); requestViewRef.current = requestView
+  const classicGo = useRef(null), nateGoRef = useRef(null)
+  const switchDone = useCallback(() => { setSwitching(null); const go = classicGo.current; classicGo.current = null; if (go) window.setTimeout(go, 200) }, [])
   const touchUI = isTouch(), buttonsMode = touchUI && moveMode === 'buttons'
   // a close-up's camera move: until it lands, only BACK TO ROOM and Nate are on screen; the rest appears the moment it does
   const [camLanded, setCamLanded] = useState(false)
@@ -1799,6 +1813,8 @@ export default function App() {
   }, [])
   const nateGo = useCallback((place, inside) => {
     window.dispatchEvent(new CustomEvent('nate-close'))
+    // asked from the classic page: switch back to the room first, then walk there
+    if (window.__classicView) { classicGo.current = () => nateGoRef.current?.(place, inside); requestViewRef.current?.('interactive'); return }
     const sc = sceneRef.current, { systemOpen: open, systemApp: app } = nateNow.current; if (!sc) return
     if (open && app === place) { nateInside(inside); return }
     if (open) sc.switchTo(place); else sc.goTo(place)
@@ -1839,6 +1855,7 @@ export default function App() {
       say('I can’t reach my brain right now. Check your connection and try again?', { error: true })
     } finally { setNateBusy(false) }
   }, [nateGo, screenNow, startTour])
+  nateGoRef.current = nateGo
   const nateCtx = { messages: nateMsgs, busy: nateBusy, send: nateSend, go: nateGo }
   const getTourSpot = useCallback(() => sceneRef.current?.inView?.()[0] || null, [])
   const getPhoneRect = useCallback(() => sceneRef.current?.phoneScreenRect() ?? null, [])
@@ -1862,7 +1879,7 @@ export default function App() {
   return <NateCtx.Provider value={nateCtx}><main className="app-shell"><OfficeScene sceneRef={sceneRef} onHotspot={updateHotspot} onDeskNear={updateDeskNear} onSystem={updateSystem} onReady={updateReady} onProgress={updateProgress} onCert={updateCert} onSettled={onCamSettled}/>
     <div className="ambient-vignette"/>
     <AnimatePresence>{loading && <Loader progress={load.progress} loaded={load.loaded} total={load.total} ready={sceneReady} onEnter={finishLoading}/>}</AnimatePresence>
-    <AnimatePresence>{land && !landOK && <RotateBack key="rotate-back"/>}</AnimatePresence>
+    <AnimatePresence>{land && !landOK && view !== 'classic' && <RotateBack key="rotate-back"/>}</AnimatePresence>
     <AnimatePresence>{systemOpen && (systemApp === 'contact'
       ? <PhoneScreen key="phone" onClose={closeSystem} getRect={getPhoneRect}/>
       : systemApp === 'about'
@@ -1888,7 +1905,7 @@ export default function App() {
           interacting={systemOpen} onBack={closeSystem} locked={tourStep !== 'done'}
           spotsLocked={tourStep !== 'done' && !(tourStep === 'demo' && !showExplore)} workLocked={tourStep !== 'done' && !(tourStep === 'demo' && !showExplore) && !(buttonsMode && tourStep === 'walk')} playLocked={tourStep !== 'done' && !(buttonsMode && tourStep === 'play')}
           teach={buttonsMode && showCue ? (tourStep === 'walk' ? 'work' : tourStep === 'play' ? 'play' : null) : null}
-          buttonsMode={buttonsMode} moveMode={moveMode} onMoveMode={changeMode}
+          buttonsMode={buttonsMode} moveMode={moveMode} onMoveMode={changeMode} onView={requestView}
           showDisco={systemOpen && systemApp === 'music'} disco={disco} onDisco={() => setDisco((d) => !d)}/>
         {touchUI && moveMode === 'joystick' && !systemOpen && <Joystick onStick={setStick}/>}
       </>}
@@ -1903,5 +1920,7 @@ export default function App() {
         ? <DeskCue key="desk" hotspot={hotspot}/>
         : hotspot && <SpotCue key={hotspot} id={hotspot}/>)}</AnimatePresence>
     </div>}
+    {view === 'classic' && <ClassicSite contacts={CONTACTS} onView={requestView} nate={<AiButton compact={isTouch()}/>}/>}
+    <AnimatePresence>{switching && <SwitchLoader key="switch" to={switching} onCover={swapView} onDone={switchDone}/>}</AnimatePresence>
   </main></NateCtx.Provider>
 }

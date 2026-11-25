@@ -2146,3 +2146,8 @@ body:has(.bar-panel) .demo-cue:not(.is-touch){top:max(76px,calc(100% - 640px))!i
 .look-cue.cam-cue.phone-cue.at-fab b,.look-cue.cam-cue.phone-cue.at-fab small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
 .look-cue.cam-cue.phone-cue.at-fab b{font-size:12px;line-height:1.25}
 .look-cue.cam-cue.phone-cue.at-fab small{font-size:10.5px;line-height:1.25;margin:0}
+/* settings (gear) turns black while its panel is open, like the other bar buttons */
+.bottom-bar .bar-icon.is-gear.open{background:#1d1f22;color:#fff;border-color:#1d1f22;box-shadow:none}
+
+/* settings button: black while its panel is open, like the other bar buttons */
+.bar-icon.is-gear.open,.bar-icon.is-gear.open:hover{background:#1d1f22;color:#fff;border-color:#1d1f22;box-shadow:none}

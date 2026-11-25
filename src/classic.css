@@ -1,0 +1,275 @@
+/* ── Classic version: one plain, full-width scrolling page over the room ── */
+.classic{
+  --bg:#f6f3ee; --surface:#fffdf9; --ink:#1f1c19; --ink2:#3a352f; --muted:#5e584f; --line:#e6dfd3; --soft:#efebe4; --serif:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;
+  --green:#6D9886; --green-ink:#4f7867; --green-hover:#5e8a77; --pad:clamp(18px,5vw,88px);
+  position:fixed;inset:0;z-index:60;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  background:var(--bg);color:var(--ink);font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;font-size:16px;line-height:1.6;
+  transition:background-color .3s,color .3s;color-scheme:light;scroll-padding-top:80px;
+}
+.classic.theme-dark{
+  --bg:#0e1014; --surface:#161a20; --ink:#f0f2f4; --ink2:#d6dae0; --muted:#aab1bb; --line:#272c34; --soft:#1d2128;
+  --green-ink:#8fbca8; color-scheme:dark;
+}
+.classic *{box-sizing:border-box}
+.classic a{color:inherit}
+.classic ::selection{background:#6D988655}
+.classic button:focus-visible,.classic a:focus-visible{outline:2px solid var(--green);outline-offset:3px;border-radius:6px}
+
+/* top bar: solid, no blur */
+.cl-bar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:16px;padding:14px var(--pad);background:var(--bg);border-bottom:1px solid transparent;transition:border-color .25s}
+.cl-bar.is-scrolled{border-bottom-color:var(--line)}
+.cl-brand{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:2px}
+.cl-brand b{font:600 20px/1.1 var(--serif);color:var(--ink)}
+.cl-brand span{font:400 11.5px 'JetBrains Mono',monospace;color:var(--muted);letter-spacing:.03em}
+.cl-view{margin-left:auto;display:flex;align-items:center;gap:12px}
+.cl-view-hint{font:500 12px 'JetBrains Mono',monospace;color:var(--muted);white-space:nowrap}
+.cl-seg{display:flex;padding:3px;border-radius:10px;background:var(--soft);border:1px solid var(--line)}
+.cl-seg button{all:unset;cursor:pointer;display:flex;align-items:center;gap:7px;padding:7px 13px;border-radius:7px;font-size:14px;font-weight:500;color:var(--muted);transition:color .2s,background .2s}
+.cl-seg button:hover{color:var(--ink)}
+.cl-seg button.on{background:var(--ink);color:var(--bg);cursor:default}
+.cl-theme{all:unset;cursor:pointer;position:relative;flex:none;width:64px;height:34px;padding:3px;box-sizing:border-box;border-radius:999px;display:flex;align-items:center;justify-content:flex-start;background:#e8e2d6;border:1px solid var(--line);transition:background-color .35s}
+.cl-theme.is-dark{justify-content:flex-end;background:#262b33}
+.cl-theme-ico{position:absolute;top:50%;transform:translateY(-50%);display:grid;color:var(--muted);opacity:.7}
+.cl-theme-ico svg{width:14px;height:14px}
+.cl-theme-ico.is-sun{left:9px}.cl-theme-ico.is-moon{right:9px}
+.cl-knob{position:relative;z-index:1;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:#fff;color:#c27a1a;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.cl-theme.is-dark .cl-knob{background:#0e1014;color:#ffe08a}
+.cl-knob svg{width:15px;height:15px}
+
+/* page */
+.cl-page{padding:0 var(--pad) 40px}
+.cl-hero{display:grid;grid-template-columns:clamp(200px,22vw,320px) 1fr;gap:clamp(28px,5vw,80px);align-items:center;padding:clamp(28px,6vw,72px) 0 clamp(40px,6vw,80px)}
+.cl-photo{width:100%;aspect-ratio:830/1000;object-fit:cover;border-radius:14px;display:block;background:var(--soft)}
+.cl-about h1{font:600 clamp(44px,6.4vw,88px)/1 var(--serif);letter-spacing:-.02em;margin:0}
+.cl-role{font:500 clamp(15px,1.4vw,18px) 'JetBrains Mono',monospace;color:var(--green-ink);margin:14px 0 22px}
+.cl-lede{font-size:clamp(17px,1.5vw,20px);line-height:1.6;color:var(--ink2);margin:22px 0 20px;max-width:62ch}
+.cl-facts{list-style:none;margin:0 0 28px;padding:0;display:flex;flex-wrap:wrap;gap:6px 26px;font:400 13.5px 'JetBrains Mono',monospace;color:var(--muted)}
+.cl-row-btns{display:flex;flex-wrap:wrap;gap:10px}
+
+/* sections: heading in its own column on wide screens, grouped by space and one rule */
+.cl-sec{display:grid;grid-template-columns:1fr;gap:clamp(20px,2.4vw,32px);padding:clamp(36px,5vw,64px) 0;border-top:1px solid var(--line)}
+.cl-sec h2{font:600 clamp(28px,2.8vw,40px)/1.1 var(--serif);letter-spacing:-.01em;margin:0}
+.cl-sec-body{min-width:0;display:grid;gap:clamp(30px,3.4vw,44px)}
+.cl-entry{min-width:0}
+.cl-entry-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px 20px;flex-wrap:wrap}
+.cl-entry h3{font:700 clamp(18px,1.6vw,21px) 'DM Sans',sans-serif;letter-spacing:-.01em;line-height:1.3;margin:0}
+.cl-when{font:400 13px 'JetBrains Mono',monospace;color:var(--muted);white-space:nowrap}
+.cl-meta{margin:4px 0 0;color:var(--muted);font-size:15px}
+.cl-text{margin:10px 0 0;color:var(--ink2);max-width:75ch}
+.cl-points{margin:12px 0 0;padding:0 0 0 20px;display:grid;gap:7px;color:var(--ink2);max-width:80ch}
+.cl-points li::marker{color:var(--muted)}
+.cl-stack{margin:14px 0 0;font:400 13px/1.7 'JetBrains Mono',monospace;color:var(--muted)}
+.cl-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:14px}
+.cl-links a{display:inline-flex;align-items:center;gap:5px;font-weight:600;font-size:15px;color:var(--green-ink);text-decoration:underline;text-decoration-color:transparent;text-underline-offset:4px;transition:text-decoration-color .2s}
+.cl-links a:hover{text-decoration-color:currentColor}
+
+/* boxes: work, skills, extracurriculars */
+.cl-box,.cl-boxed{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:clamp(18px,2.2vw,28px) clamp(18px,2.4vw,32px)}
+.cl-boxed{display:flex;gap:clamp(14px,1.8vw,22px);align-items:flex-start}
+.cl-entry-main{flex:1;min-width:0}
+.cl-logo{width:56px;height:56px;border-radius:14px;object-fit:contain;flex:none;background:#fff;padding:7px;border:1px solid var(--line)}
+.cl-sec-body:has(> .cl-boxed){gap:16px}
+
+/* skills: logos, mono labels */
+.cl-skills{margin:0;display:grid}
+.cl-skills div{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:10px 24px;padding:16px 0;border-bottom:1px solid var(--line)}
+.cl-skills div:first-child{padding-top:0}
+.cl-skills div:last-child{border-bottom:0;padding-bottom:0}
+.cl-skills dt{font:600 15px 'DM Sans',sans-serif;color:var(--ink);padding-top:7px}
+.cl-skills dd{margin:0;display:flex;flex-wrap:wrap;gap:8px}
+.cl-chip{display:inline-flex;align-items:center;gap:8px;padding:6px 12px 6px 7px;border-radius:10px;background:var(--soft);border:1px solid var(--line);font:400 13.5px 'JetBrains Mono',monospace;color:var(--ink)}
+.cl-chip i{width:22px;height:22px;border-radius:6px;background:#fff;display:grid;place-items:center;padding:3px;flex:none}
+.cl-chip i>*{width:100%;height:100%}
+
+/* achievements + certification: a picture beside the text */
+.cl-media{display:grid;grid-template-columns:clamp(160px,18vw,260px) 1fr;gap:clamp(18px,2.4vw,32px);align-items:start}
+.cl-media img{width:100%;display:block;border-radius:8px;border:1px solid var(--line);background:#fff}
+.cl-media-link{display:block}
+
+/* contact */
+.cl-group{display:grid;gap:16px;justify-items:start}
+.cl-group .cl-text{margin:0}
+.cl-contact{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;width:100%}
+.cl-cbtn{display:flex;align-items:center;gap:14px;padding:16px 18px;border-radius:12px;border:1px solid var(--line);background:var(--surface);text-decoration:none;min-width:0;transition:border-color .2s,background .2s}
+.cl-cbtn:hover{border-color:var(--green)}
+.cl-cico{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;flex:none;color:#fff;transition:transform .2s}
+.cl-cbtn:hover .cl-cico{transform:scale(1.06)}
+.cl-ctext{min-width:0}
+.cl-ctext b{display:block;font-size:16px}
+.cl-ctext small{display:block;font:400 13px 'JetBrains Mono',monospace;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* buttons: flat green, no gradients */
+.cl-btn{all:unset;cursor:pointer;font-family:'DM Sans',sans-serif;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:9px;height:46px;padding:0 20px;border-radius:10px;font-weight:600;font-size:15.5px;white-space:nowrap;color:#fff;background:var(--green);border:1px solid var(--green);transition:background .2s,border-color .2s,color .2s}
+.cl-btn:hover{background:var(--green-hover);border-color:var(--green-hover)}
+.cl-btn.ghost{background:var(--surface);color:var(--ink);border-color:#cfc7b9}
+.theme-dark .cl-btn.ghost{border-color:#3a414b}
+.cl-btn.ghost:hover{border-color:var(--ink)}
+.cl-btn.is-done{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.cl-btn-ico{display:grid}
+
+.cl-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:28px 0 8px;border-top:1px solid var(--line);font:400 13px 'JetBrains Mono',monospace;color:var(--muted)}
+
+/* Nate, same button as in the room */
+.cl-nate{position:fixed;right:clamp(14px,2.4vw,28px);bottom:calc(clamp(14px,2.4vw,28px) + env(safe-area-inset-bottom));z-index:8}
+.cl-nate .ai-wrap{visibility:visible;position:relative;right:auto;bottom:auto}
+.cl-nate .ai-btn{width:52px;height:52px;border-radius:14px;padding:0;background:#e2673f;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.cl-nate .nate-panel:not(.is-touch){bottom:calc(100% + 12px)}
+.cl-page{padding-bottom:110px}
+
+/* tablets / narrow laptop windows: headings above their sections */
+@media (max-width:980px){
+  .cl-sec{grid-template-columns:1fr;gap:20px}
+  .cl-sec h2{position:static}
+}
+@media (max-width:760px){
+  .classic{font-size:15.5px}
+  .cl-bar{flex-wrap:wrap;gap:10px 12px;padding:12px var(--pad)}
+  .cl-brand{order:1}
+  .cl-switch{order:2;margin-left:auto}
+  .cl-view{order:3;width:100%;margin:0;justify-content:space-between}
+  .cl-seg button{padding:7px 11px;font-size:13.5px}
+  .cl-contact{grid-template-columns:1fr}
+  .cl-media{grid-template-columns:1fr}
+  .cl-media img{max-width:420px}
+  .cl-skills div{grid-template-columns:1fr;gap:2px}
+}
+/* phones held upright: photo on top */
+@media (max-width:560px){
+  .cl-hero{grid-template-columns:1fr;gap:24px;padding-top:20px}
+  .cl-photo{width:min(220px,62%)}
+  .cl-row-btns .cl-btn{flex:1 1 auto}
+}
+/* phones held sideways: keep it compact and side by side */
+@media (max-height:500px) and (orientation:landscape){
+  .cl-bar{flex-wrap:nowrap}
+  .cl-brand{order:0}
+  .cl-view{order:0;width:auto;margin-left:auto}
+  .cl-switch{order:0;margin-left:0}
+  .cl-hero{grid-template-columns:clamp(150px,22vw,220px) 1fr;padding:18px 0 36px}
+  .cl-about h1{font-size:clamp(34px,6vw,52px)}
+  .cl-bar{padding-left:max(var(--pad),env(safe-area-inset-left));padding-right:max(var(--pad),env(safe-area-inset-right))}
+  .cl-page{padding-left:max(var(--pad),env(safe-area-inset-left));padding-right:max(var(--pad),env(safe-area-inset-right))}
+}
+
+/* ── version switch: the loading screen itself, over everything ── */
+.loader.switch-cad{position:fixed;inset:0;z-index:90}
+
+/* light ↔ dark: every colour eases instead of snapping */
+.classic,.classic .cl-bar,.classic .cl-box,.classic .cl-boxed,.classic .cl-chip,.classic .cl-cbtn,.classic .cl-btn,.classic .cl-seg,.classic .cl-seg button,.classic .cl-logo,.classic .cl-sec,.classic .cl-foot,.classic h1,.classic h2,.classic h3,.classic p,.classic li,.classic dt,.classic .cl-when,.classic .cl-links a{transition-property:background-color,border-color,color,text-decoration-color;transition-duration:.35s;transition-timing-function:ease}
+::view-transition-old(root),::view-transition-new(root){animation-duration:.45s;animation-timing-function:ease}
+@media (max-width:760px){.cl-skills div{grid-template-columns:1fr;gap:8px}.cl-skills dt{padding-top:0}.cl-logo{width:46px;height:46px;border-radius:12px}}
+
+/* action buttons under projects, achievements, the certification */
+.cl-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+.cl-btn.sm{height:40px;padding:0 15px;font-size:14.5px;border-radius:9px;gap:8px}
+.cl-btn.sm svg{width:17px;height:17px}
+
+/* certificate, full size */
+.cl-lightbox{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:clamp(14px,4vw,48px);background:rgba(14,16,20,.72)}
+.cl-lightbox figure{margin:0;max-width:min(1100px,100%);max-height:100%;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.cl-lightbox img{display:block;width:100%;height:auto;max-height:calc(100dvh - 160px);object-fit:contain;background:#fff}
+.cl-lightbox figcaption{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;font-weight:600;color:var(--ink)}
+
+/* ── header + footer: one contrast band (deep green from the room's menu button) ── */
+.classic{--band:#3d5f51;--band-ink:#fff;--band-mute:rgba(255,255,255,.72);--band-line:rgba(255,255,255,.18)}
+.classic.theme-dark{--band:#355446}
+.cl-bar,.cl-bar.is-scrolled{background:var(--band);border-bottom:1px solid var(--band-line);color:var(--band-ink)}
+.cl-brand b{color:var(--band-ink)}
+.cl-brand span,.cl-view-hint{color:var(--band-mute)}
+.cl-seg{background:rgba(0,0,0,.18);border-color:var(--band-line)}
+.cl-seg button{color:var(--band-mute)}
+.cl-seg button:hover{color:#fff}
+.cl-seg button.on{background:#fff;color:#1f2a25}
+.cl-foot{position:relative;z-index:1;margin:0;padding:26px var(--pad) calc(26px + env(safe-area-inset-bottom));background:var(--band);color:var(--band-mute);border-top:0}
+.cl-foot .cl-btn.ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.4)}
+.cl-foot .cl-btn.ghost:hover{border-color:#fff;background:rgba(255,255,255,.08)}
+.cl-page{padding-bottom:64px}
+.cl-foot{padding-right:calc(var(--pad) + 70px)} /* leave room for Nate */
+
+/* ── light / dark switch: a little sky, sun by day, moon and stars by night ── */
+.cl-theme{width:66px;height:34px;padding:4px;border:1px solid rgba(255,255,255,.35);background:#8fc8ee;overflow:hidden;justify-content:flex-start;transition:background-color .45s}
+.cl-theme.is-dark{background:#18213a;justify-content:flex-end}
+.cl-sky{position:absolute;inset:0;pointer-events:none}
+.cl-cloud{position:absolute;right:8px;top:12px;width:16px;height:7px;border-radius:6px;background:#fff;opacity:.95;transition:transform .45s,opacity .3s}
+.cl-cloud::before{content:'';position:absolute;left:3px;top:-4px;width:8px;height:8px;border-radius:50%;background:#fff}
+.cl-theme.is-dark .cl-cloud{opacity:0;transform:translateX(12px)}
+.cl-star{position:absolute;width:2.5px;height:2.5px;border-radius:50%;background:#fff;opacity:0;transform:scale(.3);transition:opacity .35s .1s,transform .35s .1s}
+.cl-star.s1{left:10px;top:9px}.cl-star.s2{left:20px;top:19px;width:2px;height:2px}.cl-star.s3{left:28px;top:8px;width:1.5px;height:1.5px}
+.cl-theme.is-dark .cl-star{opacity:.9;transform:none}
+.cl-knob{position:relative;z-index:1;width:24px;height:24px;border-radius:50%;background:#ffd247;box-shadow:0 0 0 4px rgba(255,210,71,.28),0 1px 3px rgba(0,0,0,.2);transition:background-color .45s,box-shadow .45s;display:block;color:inherit}
+.cl-knob i{position:absolute;border-radius:50%;background:#cfcbc0;opacity:0;transition:opacity .3s}
+.cl-knob i:nth-child(1){width:6px;height:6px;left:5px;top:6px}.cl-knob i:nth-child(2){width:4px;height:4px;left:13px;top:13px}.cl-knob i:nth-child(3){width:3px;height:3px;left:14px;top:5px}
+.cl-theme.is-dark .cl-knob{background:#ecebe5;box-shadow:0 0 0 4px rgba(236,235,229,.12),0 1px 3px rgba(0,0,0,.4)}
+.cl-theme.is-dark .cl-knob i{opacity:1}
+.cl-theme:focus-visible{outline:2px solid #fff;outline-offset:3px}
+
+/* ── background that follows the pointer: a soft light, with the loader's drafting grid showing through around it ── */
+.cl-glow{position:fixed;inset:0;z-index:0;pointer-events:none;--mx:70vw;--my:25vh;
+  background:radial-gradient(520px circle at var(--mx) var(--my),rgba(109,152,134,.16),transparent 70%)}
+.cl-glow::after{content:'';position:absolute;inset:0;
+  background-image:linear-gradient(rgba(61,95,81,.16) 1px,transparent 1px),linear-gradient(90deg,rgba(61,95,81,.16) 1px,transparent 1px);background-size:28px 28px;
+  -webkit-mask-image:radial-gradient(300px circle at var(--mx) var(--my),#000,transparent 75%);mask-image:radial-gradient(300px circle at var(--mx) var(--my),#000,transparent 75%)}
+.theme-dark .cl-glow{background:radial-gradient(560px circle at var(--mx) var(--my),rgba(109,152,134,.14),transparent 70%)}
+.theme-dark .cl-glow::after{background-image:linear-gradient(rgba(143,188,168,.13) 1px,transparent 1px),linear-gradient(90deg,rgba(143,188,168,.13) 1px,transparent 1px)}
+.cl-page{position:relative;z-index:1}
+@media (prefers-reduced-motion:reduce){.cl-glow{display:none}}
+
+/* ── project cards (like the iMac's "Things I've built") ── */
+.cl-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(16px,2vw,26px)}
+.cl-card{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden;transition:transform .3s cubic-bezier(.2,.8,.2,1),border-color .3s,box-shadow .3s}
+@media (hover:hover){.cl-card:hover{transform:translateY(-3px);border-color:var(--pc);box-shadow:0 14px 34px rgba(40,30,15,.12)}.cl-card:hover .pv{transform:scale(1.03)}}
+.cl-card-art{position:relative;aspect-ratio:16/8;margin:8px 8px 0;border-radius:12px;overflow:hidden;background:var(--pc);container-type:inline-size}
+.cl-card-art .pv{transition:transform .6s cubic-bezier(.2,.8,.2,1)}
+.cl-card-body{flex:1;display:flex;flex-direction:column;padding:18px clamp(16px,2vw,24px) 20px}
+.cl-card-kicker{font:500 12px 'JetBrains Mono',monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.cl-card h3{font:600 clamp(24px,2.2vw,30px)/1.15 var(--serif);margin:6px 0 0;color:var(--ink)}
+.cl-card .cl-text{margin-top:8px}
+.cl-card .cl-points{flex:1;font-size:15px}
+.cl-card-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:18px;padding-top:16px;border-top:1px dashed var(--line)}
+.cl-card-foot .cl-actions{margin-top:0}
+.cl-card-tools{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.cl-card-tools i{width:28px;height:28px;border-radius:7px;background:#fff;border:1px solid var(--line);display:grid;place-items:center;padding:4px}
+.cl-card-tools i>*{width:100%;height:100%}
+.cl-card-tools small{font:400 12px 'JetBrains Mono',monospace;color:var(--muted)}
+@media (max-width:900px){.cl-cards{grid-template-columns:1fr}}
+@media (max-width:760px){.cl-foot{padding-right:var(--pad);padding-bottom:calc(88px + env(safe-area-inset-bottom))}}
+
+/* ── plainer: simple switch, no glow, smaller radii, no lifts or ornaments ── */
+.cl-theme{all:unset;display:flex;align-items:center;gap:10px;cursor:pointer;width:auto;height:auto;padding:0;border:0;background:none;overflow:visible;font:500 13px 'DM Sans',sans-serif;color:var(--band-mute)}
+.cl-theme.is-dark{background:none}
+.cl-switch{all:unset;cursor:pointer;position:relative;width:36px;height:20px;border-radius:999px;background:rgba(255,255,255,.28);transition:background-color .2s}
+.cl-switch i{position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s ease}
+.cl-switch.on{background:#fff}
+.cl-switch.on i{transform:translateX(16px);background:var(--band)}
+.cl-switch:focus-visible{outline:2px solid #fff;outline-offset:3px}
+
+.cl-glow,.theme-dark .cl-glow{background:none}
+.cl-glow::after{background-size:32px 32px;-webkit-mask-image:radial-gradient(260px circle at var(--mx) var(--my),rgba(0,0,0,.7),transparent 80%);mask-image:radial-gradient(260px circle at var(--mx) var(--my),rgba(0,0,0,.7),transparent 80%)}
+
+.cl-box,.cl-boxed,.cl-card{border-radius:10px}
+.cl-card-art{border-radius:6px;margin:6px 6px 0}
+.cl-logo{border-radius:8px}
+.cl-photo{border-radius:8px}
+.cl-cbtn{border-radius:8px}
+.cl-cico{border-radius:8px}
+.cl-btn{border-radius:8px}
+.cl-btn.sm{border-radius:7px}
+.cl-chip{border-radius:6px}
+.cl-seg{border-radius:8px}.cl-seg button{border-radius:6px}
+.cl-card,.cl-card:hover{transform:none!important;box-shadow:none!important}
+.cl-card:hover .pv,.cl-card .pv{transform:none!important}
+.cl-cbtn:hover .cl-cico{transform:none}
+.cl-card-kicker{text-transform:none;letter-spacing:0;font:400 13px 'DM Sans',sans-serif}
+.cl-card-foot{border-top-style:solid}
+.cl-lightbox figure{border-radius:10px}
+
+/* switch: same height, padding and corners as the version switch beside it */
+.cl-seg{height:40px;box-sizing:border-box;align-items:stretch}
+.cl-seg button{display:flex;align-items:center}
+.cl-switch{all:unset;box-sizing:border-box;cursor:pointer;position:relative;flex:none;display:flex;align-items:center;justify-content:space-around;width:76px;height:40px;padding:3px;border-radius:8px;background:rgba(0,0,0,.18);border:1px solid var(--band-line)}
+.cl-switch.on{background:rgba(0,0,0,.18)}
+.cl-switch-ico{display:grid;color:var(--band-mute)}
+.cl-switch-ico svg,.cl-switch i svg{width:16px;height:16px}
+.cl-switch i{position:absolute;left:3px;top:3px;bottom:3px;width:34px;height:auto;border-radius:6px;background:#fff;color:#1f2a25;display:grid;place-items:center;transition:transform .2s ease}
+.cl-switch.on i{transform:translateX(34px);background:#fff}
+.cl-switch:focus-visible{outline:2px solid #fff;outline-offset:3px}

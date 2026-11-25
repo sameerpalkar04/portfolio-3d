@@ -53,7 +53,7 @@ const ImgIcon = ({ size = 16 }) => <svg viewBox="0 0 24 24" width={size} height=
 const BadgeIcon = ({ size = 16 }) => <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true"><circle cx="12" cy="10" r="7" fill="#f80000"/><path d="M8 16l-1.5 6L12 20l5.5 2L16 16" fill="#c40000"/><rect x="8" y="8" width="8" height="4" rx="2" fill="none" stroke="#fff" strokeWidth="1.6"/></svg>
 
 // ── content ──
-const OCI = {
+export const OCI = {
   title: 'Oracle Cloud Infrastructure 2023 AI Certified Foundations Associate', issuer: 'Oracle University', issued: 'July 29, 2024', id: '100756114OCI23AIFCA',
   tags: ['Machine Learning', 'Transformers', 'RAG', 'Large Language Models'], image: '/certs/oci-ai-foundations.jpg', pdf: '/certs/oci-ai-foundations.pdf',
   link: 'https://catalog-education.oracle.com/ords/certview/sharebadge?id=7824262FBF3F3E095BB71DF852E083CA468D553B477E117F84ECCD06AE90EE76',
@@ -206,7 +206,7 @@ const AppGlyph = ({ app, s = 16 }) => app === 'projects' ? <ProjectsAppIcon size
 // ── Notes (Skills) ──
 const LetterTile = ({ bg, fg, children, round }) => <svg viewBox="0 0 24 24" width="100%" height="100%" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx={round ? 11 : 5} fill={bg}/><text x="12" y="16.2" textAnchor="middle" fontSize="11" fontWeight="700" fill={fg} fontFamily="-apple-system,Helvetica,Arial">{children}</text></svg>
 const OracleMark = () => <svg viewBox="0 0 24 24" width="100%" height="100%" aria-hidden="true"><rect x="2" y="7" width="20" height="10" rx="5" fill="none" stroke="#f80000" strokeWidth="3"/></svg>
-function SkillLogo({ name }) {
+export function SkillLogo({ name }) {
   if (name === 'Java') return <img src="/skills/java.png" alt="" width="100%" height="100%" style={{ objectFit: 'contain' }} draggable="false"/>
   const i = SKILL_ICONS[name]
   if (i) return <svg viewBox="0 0 24 24" width="100%" height="100%" aria-hidden="true"><path d={i.path} fill={`#${i.hex === '000000' || i.hex === '181717' || i.hex === 'FFFFFF' ? '1d1d1f' : i.hex}`}/></svg>

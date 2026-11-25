@@ -11,7 +11,7 @@ const seg = (p, a, b) => Math.max(0, Math.min(1, (p - a) / (b - a)))
 const circ = (x, y, r) => `M${x - r} ${y} a${r} ${r} 0 1 0 ${r * 2} 0 a${r} ${r} 0 1 0 ${-r * 2} 0`
 
 // [start, end] of each stroke along the progress, its path, weight, layer and the command that draws it
-const STROKES = [
+export const STROKES = [
   { at: [0, .14], d: 'M70 20 H20 V400 H220 V372 M220 330 V20 H170', w: 3.2, layer: 'wall', cmd: 'PLINE', what: 'putting up the walls' },
   { at: [.13, .19], d: 'M70 17 H170 M70 20 H170 M70 23 H170', w: .8, layer: 'wall', cmd: 'LINE', what: 'fitting the window' },
   { at: [.18, .24], d: 'M220 372 H180 M180 372 A40 40 0 0 1 220 332', w: .8, layer: 'wall', cmd: 'ARC', what: 'hanging the door' },
@@ -36,23 +36,23 @@ const STROKES = [
 
 // Drawn without React re-renders: the playhead in Loader calls plan.draw(p) every frame, which only touches
 // the strokes, labels and title block that change; the crosshair glides in its own loop.
-function FloorPlan({ api, done, onPen, coordsRef }) {
+export function FloorPlan({ api, done, onPen, coordsRef, strokes = STROKES, day = true, finalWhat = 'switching the lights on', label = 'The office\'s floor plan being drafted' }) {
   const paths = useRef([]), labels = useRef([]), leads = useRef([]), title = useRef(null)
   const cursor = useRef(null), want = useRef(null), at = useRef(null), lastCmd = useRef(''), lens = useRef([])
   api.current = (p) => {
-    STROKES.forEach((s, i) => {
+    strokes.forEach((s, i) => {
       const el = paths.current[i]; if (!el) return
       const k = seg(p, s.at[0], s.at[1])
       if (s.dash) el.style.opacity = k; else el.style.strokeDashoffset = 1 - k
     })
     // where the pen is: the point being drawn on the newest stroke that has started
-    let i = -1; STROKES.forEach((s, j) => { if (p >= s.at[0]) i = j })
+    let i = -1; strokes.forEach((s, j) => { if (p >= s.at[0]) i = j })
     const el = paths.current[i]; if (!el) return
-    const s = STROKES[i], k = seg(p, s.at[0], s.at[1])
+    const s = strokes[i], k = seg(p, s.at[0], s.at[1])
     const L = lens.current[i] ?? (lens.current[i] = el.getTotalLength()), pt = el.getPointAtLength(L * k)
     want.current = { x: pt.x, y: pt.y }
-    const last = i === STROKES.length - 1 && k >= 1
-    const cmd = last ? 'REGEN' : k < 1 ? s.cmd : 'SELECT', what = last ? 'switching the lights on' : s.what
+    const last = i === strokes.length - 1 && k >= 1
+    const cmd = last ? 'REGEN' : k < 1 ? s.cmd : 'SELECT', what = last ? finalWhat : s.what
     if (cmd + what !== lastCmd.current) { lastCmd.current = cmd + what; onPen?.({ cmd, what }) }
   }
   // the crosshair glides after the pen (so it never jumps from the end of one stroke to the start of the next)
@@ -75,10 +75,10 @@ function FloorPlan({ api, done, onPen, coordsRef }) {
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
   }, [coordsRef])
-  return <svg className={`cad-plan${done ? ' is-done' : ''}`} viewBox="10 4 220 404" role="img" aria-label="The office's floor plan being drafted">
+  return <svg className={`cad-plan${done ? ' is-done' : ''}`} viewBox="10 4 220 404" role="img" aria-label={label}>
     <defs><clipPath id="cad-clip"><rect x="10" y="4" width="220" height="404"/></clipPath></defs>
-    <rect x="72" y="24" width="96" height="36" className="cad-day"/>
-    {STROKES.map((s, i) => <path key={i} ref={(el) => (paths.current[i] = el)} d={s.d} className={`cad-${s.layer}`} fill="none" strokeWidth={s.w || 1.2} strokeLinecap="round" strokeLinejoin="round"
+    {day && <rect x="72" y="24" width="96" height="36" className="cad-day"/>}
+    {strokes.map((s, i) => <path key={i} ref={(el) => (paths.current[i] = el)} d={s.d} className={`cad-${s.layer}`} fill="none" strokeWidth={s.w || 1.2} strokeLinecap="round" strokeLinejoin="round"
       pathLength={s.dash ? undefined : 1} strokeDasharray={s.dash || 1} style={s.dash ? { opacity: 0 } : { strokeDashoffset: 1 }}/>)}
     {/* the crosshair: full-length hairlines with a pick box, like a CAD cursor */}
     <g clipPath="url(#cad-clip)" className="cad-cursor-wrap" style={{ opacity: done ? 0 : 1 }}>

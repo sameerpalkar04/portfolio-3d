@@ -1282,6 +1282,7 @@ function createScene(canvas, handlers) {
   // message instead of opening what's nearby, and arrows / WASD move the caret instead of walking
   const natesKeys=(event)=>document.body.classList.contains('nate-open')||typing(event)
   const onDown = (event) => {
+    if (window.__classicView) return // the classic (2D) version is on top: the room ignores the keyboard
     if (natesKeys(event)) return
     const key=keyOf(event)
     if (state.system && ['backspace','delete','escape'].includes(key)) { event.preventDefault(); exitSystem(); return }
@@ -1357,6 +1358,7 @@ function createScene(canvas, handlers) {
     // while the loading screen covers the room, draw it only twice a second (enough to get its shaders
     // compiled and textures uploaded early) so the loader's animation has the frame budget to itself
     // once it's been drawn a first time (shaders compiled), not at all until the loader goes
+    if(window.__classicView){frame=requestAnimationFrame(tick);return} // the classic version covers the room: don't draw it
     if(window.__loaderUp){ if(window.__sceneWarm||now-loaderDraw<500){frame=requestAnimationFrame(tick);return} loaderDraw=now }
     const busy=now-lastInput<3000||travel||focus||hold||folder||keys.size||stick.x||stick.y||smoothTurn||smoothFwd||disco>.001||musicOn
     // busy: draw every frame the display gives us (a fixed 60 fps cap judders on 90/120 Hz phones); idle: ~30 fps
