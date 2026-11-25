@@ -1,6 +1,6 @@
 # Afterword — The Recap Journal
 
-A React and Express app for browsing TV shows and generating short episode recaps. It supports Google sign-in, guest recaps, a saved recap history, Redis caching and PostgreSQL storage.
+A React.js and Express app for browsing TV shows and generating short episode recaps. It supports Google sign-in, guest recaps, a saved recap history, Redis caching and PostgreSQL storage.
 
 ## How it works
 
@@ -14,7 +14,7 @@ A React and Express app for browsing TV shows and generating short episode recap
 
 | Layer | What it does |
 |---|---|
-| Frontend | React and TypeScript on Vite; proxies `/api` to the backend in development |
+| Frontend | React.js and TypeScript on Vite; proxies `/api` to the backend in development |
 | Backend | Express API for search, recap generation, auth and history |
 | Cache | Redis, shared by every backend instance for recap caching and rate limits |
 | Database | PostgreSQL for user accounts and saved recaps |

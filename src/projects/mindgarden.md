@@ -31,7 +31,7 @@ A calm, private space for building a personal library of ideas. Each account has
 | Folder | Contents |
 |---|---|
 | `backend/` | Express API, Prisma schema and migrations, authentication and data services |
-| `frontend/` | React app, dashboard, note editor and graph explorer |
+| `frontend/` | React.js app, dashboard, note editor and graph explorer |
 
 ## Running it locally
 

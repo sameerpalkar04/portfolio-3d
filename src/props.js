@@ -622,11 +622,12 @@ export function createDigitalCamera() {
   // the controls beside the screen: MENU and playback, a four-way wheel with OK in the middle, DISP and
   // delete, plus a little status light. Lighter metal than the body so they catch the light, with printed
   // white symbols on a decal just in front.
-  const key = new THREE.MeshStandardMaterial({ color: '#4a4c53', roughness: .32, metalness: .55 })
-  const keyLight = new THREE.MeshStandardMaterial({ color: '#6c6f77', roughness: .28, metalness: .6 })
+  // matte dark-grey rubber keys, no shine
+  const key = new THREE.MeshStandardMaterial({ color: '#4a4b50', roughness: .92, metalness: 0 })
+  const keyLight = new THREE.MeshStandardMaterial({ color: '#55565b', roughness: .92, metalness: 0 })
   const back = -D / 2
   const COL = -.0375 // centre of the control column (local x; seen from behind it sits beside the screen)
-  const wheelY = .029, rowTop = .049, rowLow = .0105, bxL = -.0305, bxR = -.0445
+  const wheelY = H / 2, rowTop = H / 2 + .0195, rowLow = H / 2 - .0195, bxL = -.0305, bxR = -.0445 // evenly spaced around the body's middle
   const button = (x, y, r, depth, mat) => { const b = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.04, depth, 28), mat); b.rotation.x = Math.PI / 2; b.position.set(x, y, back - depth / 2); cam.add(b); return b }
   // wheel: a raised ring, a recessed well and the OK button
   const wheel = new THREE.Mesh(new THREE.TorusGeometry(.0083, .0017, 12, 40), key); wheel.position.set(COL, wheelY, back - .0012); wheel.rotation.y = Math.PI; cam.add(wheel)
@@ -636,8 +637,8 @@ export function createDigitalCamera() {
   // status light (green)
   const led = new THREE.Mesh(new THREE.CircleGeometry(.0012, 12), new THREE.MeshStandardMaterial({ color: '#2fd36b', emissive: '#2fd36b', emissiveIntensity: 1.4 })); led.rotation.y = Math.PI; led.position.set(-.025, H - .0055, back - .0003); cam.add(led)
   // printed symbols: canvas decal over the column (canvas left = the screen side)
-  const DW = .031, DH = H, PX = 12000, c = document.createElement('canvas'); c.width = Math.round(DW * PX); c.height = Math.round(DH * PX)
-  const g = c.getContext('2d'), P = (x, y) => [(COL + DW / 2 - x) * PX, (H - y) * PX]
+  const DW = .031, DH = H, PX = 12000, SHARP = 3, c = document.createElement('canvas'); c.width = Math.round(DW * PX * SHARP); c.height = Math.round(DH * PX * SHARP)
+  const g = c.getContext('2d'); g.scale(SHARP, SHARP); const P = (x, y) => [(COL + DW / 2 - x) * PX, (H - y) * PX]
   g.fillStyle = g.strokeStyle = 'rgba(255,255,255,.92)'; g.lineWidth = 3; g.lineCap = g.lineJoin = 'round'; g.textAlign = 'center'; g.textBaseline = 'middle'
   const label = (t, x, y, size = 20) => { const [px, py] = P(x, y); g.font = `600 ${size}px Helvetica, Arial, sans-serif`; g.fillText(t, px, py) }
   // wheel arrows (up / right / down / left) and small icons on the ring
@@ -650,7 +651,7 @@ export function createDigitalCamera() {
   label('MENU', bxR, rowTop, 16)
   label('DISP', bxL, rowLow, 16)
   { const [px, py] = P(bxR, rowLow); g.beginPath(); g.moveTo(px - 11, py - 8); g.lineTo(px + 11, py - 8); g.moveTo(px - 4, py - 8); g.lineTo(px - 3, py - 12); g.lineTo(px + 3, py - 12); g.lineTo(px + 4, py - 8); g.moveTo(px - 8, py - 4); g.lineTo(px - 6, py + 12); g.lineTo(px + 6, py + 12); g.lineTo(px + 8, py - 4); g.moveTo(px - 2.5, py - 1); g.lineTo(px - 2, py + 8); g.moveTo(px + 2.5, py - 1); g.lineTo(px + 2, py + 8); g.stroke() }
-  const decalTex = new THREE.CanvasTexture(c); decalTex.colorSpace = THREE.SRGBColorSpace; decalTex.anisotropy = 4
+  const decalTex = new THREE.CanvasTexture(c); decalTex.colorSpace = THREE.SRGBColorSpace; decalTex.anisotropy = 8
   const decal = new THREE.Mesh(new THREE.PlaneGeometry(DW, DH), new THREE.MeshBasicMaterial({ map: decalTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }))
   decal.rotation.y = Math.PI; decal.position.set(COL, H / 2, back - .0026); decal.renderOrder = 2; cam.add(decal)
   cam.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })

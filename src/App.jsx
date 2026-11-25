@@ -5,7 +5,7 @@ import OfficeScene from './OfficeScene'
 import Loader from './Loader'
 import { viewW, viewH, fracAlong, phoneLandscape, setPortraitLock } from './orientation'
 import { ACHIEVEMENTS } from './achievements'
-import { DesktopOS } from './MacOS'
+import { DesktopOS, MAC_DOCK } from './MacOS'
 import { RESUME_URL, RESUME_VIEW, RESUME_DOWNLOAD, RESUME_NAME, loadResume } from './resume'
 import { PLACES as NATE_PLACES } from './nate/places'
 import { describeScreen } from './nate/screen'
@@ -27,7 +27,7 @@ const apps = [
   { id: 'about', label: 'About Me', icon: '👤', title: 'A little about me', body: <><p className="lead">Hi, I’m Sameer Palkar.</p><p>I’m a computer science student and builder who enjoys turning thoughtful ideas into useful, polished software.</p><div className="info-grid"><span>Based in</span><b>Bengaluru, India</b><span>Education</span><b>B.Tech, Computer Science · VIT Vellore</b><span>Graduating</span><b>August 2026</b></div></> },
   { id: 'projects', label: 'Projects', icon: '🗂️', title: 'Selected projects', body: <div className="project-list"><article><b>Full‑stack products</b><p>Responsive web applications, thoughtfully designed from interface through backend.</p></article><article><b>Applied AI experiments</b><p>Practical explorations that connect modern ML capabilities to real workflows.</p></article><article><b>Systems & tools</b><p>Small utilities and developer tools built to make everyday work simpler.</p></article></div> },
   { id: 'resume', label: 'Resume', icon: '📄', title: 'Experience & education', body: <><div className="timeline"><span>2022 — 2026</span><div><b>B.Tech in Computer Science</b><p>Vellore Institute of Technology · Vellore, India</p></div></div><div className="timeline"><span>Now</span><div><b>Building, learning, and looking ahead</b><p>Interested in software engineering, backend systems, and applied AI.</p></div></div><ResumeLink/></> },
-  { id: 'skills', label: 'Skills', icon: '🧰', title: 'Tools I work with', body: <><p>From shaping an idea to shipping it, these are some of the tools in my kit.</p><div className="skill-pills">{['Java','Python','C++','JavaScript','TypeScript','React','Node.js','Spring Boot','FastAPI','SQL','Docker','Kubernetes','Git','Figma','AI / ML'].map((x) => <span key={x}>{x}</span>)}</div></> },
+  { id: 'skills', label: 'Skills', icon: '🧰', title: 'Tools I work with', body: <><p>From shaping an idea to shipping it, these are some of the tools in my kit.</p><div className="skill-pills">{['Java','Python','C++','JavaScript','TypeScript','React.js','Node.js','Spring Boot','FastAPI','SQL','Docker','Kubernetes','Git','Figma','AI / ML'].map((x) => <span key={x}>{x}</span>)}</div></> },
   { id: 'photos', label: 'Photos', icon: '📷', title: 'Through my lens', body: <><p>Some of the places and moments I’ve photographed.</p><p className="note">The gallery is being put together. Check back soon.</p></> },
   { id: 'music', label: 'Music', icon: '🎧', title: 'On my speaker', body: <Playlist/> },
   { id: 'contact', label: 'Contact', icon: '✉️', title: 'Let’s make something', body: <><p className="lead">Have an interesting idea or opportunity?</p><p>I’d love to hear about it. The best way to reach me is by email.</p><a className="mail-link" href="mailto:palkarsameer04@gmail.com">palkarsameer04@gmail.com ↗</a><a className="mail-link" href="https://www.linkedin.com/in/sameer-palkar-9707b9286/" target="_blank" rel="noreferrer">LinkedIn · Sameer Palkar ↗</a><a className="mail-link" href="https://github.com/sameerpalkar04" target="_blank" rel="noreferrer">GitHub · sameerpalkar04 ↗</a><p className="note">Bengaluru · India</p></> },
@@ -966,25 +966,43 @@ const SHORTCUTS = [
   { label: 'Take a break', bg: '#3cc7d6', icon: WX.ico(<><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></>) },
   { label: 'Pet Rio & Bruno', bg: '#ee6060', icon: WX.ico(<><ellipse cx="12" cy="16" rx="4" ry="3.2"/><circle cx="6.5" cy="11" r="1.6"/><circle cx="9.8" cy="7.4" r="1.6"/><circle cx="14.2" cy="7.4" r="1.6"/><circle cx="17.5" cy="11" r="1.6"/></>) },
 ]
-const DOCK = [['#1e90ff', '#0a5bd8', 'finder'], ['#8e8e93', '#5a5a5f', 'apps'], ['#2b9bff', '#0a6be0', 'safari'], ['#34c759', '#1f9a3e', 'msg'], ['#3a8bff', '#1159d8', 'mail'], ['#ff5f57', '#ff2d55', 'photos'], ['#34c759', '#25a244', 'facetime'], ['#ffffff', '#e8e8e8', 'cal'], ['#f5d06a', '#e9b23a', 'notes'], ['#ff375f', '#e0244a', 'music'], ['#1c1c1e', '#000000', 'term'], ['#0a84ff', '#0060d0', 'code'], ['#8e8e93', '#636366', 'settings']]
-const DockGlyph = ({ k }) => {
-  const W = { stroke: '#fff', strokeWidth: 2, fill: 'none', strokeLinecap: 'round', strokeLinejoin: 'round' }
-  return <svg viewBox="0 0 24 24" width="62%" height="62%" aria-hidden="true">{{
-    finder: <><path d="M12 3v18" {...W}/><circle cx="8" cy="10" r="1" fill="#fff"/><circle cx="16" cy="10" r="1" fill="#fff"/><path d="M7.5 15.5q4.5 3 9 0" {...W}/></>,
-    apps: <>{[6, 12, 18].map((x) => [6, 12, 18].map((y) => <circle key={x + '' + y} cx={x} cy={y} r="1.8" fill="#fff"/>))}</>,
-    safari: <><circle cx="12" cy="12" r="8.5" {...W}/><path d="M15.5 8.5 13 13l-4.5 2.5L11 11z" fill="#ff453a"/></>,
-    msg: <path d="M12 4.5c4.7 0 8.5 3 8.5 6.8s-3.8 6.8-8.5 6.8c-1 0-2-.1-2.9-.4L5 19.5l1.2-3.4C4.5 14.9 3.5 13.2 3.5 11.3 3.5 7.5 7.3 4.5 12 4.5z" fill="#fff"/>,
-    mail: <><rect x="3.5" y="6" width="17" height="12" rx="2" {...W}/><path d="m4 7 8 6 8-6" {...W}/></>,
-    photos: <>{[0, 60, 120, 180, 240, 300].map((a, i) => <ellipse key={a} cx="12" cy="7.5" rx="2.6" ry="4.5" fill={['#ffd60a', '#ff9f0a', '#ff375f', '#bf5af2', '#0a84ff', '#30d158'][i]} opacity=".9" transform={`rotate(${a} 12 12)`}/>)}</>,
-    facetime: <><rect x="3.5" y="7.5" width="11" height="9" rx="2" fill="#fff"/><path d="M15.5 11 20.5 8v8l-5-3z" fill="#fff"/></>,
-    cal: <><text x="12" y="8" fontSize="5" textAnchor="middle" fill="#ff3b30" fontWeight="700">NOV</text><text x="12" y="19" fontSize="10" textAnchor="middle" fill="#1c1c1e" fontWeight="600">{new Date().getDate()}</text></>,
-    notes: <>{[9, 13, 17].map((y) => <path key={y} d={`M6 ${y}h12`} stroke="#7a5b12" strokeWidth="1.4"/>)}</>,
-    music: <><path d="M9.5 17V6.5l9-2V15" {...W}/><circle cx="7.3" cy="17" r="2.3" fill="#fff"/><circle cx="16.3" cy="15" r="2.3" fill="#fff"/></>,
-    term: <><path d="m6 8 4 4-4 4M12 16h6" stroke="#30d158" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></>,
-    code: <path d="m9 7-5 5 5 5M15 7l5 5-5 5" {...W}/>,
-    settings: <><circle cx="12" cy="12" r="3" {...W}/><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3M6 6l2.1 2.1M15.9 15.9 18 18M6 18l2.1-2.1M15.9 8.1 18 6" {...W}/></>,
-  }[k]}</svg>
+// The dock: Finder plus the desktop's five things. On a laptop it magnifies under the pointer like
+// macOS (the icons nearest grow, pushing their neighbours apart) and names the app above it.
+function MacDock() {
+  const ref = useRef(null), raf = useRef(0), last = useRef(null), [near, setNear] = useState(-1)
+  const BASE = 44, GAP = 7, PAD = 8, MAX = .6, REACH = 2.6, n = MAC_DOCK.length
+  const fine = typeof window !== 'undefined' && window.matchMedia?.('(hover: hover) and (pointer: fine)').matches
+  const WIDTH = PAD * 2 + n * BASE + (n - 1) * GAP, center = (i) => PAD + i * (BASE + GAP) + BASE / 2
+  // lay the icons out for a pointer at x (dock units from its left edge, as if unmagnified), straight on
+  // the DOM, once a frame: no re-render, and measured from the dock's centre (which never moves), so the
+  // dock growing can't feed back into where the pointer seems to be
+  const paint = (x) => {
+    const el = ref.current; if (!el) return
+    const sc = MAC_DOCK.map((_, i) => x == null ? 1 : 1 + MAX * Math.max(0, Math.cos(Math.min(1, Math.abs(x - center(i)) / (BASE * REACH)) * Math.PI / 2)))
+    const extra = sc.map((v) => (v - 1) * BASE), total = extra.reduce((a, b) => a + b, 0)
+    let run = 0
+    el.querySelectorAll('.dock-app').forEach((b, i) => { b.style.transform = `translateX(${run + extra[i] / 2 - total / 2}px) scale(${sc[i]})`; b.style.setProperty('--inv', 1 / sc[i]); run += extra[i] })
+    el.style.setProperty('--grow', `${total / 2}px`)
+    const best = x == null ? -1 : sc.indexOf(Math.max(...sc))
+    setNear((v) => (v === best ? v : best))
+  }
+  const onMove = (e) => {
+    if (!fine) return
+    const el = ref.current, r = el.getBoundingClientRect(), k = r.width / el.offsetWidth
+    last.current = (e.clientX - (r.left + r.width / 2)) / k + WIDTH / 2
+    if (!el.classList.contains('is-mag')) { el.classList.add('is-in'); setTimeout(() => el.classList.remove('is-in'), 140) }
+    el.classList.add('is-mag')
+    if (!raf.current) raf.current = requestAnimationFrame(() => { raf.current = 0; paint(last.current) })
+  }
+  const onLeave = () => { cancelAnimationFrame(raf.current); raf.current = 0; last.current = null; ref.current?.classList.remove('is-mag'); paint(null) }
+  useEffect(() => () => cancelAnimationFrame(raf.current), [])
+  return <div ref={ref} className="mac-dock" onMouseMove={onMove} onMouseLeave={onLeave}>
+    {MAC_DOCK.map((d, i) => <button key={d.id} className="dock-app" aria-label={d.name} onClick={() => window.dispatchEvent(new CustomEvent('mac-dock', { detail: d.id }))}>
+      {d.icon(BASE)}{i === near && <span className="dock-label">{d.name}</span>}{d.id === 'finder' && <i className="dock-dot"/>}
+    </button>)}
+  </div>
 }
+
 // The lock screen the iMac rests on (the 3D screen shows the same): date and time up top, one user at the bottom.
 // On Interact, once the camera has settled, the password fills in and it opens onto the desktop.
 function LockScreen({ now, typed }) {
@@ -1060,10 +1078,7 @@ function PortfolioSystem({ stageH = 660, lockDelay = 0 }) {
       </section>
     </div>
     {home && <DesktopOS stageH={stageH}/>}
-    <div className="mac-dock">{DOCK.map(([a, b, k], i) => <span key={k} className={`dock-app${['finder', 'notes', 'code'].includes(k) ? ' live' : ''}`} style={{ background: `linear-gradient(${a},${b})` }} onClick={() => window.dispatchEvent(new CustomEvent('mac-dock', { detail: k }))}><DockGlyph k={k}/>{i === 0 && <i className="dock-dot"/>}</span>)}
-      <em/><span className="dock-app" style={{ background: 'linear-gradient(#7cc6ff,#3a9bf0)' }}>{WX.ico(<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="#fff" stroke="none"/>, 26)}</span>
-      <span className="dock-app trash">{WX.ico(<><path d="M5 7h14l-1.2 13H6.2z" fill="#e8eaee" stroke="#9aa0a8"/><path d="M4 7h16M9 4h6" stroke="#9aa0a8"/></>, 28)}</span>
-    </div>
+    <MacDock/>
   </motion.div>
 }
 

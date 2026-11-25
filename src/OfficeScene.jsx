@@ -1023,7 +1023,8 @@ function createScene(canvas, handlers) {
       const reserved=coarse?172:(W<=720?150:104)
       // body ≈ 62% of the view height, and narrow enough to leave room for the arrow buttons either side
       const side=2*(56+28), bodyFrac=Math.max(.42,Math.min(.62,(W-side)/W))
-      const dH=(.06/2)/(t*.5), dW=(.105/2)/(t*(W/H)*bodyFrac)
+      // laptops: a bit bigger (≈ 64% of the height); phones keep the earlier size
+      const dH=(.06/2)/(t*(coarse||W<=720?.5:.64)), dW=(.105/2)/(t*(W/H)*(coarse||W<=720?bodyFrac:Math.min(.7,(W-side)/W)))
       d=Math.max(dH,dW); lift=((reserved-20)/2/(H/2))*d*t
     }
     const q=camera.quaternion.clone().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),Math.PI))
@@ -1450,7 +1451,9 @@ function createScene(canvas, handlers) {
     // phones resize the page without always telling the observer (address bar, rotation)
     const size=renderer.getSize(tmpSize); if(Math.abs(size.x-canvas.clientWidth)>1||Math.abs(size.y-canvas.clientHeight)>1)resize()
         if(travel||keys.size||stick.x||stick.y||smoothTurn||smoothFwd||pointer)lastMove=now
-        const wantPR=now-lastMove<220?Math.min(pixelRatio,1):pixelRatio
+        // a held close-up (the camera) is small and detailed: once it has landed, draw it at the screen's full sharpness
+        const sharp=hold&&hold.phase==='in'&&hold.t>=1
+        const wantPR=now-lastMove<220?Math.min(pixelRatio,1):sharp?Math.min(window.devicePixelRatio||1,2):pixelRatio
         if(wantPR!==drawPR){drawPR=wantPR;renderer.setPixelRatio(drawPR);resize()}
         for(const l of dynLights){const on=l.intensity>.001;if(l.visible!==on)l.visible=on}
         // a close-up has landed once every camera / object move into it has finished (zoom, picked-up camera, résumé folder)

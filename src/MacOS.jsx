@@ -60,11 +60,62 @@ const OCI = {
 }
 // the résumé PDF (the same file as in the room's Files), opens in Preview
 const RESUME_ITEM = { id: 'resume', name: RESUME_NAME, kind: 'PDF document', date: 'Today, 9:00 AM', size: '120 KB', icon: (s) => <MdIcon size={s} label="PDF" tone="#e5483b"/> }
+// 3D modelling is a hobby: a plain folder at the end of the desktop, one sub-folder of renders per model
+const cubeGlyph = <><path d="M12 2 4 6.5v9L12 20l8-4.5v-9z"/><path d="M4 6.5 12 11l8-4.5M12 11v9"/></>
+// the box says why; the timeline beside it says what happened, so the two don't repeat each other
+const SKETCH_STORY = [
+  'SketchUp is where I first started making things. Most of what I built back then was pretty rough, but I loved working out how the pieces fit together.',
+  'I still model for fun, mostly buildings like the one below. It’s a nice break from code, and it’s a big part of why I wanted this portfolio to be a room you can walk around in.',
+]
+const MODELS = [
+  { id: 'skyon', name: 'Residential Society I', about: 'A residential township courtyard: palms, a stepped plaza and a pool between the towers.',
+    shots: [['1', 'Central courtyard'], ['2', 'Over the palms'], ['3', 'Aerial view'], ['4', 'Pool steps']] },
+  { id: 'flat-interior-1', name: 'Flat Interior 1', kind: 'Interior', about: 'A compact apartment: a living room and open kitchen behind a geometric screen, and a bedroom with a built-in TV unit.',
+    shots: [['1', 'Living room & kitchen'], ['2', 'Bedroom TV unit'], ['3', 'Bedroom'], ['4', 'Sofa corner']] },
+  { id: 'flat-interior-2', name: 'Flat Interior II', kind: 'Interior', about: 'A four-bedroom apartment, furnished room by room: two living areas, a dining space, bedrooms with en-suites and a U-shaped kitchen.',
+    shots: [['1', 'Living room'], ['2', 'Floor plan'], ['3', 'Bedrooms'], ['4', 'Kitchen']] },
+  { id: 'mansion', name: 'Mansion', about: 'A multi-level house stepped into a hillside, with terraces, an infinity pool and a sports court in the gardens below.',
+    shots: [['1', 'Front elevation'], ['2', 'Aerial view'], ['3', 'From the garden'], ['4', 'Terrace & stairs']] },
+  { id: 'airport', v: 'c', name: 'Airport', about: 'An airport terminal with two piers of gates, a landscaped forecourt, a check-in and immigration hall, and planes at the jet bridges.',
+    shots: [['1', 'Terminal 5 forecourt'], ['2', 'Gates & jet bridges'], ['3', 'Immigration hall'], ['4', 'Site plan']] },
+  { id: 'residential-2', name: 'Residential Society II', about: 'A gated township of high-rise towers around a central park, with fountains, a clubhouse, play areas and sports courts.',
+    shots: [['1', 'Aerial view'], ['2', 'Fountain walk'], ['3', 'Clubhouse & courts'], ['4', 'Central park']] },
+  { id: 'residential-3', name: 'Residential Society III', about: 'Mid-rise towers wrapped around a large central lawn, with a clubhouse and pool, a sports court, an open-air gym and parking along the edges.',
+    shots: [['1', 'Central lawn'], ['2', 'Tree-lined avenue'], ['3', 'Open-air gym'], ['4', 'Site plan']] },
+]
+// The Sketchbook's own icon: a squircle of drafting paper with a wireframe cube being drawn by a pencil
+export const SketchbookIcon = ({ size = 64 }) => <svg viewBox="0 0 64 64" width={size} height={size} aria-hidden="true">
+  <defs><clipPath id="sbi"><rect x="4" y="4" width="56" height="56" rx="14"/></clipPath>
+    <linearGradient id="sbig" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#fffaf0"/><stop offset="1" stopColor="#efe6d2"/></linearGradient>
+    <pattern id="sbip" width="7" height="7" patternUnits="userSpaceOnUse"><path d="M7 0H0v7" fill="none" stroke="#d9cdb4" strokeWidth=".6"/></pattern></defs>
+  <g clipPath="url(#sbi)">
+    <rect x="4" y="4" width="56" height="56" fill="url(#sbig)"/><rect x="4" y="4" width="56" height="56" fill="url(#sbip)"/>
+    <path d="M30 17 17 24.5v15L30 47l13-7.5v-15z" fill="#e2673f" opacity=".14"/>
+    <path d="M30 17 17 24.5v15L30 47l13-7.5v-15zM17 24.5 30 32l13-7.5M30 32v15" fill="none" stroke="#2b2622" strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round"/>
+    <path d="M17 39.5 30 32M43 39.5 30 32" stroke="#2b2622" strokeWidth="1.2" strokeDasharray="2 2.2" opacity=".45"/>
+    <g transform="rotate(42 46 40)"><rect x="43" y="22" width="6" height="22" rx="1" fill="#f5b83d"/><rect x="43" y="22" width="6" height="4" fill="#e2673f"/><path d="M43 44h6l-3 6z" fill="#f3d7b0"/><path d="M45.2 48.4h1.6L46 50z" fill="#2b2622"/></g>
+  </g>
+  <rect x="4.5" y="4.5" width="55" height="55" rx="13.5" fill="none" stroke="rgba(0,0,0,.14)"/>
+</svg>
+const MODELS_ITEM = { id: '3d', name: '3D stuff', kind: 'Application', app: 'photos', date: 'Side quest', icon: (s) => <SketchbookIcon size={s}/> }
 const DESKTOP = [
   { id: 'projects', name: 'Projects', kind: 'Application', app: 'projects', date: 'Today, 6:00 PM', icon: (s) => <ProjectsAppIcon size={s}/> },
   { id: 'certs', name: 'Certifications', kind: 'Note', date: 'Today, 5:58 PM', icon: (s) => <NoteIcon size={s}/> },
   { id: 'skills', name: 'Skills', kind: 'Note', date: 'Today, 5:55 PM', icon: (s) => <NoteIcon size={s}/> },
   RESUME_ITEM,
+  MODELS_ITEM,
+]
+// The dock: Finder, then the same five things that are on the desktop, as apps
+const Squircle = ({ size, bg, children }) => <svg viewBox="0 0 64 64" width={size} height={size} aria-hidden="true"><rect x="4" y="4" width="56" height="56" rx="14" fill={bg}/>{children}<rect x="4.5" y="4.5" width="55" height="55" rx="13.5" fill="none" stroke="rgba(0,0,0,.14)"/></svg>
+export const MAC_DOCK = [
+  { id: 'finder', name: 'Finder', icon: (s) => <Squircle size={s} bg="url(#dkf)"><defs><linearGradient id="dkf" x1="0" y1="0" x2="1" y2="0"><stop offset=".5" stopColor="#1e90ff"/><stop offset=".5" stopColor="#e9f3ff"/></linearGradient></defs>
+    <path d="M32 12v40" stroke="#0a5bd8" strokeWidth="2.4"/><circle cx="23" cy="27" r="2.6" fill="#fff"/><circle cx="41" cy="27" r="2.6" fill="#0a5bd8"/><path d="M21 40q11 7 22 0" fill="none" stroke="#0a5bd8" strokeWidth="2.6" strokeLinecap="round"/></Squircle> },
+  { id: 'projects', name: 'Projects', icon: (s) => <ProjectsAppIcon size={s}/> },
+  { id: 'skills', name: 'Skills', icon: (s) => <Squircle size={s} bg="#fffdf6"><path d="M4 18a14 14 0 0 1 14-14h28a14 14 0 0 1 14 14v2H4z" fill="#f6c84c"/>{[30, 37, 44].map((y, i) => <path key={y} d={`M14 ${y}h${i === 2 ? 22 : 36}`} stroke="#cfc7b4" strokeWidth="2.4" strokeLinecap="round"/>)}<path d="m40 41 4 4 8-9" fill="none" stroke="#e2673f" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></Squircle> },
+  { id: 'certs', name: 'Certifications', icon: (s) => <Squircle size={s} bg="#fffdf6"><path d="M4 18a14 14 0 0 1 14-14h28a14 14 0 0 1 14 14v2H4z" fill="#f6c84c"/><circle cx="32" cy="36" r="9" fill="#f80000"/><rect x="27" y="33.5" width="10" height="5" rx="2.5" fill="none" stroke="#fff" strokeWidth="1.8"/><path d="m26.5 43-2 9 7.5-3 7.5 3-2-9" fill="#c40000"/></Squircle> },
+  { id: 'resume', name: 'Résumé', icon: (s) => <Squircle size={s} bg="url(#dkr)"><defs><linearGradient id="dkr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#8fd0ff"/><stop offset="1" stopColor="#3a9bf0"/></linearGradient></defs>
+    <path d="M20 13h17l9 9v29H20z" fill="#fff"/><path d="M37 13v9h9" fill="#dfe6ee"/>{[28, 33].map((y) => <path key={y} d={`M25 ${y}h16`} stroke="#c9d2dc" strokeWidth="2" strokeLinecap="round"/>)}<rect x="24" y="38" width="15" height="8" rx="2" fill="#e5483b"/><text x="31.5" y="44.2" textAnchor="middle" fontSize="5.6" fontWeight="700" fill="#fff" fontFamily="-apple-system,Helvetica,Arial">PDF</text></Squircle> },
+  { id: '3d', name: '3D stuff', icon: (s) => <SketchbookIcon size={s}/> },
 ]
 const PLACES = {
   desktop: { title: 'Desktop', items: DESKTOP },
@@ -434,6 +485,96 @@ function Reader({ project: p, onBack }) {
   </div>
 }
 
+// Sketchbook: the SketchUp side quest, dressed like the Projects app (cream paper, serif heads, the same
+// cards). The front page tells how it started and lists the models; a model shows its renders, and any
+// render opens in the viewer.
+const SKETCH_STEPS = [
+  ['SketchUp at nine', 'My dad, a mechanical engineer, introduced me to SketchUp. I started with simple boxes and shapes.'],
+  ['Learning from his drawings', 'Watching him work on CAD drawings showed me how things get planned before they’re built.'],
+  ['Into software', 'That curiosity about how things work is what led me to software development.'],
+]
+function Sketchbook({ onShot, album = null, setAlbum }) {
+  const m = MODELS.find((x) => x.id === album)
+  const img = (mm, f, thumb) => `/3d/${mm.id}/${f}${thumb ? '-thumb' : ''}.webp?v=2${mm.v || ''}`
+  const top = useRef(null)
+  useEffect(() => { top.current?.scrollTo({ top: 0 }) }, [album])
+  const card = (x, i) => <button key={x.id} className="pcard sb-card" style={{ order: 2 + i }} onClick={() => setAlbum(x.id)}>
+            <span className="pcard-art"><img src={img(x, x.shots[0][0], true)} alt="" loading="lazy" draggable="false"/></span>
+            <span className="pcard-body">
+              <span className="pcard-kicker">{x.kind || 'Architecture'} · {x.shots.length} renders</span>
+              <b className="pcard-name">{x.name}</b>
+              <span className="pcard-line">{x.about}</span>
+              <span className="pcard-foot">
+                <span className="pcard-tools"><i title="SketchUp"><SkillLogo name="SketchUp"/></i><small>SketchUp</small></span>
+                <span className="pcard-open">View {ico(<path d="M5 12h14M13 6l6 6-6 6"/>, 14, 2)}</span>
+              </span>
+            </span>
+          </button>
+  return <div className="papp sb" ref={top}>
+    <AnimatePresence mode="wait">
+      {!m ? <motion.div key="all" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}>
+        <header className="papp-head">
+          <h1>Sketchbook</h1>
+          <p>Architectural models I build in SketchUp, for fun.</p>
+        </header>
+        {/* two columns: the story and the timeline on top, then the models alternate left, right, left… */}
+        <section className="sb-origin">
+          <div className="sb-col">
+            <div className="sb-story">{SKETCH_STORY.map((t) => <p key={t}>{t}</p>)}</div>
+            {MODELS.map((x, i) => i % 2 === 0 && card(x, i))}
+          </div>
+          <div className="sb-col">
+            <ol className="sb-steps">{SKETCH_STEPS.map(([k, t]) => <li key={k}><b>{k}</b><span>{t}</span></li>)}</ol>
+            {MODELS.map((x, i) => i % 2 === 1 && card(x, i))}
+            {MODELS.length % 2 === 1 && <span className="sb-fin"><span className="end-mark">— fin —</span><button type="button" className="sb-top" onClick={() => top.current?.scrollTo({ top: 0, behavior: 'smooth' })}>{ico(<path d="M12 19V5M6 11l6-6 6 6"/>, 14, 2)}Back to top</button></span>}
+          </div>
+          {MODELS.length % 2 === 0 && <span className="sb-fin sb-fin-full"><span className="end-mark">— fin —</span><button type="button" className="sb-top" onClick={() => top.current?.scrollTo({ top: 0, behavior: 'smooth' })}>{ico(<path d="M12 19V5M6 11l6-6 6 6"/>, 14, 2)}Back to top</button></span>}
+        </section>
+      </motion.div> : <motion.div key={m.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .2 }}>
+        <button className="cs-back" onClick={() => setAlbum(null)}>{ico(<path d="M19 12H5M11 6l-6 6 6 6"/>, 15, 2)}Sketchbook</button>
+        <header className="papp-head sb-album-head">
+          <small>{m.kind || 'Architecture'} · SketchUp</small>
+          <h1>{m.name}</h1>
+          <p>{m.about}</p>
+        </header>
+        <div className="sb-shots">
+          {m.shots.map(([f, cap], j) => <button key={f} className={`sb-shot${j === 0 ? ' hero' : ''}`} onClick={() => onShot(m, j)}>
+            <span className="sb-shot-art"><img src={img(m, f, j !== 0)} alt={`${m.name}: ${cap}`} loading={j ? 'lazy' : undefined} draggable="false"/></span>
+            <span className="sb-shot-cap"><b>{cap}</b></span>
+          </button>)}
+        </div>
+      </motion.div>}
+    </AnimatePresence>
+  </div>
+}
+
+// Preview for the 3D renders: one image at a time, arrows (and arrow keys / swipe) to flip through
+function ShotViewer({ shot, onShot, onBack }) {
+  const { model: m, i } = shot, n = m.shots.length
+  const go = (d) => onShot((i + d + n) % n)
+  const [loaded, setLoaded] = useState(false)
+  useEffect(() => { setLoaded(false) }, [i])
+  useEffect(() => {
+    const k = (e) => { if (e.key === 'ArrowRight') { e.stopPropagation(); go(1) } else if (e.key === 'ArrowLeft') { e.stopPropagation(); go(-1) } }
+    window.addEventListener('keydown', k, true); return () => window.removeEventListener('keydown', k, true)
+  })
+  const sx = useRef(null)
+  const src = `/3d/${m.id}/${m.shots[i][0]}.webp`
+  // on a phone held upright the desktop is turned sideways, so its left-right runs down the screen
+  const along = (e) => { const d = e.currentTarget.closest('.mac-desktop'), r = d?.getBoundingClientRect(); return r && d.offsetWidth > d.offsetHeight && r.height > r.width ? e.clientY : e.clientX }
+  return <div className="shot-view" onPointerDown={(e) => { if (!e.target.closest('button')) sx.current = along(e) }} onPointerUp={(e) => { const p = along(e); if (sx.current != null && Math.abs(p - sx.current) > 40) go(p < sx.current ? 1 : -1); sx.current = null }}>
+    <img key={src} className={`shot-img${loaded ? ' in' : ''}`} src={src} alt={`${m.name}: ${m.shots[i][1]}`} onLoad={() => setLoaded(true)} draggable="false"/>
+    {!loaded && <i className="spin shot-spin" aria-hidden="true"/>}
+    <button className="shot-back" onClick={onBack}>{ico(<path d="M19 12H5M11 6l-6 6 6 6"/>, 15, 2)}{m.name}</button>
+    <button className="shot-nav prev" onClick={() => go(-1)} aria-label="Previous render">{ico(<path d="m15 5-7 7 7 7"/>, 20, 2.2)}</button>
+    <button className="shot-nav next" onClick={() => go(1)} aria-label="Next render">{ico(<path d="m9 5 7 7-7 7"/>, 20, 2.2)}</button>
+    <div className="shot-foot">
+      <p className="shot-bar"><b>{m.shots[i][1]}</b><span>{i + 1} of {n}</span></p>
+      <div className="shot-strip">{m.shots.map(([f, cap], j) => <button key={f} className={j === i ? 'on' : ''} onClick={() => onShot(j)} aria-label={cap}><img src={`/3d/${m.id}/${f}-thumb.webp?v=2${m.v || ''}`} alt="" draggable="false"/></button>)}</div>
+    </div>
+  </div>
+}
+
 // Preview: the résumé's page (rendered with pdf.js), its links still clickable
 function PdfPreview() {
   const [doc, setDoc] = useState(null), [failed, setFailed] = useState(false)
@@ -466,16 +607,15 @@ export function DesktopOS({ stageH }) {
     if (it.app === 'projects') return openWin('projects', { init: sized({ app: 'projects', x: 110, y: 40, w: 960, h: 570 }), patch: {} })
     if (it.app === 'notes' || it.kind === 'Note') return openWin('notes', { init: sized({ app: 'notes', x: 150, y: 46, w: 860, h: 500 }), patch: { note: it.kind === 'Note' ? it.id : undefined } })
     if (it.kind === 'Folder') return finderAt(it.id)
+    if (it.app === 'photos') return openWin('photos', { init: { app: 'photos', x: 0, y: 28, w: 1180, h: stageH - 28 }, patch: { album: it.album } })
+    if (it.shot) return openWin('viewer', { init: { app: 'viewer', x: 0, y: 28, w: 1180, h: stageH - 28 }, patch: { shot: it.shot } })
     if (it.kind === 'PDF document') return openWin('pdf', { init: { app: 'pdf', x: 0, y: 28, w: 1180, h: stageH - 28 }, patch: {} })
     // projects open full screen (below the menu bar), on laptop and phone
     if (it.project) return openWin('reader', { init: { app: 'reader', x: 0, y: 28, w: 1180, h: stageH - 28 }, patch: { project: it.project } })
   }
   return <>
     {T && <TouchFlag/>}
-    <div className="desk-icons" onClick={(e) => { if (e.target === e.currentTarget) setSel(null) }}>
-      {DESKTOP.map((it) => <button key={it.id} className={`desk-icon${sel === it.id ? ' sel' : ''}`} onClick={() => { setSel(it.id); if (touch()) open(it) }} onDoubleClick={() => open(it)}>
-        {it.icon(58)}<span>{it.name}</span></button>)}
-    </div>
+    <DeskIcons T={T} stageH={stageH} sel={sel} setSel={setSel} open={open}/>
     <AnimatePresence>{wins.map((w) => {
       const common = { key: w.key, w: { ...w, move: (x, y) => upd(w.key, { x, y }) }, onFocus: () => focus(w.key), onClose: () => close(w.key) }
       if (w.app === 'finder') return <Win {...common} className="win-finder" toolbar={<span className="mac-win-title"/>}>
@@ -485,14 +625,88 @@ export function DesktopOS({ stageH }) {
         <a className="pdf-dl" href={RESUME_DOWNLOAD} download={RESUME_NAME} title="Download PDF" aria-label="Download PDF">{ico(<><path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 20h14"/></>, 17, 2)}</a></>}><PdfPreview/></Win>
       if (w.app === 'projects') return <Win {...common} className="win-projects win-full" title="Projects"><ProjectsApp onOpen={(p) => open({ project: p })}/></Win>
       if (w.app === 'reader') return <Win {...common} className="win-reader win-full" title={w.project?.file}><Reader project={w.project} onBack={() => { close(w.key); open({ app: 'projects' }) }}/></Win>
+      if (w.app === 'photos') return <Win {...common} className="win-photos win-full" title="Sketchbook"><Sketchbook album={w.album} setAlbum={(a) => upd(w.key, { album: a })} onShot={(model, i) => open({ shot: { model, i } })}/></Win>
+      if (w.app === 'viewer') return <Win {...common} className="win-preview win-full win-viewer" title={`${w.shot.model.name} — ${w.shot.model.shots[w.shot.i][1]}`}>
+        <ShotViewer shot={w.shot} onShot={(i) => upd(w.key, { shot: { ...w.shot, i } })} onBack={() => { const id = w.shot.model.id; close(w.key); open({ app: 'photos', album: id }) }}/></Win>
       if (w.app === 'notes') return <Win {...common} className="win-notes win-full" title=""><Notes note={w.note || 'skills'} onNote={(n) => upd(w.key, { note: n })}/></Win>
       return null
     })}</AnimatePresence>
     {/* the dock's Finder and Notes open their apps */}
     <NateHooks onOpen={(x) => x.note ? open({ kind: 'Note', id: x.note }) : x.project && open({ project: PROJECTS.find((p) => p.id === x.project) })}/>
-    <DockHooks onFinder={() => finderAt('desktop')} onNotes={() => open({ app: 'notes' })} onPreview={() => {}} onProjects={() => open({ app: 'projects' })}/>
+    <DockHooks onOpen={(id) => { if (id === 'finder') return finderAt('desktop'); const it = DESKTOP.find((x) => x.id === id); if (it) open(it) }}/>
   </>
 }
+// The desktop icons sit on a grid, right-aligned like macOS. Drag one (on a phone: press and hold, then
+// drag) and it snaps to the nearest cell when let go, swapping places with an icon already there.
+const STAGE_W = 1180
+function DeskIcons({ T, stageH, sel, setSel, open }) {
+  const cw = T ? 140 : 104, ch = T ? 168 : 120, top = T ? 300 : 320, right = 16
+  // the grid is laid so a row lands exactly where the icons start (below the widgets)
+  const r0 = Math.floor((top - 34) / ch), y0 = top - r0 * ch
+  const cols = Math.max(1, Math.floor((STAGE_W - 2 * right) / cw)), rows = Math.max(r0 + 2, Math.floor((stageH - 96 - y0) / ch))
+  // starting layout, [column from the right, row]: Projects · Skills · 3D projects along the top,
+  // Certifications under Skills and the résumé under 3D projects
+  const START = { '3d': [0, 0], resume: [0, 1], skills: [1, 0], certs: [1, 1], projects: [2, 0] }
+  const defaults = () => Object.fromEntries(DESKTOP.map((it, i) => [it.id, START[it.id] ? [START[it.id][0], r0 + START[it.id][1]] : [3 + Math.floor(i / 2), r0 + (i % 2)]]))
+  const [cells, setCells] = useState(defaults)
+  useEffect(() => { setCells(defaults()) }, [T, rows]) // eslint-disable-line react-hooks/exhaustive-deps
+  const [drag, setDrag] = useState(null) // { id, x, y, cell }
+  const box = useRef(null), st = useRef(null), justDragged = useRef(0)
+  const cellXY = ([c, r]) => [STAGE_W - right - (c + 1) * cw, y0 + r * ch]
+  const nearest = (x, y) => [Math.min(cols - 1, Math.max(0, Math.round((STAGE_W - right - x) / cw - 1))), Math.min(rows - 1, Math.max(0, Math.round((y - y0) / ch)))]
+  // screen point → the desktop's own coordinates (it may be scaled, or turned sideways on a phone)
+  const mapper = () => {
+    const el = box.current, probe = (x, y) => { const d = document.createElement('i'); d.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:0;height:0`; el.appendChild(d); const r = d.getBoundingClientRect(); d.remove(); return [r.left, r.top] }
+    const o = probe(0, 0), a = probe(1000, 0), b = probe(0, 1000)
+    const ax = (a[0] - o[0]) / 1000, ay = (a[1] - o[1]) / 1000, bx = (b[0] - o[0]) / 1000, by = (b[1] - o[1]) / 1000, det = ax * by - bx * ay
+    return (X, Y) => { const dx = X - o[0], dy = Y - o[1]; return [(dx * by - bx * dy) / det, (ax * dy - dx * ay) / det] }
+  }
+  const down = (e, id) => {
+    if (e.button !== undefined && e.button !== 0) return
+    const map = mapper(), [lx, ly] = map(e.clientX, e.clientY), [ix, iy] = cellXY(cells[id])
+    st.current = { id, map, ox: lx - ix, oy: ly - iy, sx: e.clientX, sy: e.clientY, on: false, pid: e.pointerId, el: e.currentTarget }
+    // follow the pointer anywhere on the page until it's let go
+    const mv = (ev) => move(ev), fin = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', fin); window.removeEventListener('pointercancel', fin); up() }
+    window.addEventListener('pointermove', mv); window.addEventListener('pointerup', fin); window.addEventListener('pointercancel', fin)
+    if (T) st.current.timer = setTimeout(() => { const s = st.current; if (!s) return; s.on = true; navigator.vibrate?.(12); try { s.el.setPointerCapture(s.pid) } catch {} ; setDrag({ id, x: ix, y: iy, cell: cells[id] }) }, 380)
+  }
+  const move = (e) => {
+    const s = st.current; if (!s) return
+    const far = Math.hypot(e.clientX - s.sx, e.clientY - s.sy)
+    if (!s.on) {
+      if (T) { if (far > 10) { clearTimeout(s.timer); st.current = null } return }
+      if (far < 5) return
+      s.on = true; try { s.el.setPointerCapture(s.pid) } catch {}
+    }
+    const [lx, ly] = s.map(e.clientX, e.clientY), x = lx - s.ox, y = ly - s.oy
+    setDrag({ id: s.id, x, y, cell: nearest(x, y) })
+  }
+  const up = () => {
+    const s = st.current; st.current = null; if (!s) return
+    clearTimeout(s.timer)
+    if (!s.on) return
+    justDragged.current = Date.now()
+    setDrag((d) => {
+      if (d) setCells((cs) => {
+        const to = d.cell, from = cs[d.id], other = Object.keys(cs).find((k) => k !== d.id && cs[k][0] === to[0] && cs[k][1] === to[1])
+        return { ...cs, [d.id]: to, ...(other ? { [other]: from } : {}) }
+      })
+      return null
+    })
+  }
+  const recent = () => Date.now() - justDragged.current < 350
+  return <div className="desk-icons" ref={box} onClick={(e) => { if (e.target === e.currentTarget) setSel(null) }}>
+    {drag && (() => { const [gx, gy] = cellXY(drag.cell); return <span className="desk-slot" style={{ left: gx, top: gy, width: cw, height: ch - 8 }}/> })()}
+    {DESKTOP.map((it) => {
+      const dragging = drag?.id === it.id, [x, y] = dragging ? [drag.x, drag.y] : cellXY(cells[it.id] || [0, 0])
+      return <button key={it.id} className={`desk-icon${sel === it.id ? ' sel' : ''}${dragging ? ' dragging' : ''}`} style={{ left: x, top: y, width: cw }}
+        onPointerDown={(e) => down(e, it.id)} onContextMenu={(e) => e.preventDefault()}
+        onClick={() => { if (recent()) return; setSel(it.id); if (touch()) open(it) }} onDoubleClick={() => { if (!recent()) open(it) }}>
+        {it.icon(58)}<span>{it.name}</span></button>
+    })}
+  </div>
+}
+
 // Nate's "Take me to …" can ask for a note or a project: picked up when the computer opens
 // (window.__macOpen, if recent) or straight away if it's already open (the mac-open event)
 function NateHooks({ onOpen }) {
@@ -504,10 +718,10 @@ function NateHooks({ onOpen }) {
   return null
 }
 // the dock lives in App; it calls these through a window event so the dock markup can stay there
-function DockHooks({ onFinder, onNotes, onPreview, onProjects }) {
-  const ref = useRef({}); ref.current = { onFinder, onNotes, onPreview, onProjects }
+function DockHooks({ onOpen }) {
+  const ref = useRef(onOpen); ref.current = onOpen
   useEffect(() => {
-    const h = (e) => { const f = { finder: 'onFinder', notes: 'onNotes', photos: 'onPreview', code: 'onProjects' }[e.detail]; f && ref.current[f]() }
+    const h = (e) => ref.current(e.detail)
     window.addEventListener('mac-dock', h); return () => window.removeEventListener('mac-dock', h)
   }, [])
   return null
