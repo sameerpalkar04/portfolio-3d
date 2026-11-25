@@ -2002,3 +2002,14 @@ button.cs-btn{cursor:pointer}
 /* no Enter button: the command bar is just the percentage and the command line */
 .cad-cmd{grid-template-columns:auto 1fr;gap:22px}
 @media (max-width:700px){.cad-cmd{grid-template-columns:auto 1fr;gap:14px;padding:14px 16px 18px}}
+/* the zoom slider never runs into BACK TO ROOM: it stops short of that button's column. When the phone is
+   held sideways the app is turned back to its portrait layout, so measure against the portrait width
+   (--lh, the phone's short side) rather than 100vw (which is then the long side). */
+/* sideways phone: there's no room beside BACK TO ROOM, so the slider sits one row further in, full length */
+html[data-lock] .zoom-pop:not(.is-vertical){width:min(220px,calc(var(--lh) - 28px));bottom:calc(86px + 66px + 10px + env(safe-area-inset-bottom))}
+/* laptop intro step 3, narrow window: when the demo opens the Work menu, the step card moves up out of its way */
+.demo-cue:not(.is-touch){transition:top .35s cubic-bezier(.2,.8,.2,1)}
+body:has(.bar-panel) .demo-cue:not(.is-touch){top:max(76px,calc(100% - 640px))!important}
+/* the plan always fits the drawing area (it keeps its shape inside this box) */
+.cad-plan{position:absolute;left:0;top:52px;width:100%;height:calc(100% - 72px);max-width:none;max-height:none;padding:0}
+@media (max-width:700px){.cad-plan{top:44px;height:calc(100% - 56px);padding:0}}

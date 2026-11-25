@@ -32,30 +32,7 @@ const STROKES = [
   { at: [.77, .82], d: 'M222 166 V176 M222 184 V196 M222 204 V214 M222 222 V234', w: 1.8, layer: 'obj', cmd: 'LINE', what: 'hanging the certificates' },
   { at: [.81, .86], d: 'M32 336 h24 v13 h-24 Z M32 340 h24', layer: 'obj', cmd: 'RECT', what: 'filing the résumé' },
 ]
-const LABELS = [
-  { at: .66, x: 46, y: 186, lx: -8, ly: 186, end: true, t: 'BOOKS' },
-  { at: .7, x: 45, y: 145, lx: -8, ly: 140, end: true, t: 'CAMERA' },
-  { at: .74, x: 46, y: 318, lx: -8, ly: 316, end: true, t: 'SPEAKER' },
-  { at: .78, x: 119, y: 41, lx: -8, ly: 34, end: true, t: 'RIO & BRUNO' },
-  { at: .82, x: 204, y: 204, lx: 258, ly: 204, t: 'COMPUTER' },
-  { at: .85, x: 222, y: 170, lx: 258, ly: 162, t: 'ACHIEVEMENTS' },
-  { at: .88, x: 196, y: 242, lx: 258, ly: 246, t: 'PHONE' },
-  { at: .91, x: 44, y: 344, lx: -8, ly: 350, end: true, t: 'FILES' },
-]
 
-// the ribbon: the drawing tools, the one in use lit up as the plan draws
-const ti = (d) => <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">{d}</svg>
-const CAD_TOOLS = [
-  ['LINE', 'Line', ti(<path d="M4 16 16 4"/>)],
-  ['PLINE', 'Polyline', ti(<path d="M3 15 8 6l5 7 4-9"/>)],
-  ['CIRCLE', 'Circle', ti(<circle cx="10" cy="10" r="6"/>)],
-  ['ARC', 'Arc', ti(<path d="M4 15a7 7 0 0 1 12-6"/>)],
-  ['RECT', 'Rectangle', ti(<rect x="4" y="5" width="12" height="10"/>)],
-  ['DIM', 'Dimension', ti(<path d="M3 13h14M3 10v6M17 10v6M5 13l2-1.5M5 13l2 1.5M15 13l-2-1.5M15 13l-2 1.5"/>)],
-  ['LAYER', 'Layers', ti(<path d="M10 3 3 7l7 4 7-4-7-4ZM3 11l7 4 7-4"/>)],
-  ['REGEN', 'Regen', ti(<path d="M15 6a6 6 0 1 0 1 6M15 3v3h-3"/>)],
-  ['RENDER', 'Render', ti(<><circle cx="10" cy="9" r="3.5"/><path d="M10 2v1.5M10 14.5V16M3 9h1.5M15.5 9H17M5 4l1 1M15 4l-1 1"/></>)],
-]
 
 // Drawn without React re-renders: the playhead in Loader calls plan.draw(p) every frame, which only touches
 // the strokes, labels and title block that change; the crosshair glides in its own loop.
@@ -68,8 +45,6 @@ function FloorPlan({ api, done, onPen, coordsRef }) {
       const k = seg(p, s.at[0], s.at[1])
       if (s.dash) el.style.opacity = k; else el.style.strokeDashoffset = 1 - k
     })
-    LABELS.forEach((l, i) => { const k = seg(p, l.at, l.at + .05); const g = labels.current[i]; if (g) g.style.opacity = k; const d = leads.current[i]; if (d) d.style.strokeDashoffset = 1 - k })
-    if (title.current) title.current.style.opacity = seg(p, .02, .1)
     // where the pen is: the point being drawn on the newest stroke that has started
     let i = -1; STROKES.forEach((s, j) => { if (p >= s.at[0]) i = j })
     const el = paths.current[i]; if (!el) return
@@ -100,26 +75,17 @@ function FloorPlan({ api, done, onPen, coordsRef }) {
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
   }, [coordsRef])
-  return <svg className={`cad-plan${done ? ' is-done' : ''}`} viewBox="-90 0 420 425" role="img" aria-label="The office's floor plan being drafted">
-    <defs><clipPath id="cad-clip"><rect x="-90" y="0" width="420" height="425"/></clipPath></defs>
+  return <svg className={`cad-plan${done ? ' is-done' : ''}`} viewBox="10 4 220 404" role="img" aria-label="The office's floor plan being drafted">
+    <defs><clipPath id="cad-clip"><rect x="10" y="4" width="220" height="404"/></clipPath></defs>
     <rect x="72" y="24" width="96" height="36" className="cad-day"/>
     {STROKES.map((s, i) => <path key={i} ref={(el) => (paths.current[i] = el)} d={s.d} className={`cad-${s.layer}`} fill="none" strokeWidth={s.w || 1.2} strokeLinecap="round" strokeLinejoin="round"
       pathLength={s.dash ? undefined : 1} strokeDasharray={s.dash || 1} style={s.dash ? { opacity: 0 } : { strokeDashoffset: 1 }}/>)}
-    {LABELS.map((l, i) => <g key={l.t} ref={(el) => (labels.current[i] = el)} className="cad-label" style={{ opacity: 0 }}>
-      <path ref={(el) => (leads.current[i] = el)} d={`M${l.x} ${l.y} L${l.lx} ${l.ly}`} pathLength="1" strokeDasharray="1" style={{ strokeDashoffset: 1 }}/>
-      <circle cx={l.x} cy={l.y} r="1.7"/>
-      <text x={l.lx + (l.end ? -4 : 4)} y={l.ly + 3} textAnchor={l.end ? 'end' : 'start'}>{l.t}</text>
-    </g>)}
     {/* the crosshair: full-length hairlines with a pick box, like a CAD cursor */}
     <g clipPath="url(#cad-clip)" className="cad-cursor-wrap" style={{ opacity: done ? 0 : 1 }}>
       <g ref={cursor} className="cad-cursor">
         <line x1="-600" y1="0" x2="600" y2="0"/><line x1="0" y1="-600" x2="0" y2="600"/>
         <rect x="-4" y="-4" width="8" height="8"/>
       </g>
-    </g>
-    <g ref={title} className="cad-titleblock" style={{ opacity: 0 }}>
-      <line x1="20" y1="413" x2="220" y2="413"/>
-      <text x="20" y="422">PLAN · HOME OFFICE</text><text x="220" y="422" textAnchor="end">1:40</text>
     </g>
   </svg>
 }
@@ -128,30 +94,32 @@ export default function Loader({ progress, loaded, total, ready, onEnter }) {
   // The drawing (and the number) move at a steady, CAD-like pace: never faster than DRAW_S for the whole
   // plan, never ahead of the real download, easing out over the last stretch. A fast or cached load
   // still gets the full animation; a slow one just draws as far as the download has got.
-  const DRAW_S = 5.2
-  const goal = useRef(0); goal.current = ready ? 1 : Math.min(.97, progress * .97)
+  const DRAW_S = 2.4
+  const goal = useRef(0); goal.current = ready ? 1 : Math.max(.6, Math.min(.92, progress * .92))
   const [finished, setFinished] = useState(false)
   const shownRef = useRef(0), plan = useRef(null), pctRef = useRef(null), barRef = useRef(null)
   const paint = (v) => { plan.current?.(v); if (pctRef.current) pctRef.current.firstChild.nodeValue = String(Math.round(v * 100)).padStart(2, '0'); if (barRef.current) barRef.current.style.transform = `scaleX(${v})` }
+  const prog = useRef(0); prog.current = progress
   useEffect(() => {
-    // a short beat on the empty grid first: the room file is parsed in these first moments and the
-    // browser stutters while it does, so the drawing starts once that's out of the way
-    // Start once the room has finished setting itself up (that's when the browser freezes for a moment), or,
-    // on a slow connection where that's a while off, after a short beat so there's something to watch.
-    let raf = 0, last = performance.now(), mount = last, readyAt = 0, started = false
+    // The playhead has a velocity that eases up and down, so the drawing never starts or stops with a jerk.
+    // It coasts to a hold while the room is being built (right after its download finishes, and its first
+    // draw), because that's when the browser freezes for a moment: a held drawing doesn't look like it
+    // stuttered. Then it picks up again and eases into the finish.
+    let raf = 0, last = performance.now(), mount = last, speed = 0, holdSince = 0
+    const BASE = 1 / DRAW_S
     const tick = (now) => {
-      const dt = Math.max(0, Math.min(.05, (now - last) / 1000)); last = now
-      if (!started) {
-        // ready = the room is built and has been drawn once (its shaders compiled): the browser's freeze is behind us
-        if (goal.current >= 1 && window.__sceneWarm && !readyAt) readyAt = now
-        started = (readyAt && now - readyAt > 150) || (now - mount > 1800 && goal.current < .9) || now - mount > 6000
-        if (!started) { raf = requestAnimationFrame(tick); return }
-      }
-      const v = shownRef.current, room = goal.current - v
-      if (room > 0) {
-        const slow = v > .88 ? .55 + .45 * (1 - v) / .12 : 1 // ease into the finish
-        shownRef.current = Math.min(goal.current, v + dt / DRAW_S * slow, 1)
-        if (1 - shownRef.current < .0015 && goal.current >= 1) shownRef.current = 1
+      const dt = Math.max(0, Math.min(.034, (now - last) / 1000)); last = now
+      const v = shownRef.current
+      let building = (prog.current >= 1 && goal.current < 1) || (goal.current >= 1 && !window.__sceneWarm) || !!window.__sceneBusy
+      if (building) { holdSince ||= now; if (now - holdSince > 8000) building = false } else holdSince = 0 // never hold forever
+      const room = goal.current - v
+      let want = now - mount < 420 || building || room <= 0 ? 0 : BASE
+      if (want && room < .06) want *= Math.max(.25, room / .06) // ease to a stop if it's about to catch the download
+      if (want && v > .85) want *= .45 + .55 * (1 - v) / .15 // ease into the finish
+      speed += (want - speed) * Math.min(1, dt * 7)
+      if (speed > 1e-4) {
+        shownRef.current = Math.min(goal.current, v + speed * dt, 1)
+        if (goal.current >= 1 && 1 - shownRef.current < .002) shownRef.current = 1
         paint(shownRef.current)
       }
       if (shownRef.current < 1) raf = requestAnimationFrame(tick); else setFinished(true)
@@ -168,7 +136,7 @@ export default function Loader({ progress, loaded, total, ready, onEnter }) {
   // once it's drawn and rendered, hold a beat on the lit plan, then go straight into the room
   useEffect(() => {
     if (!done) return undefined
-    const t = window.setTimeout(onEnter, 900)
+    const t = window.setTimeout(onEnter, 450)
     return () => window.clearTimeout(t)
   }, [done, onEnter])
 
@@ -178,15 +146,10 @@ export default function Loader({ progress, loaded, total, ready, onEnter }) {
         {['File', 'Edit', 'View', 'Insert', 'Draw', 'Dimension', 'Modify', 'Window', 'Help'].map((m) => <span key={m} className="cad-menu">{m}</span>)}
         <span className="cad-size">{total ? `${mb(loaded)} / ${mb(total)} MB` : ''}</span>
       </div>
-      <div className="cad-ribbon">
-        {CAD_TOOLS.map(([id, label, icon]) => <span key={id} className={`cad-tool${(done ? 'RENDER' : pen.cmd) === id ? ' on' : ''}`} title={label}>{icon}<small>{label}</small></span>)}
-        <span className="cad-tab">office.dwg<i aria-hidden="true">×</i></span>
-      </div>
     </header>
     <main className="cad-view">
       <div className="cad-name"><b>sameer palkar</b><span>// software engineer</span></div>
       <FloorPlan api={plan} done={done} onPen={setPen} coordsRef={coordsRef}/>
-      <div className="cad-coords" aria-hidden="true" ref={coordsRef}>X    0.00   Y    0.00</div>
     </main>
     <footer className="cad-cmd">
       <div className="cad-pct" ref={pctRef}>{done ? '100' : '00'}<span>%</span></div>

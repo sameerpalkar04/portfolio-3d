@@ -903,16 +903,16 @@ export const DOG_COATS = {
   // [body, head, muzzle, ears, legs, tail, eye rims, nose, tongue, lips/mouth, bandana] — from photos of Rio and Bruno
   // Rio: cream all over, with light brown ears
   white: ['#eee5d5', '#ebe1cf', '#e8dfd1', '#b48c62', '#f1eadf', '#ece2d1', '#3a2c26', '#141111', '#e8818c', '#1c1615', '#141414'],
-  // Bruno: warm chestnut body, a near-black face and head with golden-brown tips through it
-  bruno: ['#6f4b31', '#3b2b21', '#1e1814', '#4a3527', '#7c573a', '#6b4830', '#1c1411', '#141111', '#e8818c', '#1d1512', '#141414'],
+  // Bruno: black and brown, a near-black head, face and ears, a brown body with black running through it
+  bruno: ['#86593a', '#3d2d22', '#2a211b', '#4d3727', '#8a5f3f', '#6a4932', '#1c1411', '#141111', '#e8818c', '#1d1512', '#141414'],
 }
 const GLOSSY = new Set([6, 7, 8])
-export function createShihTzu(srcMesh, { coat = DOG_COATS.white, height = .27, frost = null, sheen = coat === DOG_COATS.bruno ? '#b88a5c' : '#fff4e2' } = {}) {
+export function createShihTzu(srcMesh, { coat = DOG_COATS.white, height = .27, frost = null, sheen = coat === DOG_COATS.bruno ? '#9a7a5c' : '#fff4e2', mix = coat === DOG_COATS.bruno ? '#211814' : null } = {}) {
   // plain float geometry in model space (the file's positions/normals are quantized)
   srcMesh.updateWorldMatrix(true, false)
   const src = srcMesh.geometry, n = src.attributes.position.count, M = srcMesh.matrixWorld, NM = new THREE.Matrix3().getNormalMatrix(M)
   const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3), region = new Uint8Array(n)
-  const v = new THREE.Vector3(), c = new THREE.Color(), pal = coat.map((h) => new THREE.Color(h))
+  const v = new THREE.Vector3(), c = new THREE.Color(), pal = coat.map((h) => new THREE.Color(h)), mixC = mix && new THREE.Color(mix)
   for (let i = 0; i < n; i++) {
     v.fromBufferAttribute(src.attributes.position, i).applyMatrix4(M); pos.set([v.x, v.y, v.z], i * 3)
     v.fromBufferAttribute(src.attributes.normal, i).applyMatrix3(NM).normalize(); nor.set([v.x, v.y, v.z], i * 3)
@@ -923,7 +923,14 @@ export function createShihTzu(srcMesh, { coat = DOG_COATS.white, height = .27, f
     const streak = Math.sin(px * 1.7 + Math.sin(py * .11) * 3) * Math.sin(pz * 1.3 + Math.cos(py * .09) * 2.4)
     const fine = Math.sin(px * 7.1 + pz * 5.3 + py * .6) * Math.sin(px * 4.3 - pz * 6.7)
     const j = GLOSSY.has(r) || r === 10 ? 1 : .94 + .04 * streak + .02 * fine
-    c.copy(pal[r]).multiplyScalar(j); col.set([c.r, c.g, c.b], i * 3)
+    c.copy(pal[r]).multiplyScalar(j)
+    // a two-tone coat (Bruno): black running through the brown in long clumps, darker along the back
+    if (mix && (r === 0 || r === 4 || r === 5)) {
+      const back = THREE.MathUtils.smoothstep(py, 40, 75) * (r === 0 ? 1 : .5)
+      const k = Math.min(.55, THREE.MathUtils.smoothstep(streak + fine * .5, -.1, .6) * .4 + back * .25)
+      c.lerp(mixC, k)
+    }
+    col.set([c.r, c.g, c.b], i * 3)
   }
   // the mouth: only a thin, soft black lip line right along the edge of the (tucked-away) tongue; the
   // rest of the mouth area is muzzle fur, so the mouth reads as closed

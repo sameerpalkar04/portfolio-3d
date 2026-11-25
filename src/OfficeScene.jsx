@@ -128,6 +128,13 @@ function createScene(canvas, handlers) {
   const discoHue = (t, off, h = .84, amp = .06) => discoTmp.setHSL(((h + amp * Math.sin(t * .35 + off)) % 1 + 1) % 1, 1, .55)
   let windowSun=null
   const loader = new GLTFLoader()
+  // Count every file the scene is still downloading (all of three's loaders report to its default manager), so the
+  // loading screen only finishes once everything — dogs, photos, certificates, textures — is actually in the room
+  const pending = new Map() // url -> how many of this scene's requests for it are still open
+  const mgr = THREE.DefaultLoadingManager, prevStart = mgr.itemStart, prevEnd = mgr.itemEnd
+  mgr.itemStart = function (url) { pending.set(url, (pending.get(url) || 0) + 1); return prevStart.call(this, url) }
+  mgr.itemEnd = function (url) { const n = pending.get(url); if (n > 1) pending.set(url, n - 1); else pending.delete(url); return prevEnd.call(this, url) }
+  let dogsPending = true
   const panoramaLoader = new THREE.TextureLoader()
   const wallCanvas = document.createElement('canvas'); wallCanvas.width=1024; wallCanvas.height=1024
   const wallTexture = new THREE.CanvasTexture(wallCanvas)
@@ -188,6 +195,7 @@ function createScene(canvas, handlers) {
   const { isFree, nearestFree } = createWalkTester(() => grid, () => walkBounds)
 
   loader.load(MODEL_URL, (gltf) => {
+    if (disposed) return // an earlier copy of the scene that was already thrown away
     model = gltf.scene
     // The supplied FBX uses centimeters; scale it to meters before positioning it.
     model.scale.setScalar(.01)
@@ -575,14 +583,17 @@ function createScene(canvas, handlers) {
         const dogLoader = new GLTFLoader(); dogLoader.setMeshoptDecoder(MeshoptDecoder)
         dogLoader.load('/models/shih-tzu.glb?v=5', (gltf) => {
           let src = null; gltf.scene.traverse((o) => { if (o.isMesh && !src) src = o })
-          if (!src) return
+          if (src) buildDogs(src)
+          dogsPending = false
+        }, undefined, () => { dogsPending = false })
+        const buildDogs = (src) => {
           for (const s of seats) {
-            const d = createShihTzu(src, { coat: s.coat, height: s.height, frost: s.coat === DOG_COATS.bruno ? '#6a4e37' : null }); d.name = s.name
+            const d = createShihTzu(src, { coat: s.coat, height: s.height, frost: s.coat === DOG_COATS.bruno ? '#7a5a40' : null }); d.name = s.name
             d.position.copy(s.p); d.rotation.y = face + side * s.turn
             d.userData.base = { y: s.p.y, ry: d.rotation.y, h: s.height }
             petGroup.add(d)
           }
-        })
+        }
       }
     }
     // Replace the vase of white roses with a potted pothos on a wooden tray.
@@ -774,9 +785,27 @@ function createScene(canvas, handlers) {
     }
     handlers.onPosition?.({ x:state.x,z:state.z,minX:walkBounds.min.x,maxX:walkBounds.max.x,minZ:walkBounds.min.z,maxZ:walkBounds.max.z })
     dynLights=[]; scene.traverse((o)=>{ if(o.isPointLight||o.isSpotLight||o.isRectAreaLight)dynLights.push(o) })
+    // Only report ready once every other file has arrived and been placed (dogs, photos, certificates, textures),
+    // then get every material compiled and every texture onto the GPU, all behind the loading screen
+    const t0 = performance.now()
+    const whenAllLoaded = () => {
+      if (disposed) return
+      if ((pending.size > 0 || (dogsPending && petGroup)) && performance.now() - t0 < 25000) { window.setTimeout(whenAllLoaded, 60); return }
+      warmAndReady()
+    }
+    whenAllLoaded()
+  }, (xhr) => { if (xhr.total) handlers.onProgress?.(xhr.loaded / xhr.total, xhr.loaded, xhr.total) }, (error) => { console.error('Unable to load the home-office model.',error); loadError=true; handlers.onReady?.() })
+  const warmAndReady = () => {
+    dynLights=[]; scene.traverse((o)=>{ if(o.isPointLight||o.isSpotLight||o.isRectAreaLight)dynLights.push(o) })
+    try {
+      renderer.compile(scene, camera)
+      scene.traverse((o) => { const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []
+        for (const m of ms) for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'alphaMap', 'aoMap', 'bumpMap']) if (m[k]?.isTexture) renderer.initTexture(m[k]) })
+    } catch (e) { console.warn('warm-up skipped', e) }
+    renderer.shadowMap.needsUpdate = true
     sceneBuilt = true; window.__sceneWarm = 0; loaderDraw = 0
     handlers.onReady?.(); if (import.meta.env.DEV && !disposed) window.__dbg = { scene, camera, state, THREE, renderer }
-  }, (xhr) => { if (xhr.total) handlers.onProgress?.(xhr.loaded / xhr.total, xhr.loaded, xhr.total) }, (error) => { console.error('Unable to load the home-office model.',error); loadError=true; handlers.onReady?.() })
+  }
 
   // Phone close-up: the camera glides down to look straight onto the phone lying on the desk.
   let focus=null, speakerObj=null, pendantsHidden=false, musicLevel=0, musicSm=0, musicOn=false, musicDim=0
@@ -1145,7 +1174,7 @@ function createScene(canvas, handlers) {
     const eyeY=floorY+EYE_HEIGHT, pitch=THREE.MathUtils.clamp(Math.atan2(spot.pos.y-eyeY,Math.hypot(spot.pos.x-view.x,spot.pos.z-view.z)),-.75,.5)
     const dYaw=Math.atan2(Math.sin(yaw-state.yaw),Math.cos(yaw-state.yaw))
     const far=Math.hypot(view.x-state.x,view.z-state.z)
-    travel={t:0,duration:SNAPPY?Math.min(1.25,.5+far*.26):Math.min(1.8,.7+far*.35),from:{x:state.x,z:state.z,yaw:state.yaw,pitch:state.pitch},to:{x:view.x,z:view.z,pitch},dYaw}
+    travel={t:0,duration:SNAPPY?Math.min(1.25,.5+far*.26):Math.min(1.45,.6+far*.28),from:{x:state.x,z:state.z,yaw:state.yaw,pitch:state.pitch},to:{x:view.x,z:view.z,pitch},dYaw}
   }
   const exitSystem=(sequential=false)=>{
     if(!state.system)return
@@ -1248,7 +1277,13 @@ function createScene(canvas, handlers) {
     const drawGap=now-lastDraw; lastDraw=now
     if(busy&&drawGap<200){ slowFrames=drawGap>24?slowFrames+1:Math.max(0,slowFrames-1); if(slowFrames>45&&pixelRatio>1){pixelRatio=Math.max(1,pixelRatio-.25);slowFrames=0} }
     // shadows don't move with the camera, so skip re-rendering them while walking (that spike every 250 ms was a stutter)
-    if(hold||folder||(now-lastShadow>250&&!smoothTurn&&!smoothFwd)){renderer.shadowMap.needsUpdate=true;lastShadow=now}
+    // Shadows come from the sun alone, which never moves, so they only need redrawing when something that casts
+    // one moves (a picked-up object, the résumé folder, the dogs being petted). While you walk or look around the
+    // shadows don't change at all, so they're not recalculated mid-move (that was a dropped frame 4× a second);
+    // a refresh once a second while standing still keeps them exact whatever else happens.
+    const moving=travel||focus||keys.size||stick.x||stick.y||smoothTurn||smoothFwd||pointer
+    // (petting: the dogs' shadows follow their hops ~10× a second, smoother than the old 4×, without a shadow pass every frame)
+    if(hold||folder||(petT>=0&&now-lastShadow>95)||(!moving&&now-lastShadow>1000)){renderer.shadowMap.needsUpdate=true;lastShadow=now}
     const dt=Math.min((now-last)/1000,.04);last=now;uiTime+=dt
     tickPets(dt)
     // disco mode forces night; turning it off eases back to the time of day
@@ -1345,7 +1380,7 @@ function createScene(canvas, handlers) {
     camera.position.set(state.x,roomBounds?floorY+EYE_HEIGHT:EYE_HEIGHT,state.z);camera.rotation.set(state.pitch,state.yaw,0)
     if(focus){
       const slow=focus.to.pivot?1.3:1 // the aimed glide (speaker) takes a little longer so it reads as one smooth move
-      focus.t=Math.min(1,focus.t+dt/((focus.phase==='in'?(SNAPPY?.85:1.15):(SNAPPY?.65:.9))*slow))
+      focus.t=Math.min(1,focus.t+dt/((focus.phase==='in'?(SNAPPY?.85:.95):(SNAPPY?.65:.72))*slow))
       let e=focus.t<.5?4*focus.t**3:1-Math.pow(-2*focus.t+2,3)/2
       if(focus.phase==='in'){
         if(focus.t>=1){const v=focusView(focus.to.id);if(v)focus.to=v} // follow window resizes
@@ -1544,7 +1579,7 @@ function createScene(canvas, handlers) {
       return {left:x0,top:y0,width:x1-x0,height:y1-y0,bodyLeft:bx0,bodyRight:bx1,bodyTop:by0,bodyBottom:by1,rotated:sideways()}
     },
     goToSpot(index){if(!spots[index])return;const spot=nearestFree(spots[index].x,spots[index].z);state.x=spot.x;state.z=spot.z;const target=index===3?spots[0]:desk;state.yaw=target?Math.atan2(-(target.x-state.x),-(target.z-state.z)):-Math.PI/2;state.pitch=0},
-    dispose(){disposed=true;cancelAnimationFrame(frame);['pointermove','pointerdown','keydown','wheel','touchmove'].forEach((e)=>window.removeEventListener(e,poke));observer.disconnect();window.removeEventListener('keydown',onDown);window.removeEventListener('keyup',onUp);window.removeEventListener('blur',clearKeys);canvas.removeEventListener('pointerdown',pointerDown);canvas.removeEventListener('pointermove',pointerMove);canvas.removeEventListener('pointermove',hoverCert);canvas.removeEventListener('pointerup',pointerUp);canvas.removeEventListener('pointercancel',pointerUp);canvas.removeEventListener('wheel',onWheel);scene.traverse((object)=>{object.geometry?.dispose();if(Array.isArray(object.material))object.material.forEach((m)=>m.dispose());else object.material?.dispose()});groundMaterial?.map?.dispose();wallTexture.dispose();wallSource.dispose();floorTexture.dispose();cabinetTexture.dispose();doorTexture.dispose();desktopTexture.userData.dispose?.();desktopTexture.dispose();exteriorTexture.dispose();renderer.dispose()},
+    dispose(){disposed=true;mgr.itemStart=prevStart;mgr.itemEnd=prevEnd;cancelAnimationFrame(frame);['pointermove','pointerdown','keydown','wheel','touchmove'].forEach((e)=>window.removeEventListener(e,poke));observer.disconnect();window.removeEventListener('keydown',onDown);window.removeEventListener('keyup',onUp);window.removeEventListener('blur',clearKeys);canvas.removeEventListener('pointerdown',pointerDown);canvas.removeEventListener('pointermove',pointerMove);canvas.removeEventListener('pointermove',hoverCert);canvas.removeEventListener('pointerup',pointerUp);canvas.removeEventListener('pointercancel',pointerUp);canvas.removeEventListener('wheel',onWheel);scene.traverse((object)=>{object.geometry?.dispose();if(Array.isArray(object.material))object.material.forEach((m)=>m.dispose());else object.material?.dispose()});groundMaterial?.map?.dispose();wallTexture.dispose();wallSource.dispose();floorTexture.dispose();cabinetTexture.dispose();doorTexture.dispose();desktopTexture.userData.dispose?.();desktopTexture.dispose();exteriorTexture.dispose();renderer.dispose()},
   }
 }
 

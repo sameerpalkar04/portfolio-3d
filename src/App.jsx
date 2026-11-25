@@ -530,7 +530,7 @@ function ExploreCue({ onDismiss, total = 3 }) {
     <span className="tour-step">Step {total} of {total}</span>
     <b>Things to explore</b>
     <ul className="explore-rows">{ALL_SPOTS.map((s) => <li key={s.id}><span className="cue-cam">{CUES[s.id]?.icon}</span><span className="ex-name">{s.object}</span><small>{s.opens}</small></li>)}
-      <li key="ai"><span className="cue-cam ex-ai"><AiIcon size={18}/></span><span className="ex-name">Ask Nate</span><small>AI assistant · soon</small></li>
+      <li key="ai"><span className="cue-cam ex-ai"><AiIcon size={18}/></span><span className="ex-name">Ask Nate</span><small>AI assistant</small></li>
     </ul>
     <small className="explore-foot">{touch ? 'Walk up to one, or use the menu to go straight there' : 'Walk up to one, or use the shortcuts in the bar'}</small>
     <button className="tour-start" onClick={onDismiss}>Start exploring <Arrow dir="right" size={16}/></button>
@@ -1807,11 +1807,12 @@ export default function App() {
   const getResumeRect = useCallback(() => sceneRef.current?.resumeRect?.() ?? null, [])
   const setResumeInsets = useCallback((v) => sceneRef.current?.setResumeInsets?.(v), [])
   // fetch the résumé in the background once the room is up, so it's already on the sheet in the file
+  // (after the loading screen has gone: rendering the PDF takes the browser a moment, which showed as a hitch in its animation)
   useEffect(() => {
-    if (!sceneReady) return
-    const t = window.setTimeout(() => loadResume().then((r) => sceneRef.current?.setResumePage(r.canvas, r.aspect)).catch(() => {}), 1500)
+    if (!sceneReady || loading) return
+    const t = window.setTimeout(() => loadResume().then((r) => sceneRef.current?.setResumePage(r.canvas, r.aspect)).catch(() => {}), 2500)
     return () => window.clearTimeout(t)
-  }, [sceneReady])
+  }, [sceneReady, loading])
   useEffect(() => { sceneRef.current?.setTimeOfDay(hour) }, [hour, sceneReady])
   useEffect(() => { const timer = window.setInterval(() => setClockHour(systemHour()), 60000); return () => window.clearInterval(timer) }, [])
   return <NateCtx.Provider value={nateCtx}><main className="app-shell"><OfficeScene sceneRef={sceneRef} onHotspot={updateHotspot} onDeskNear={updateDeskNear} onSystem={updateSystem} onReady={updateReady} onProgress={updateProgress} onCert={updateCert} onSettled={onCamSettled}/>
