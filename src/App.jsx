@@ -694,8 +694,11 @@ const bookSpread = (page, goTo) => page === 0 ? [
         <b>Application Software Engineer 1</b>
         <span>Oracle Financial Services Software Ltd.</span>
         <span className="edu-meta">August 2026 – Present</span>
-        {/* description goes here */}
-        <div className="exp-desc"/>
+        <ul className="xc-points exp-points">
+          <li>Working on Oracle’s Accounting Foundation Cloud Service (AFCS).</li>
+          <li>Developing across the Data Integration Hub (DIH) and Sub Ledger Applications (SLA) modules.</li>
+          <li>Implemented API test automation, making API testing faster and more reliable.</li>
+        </ul>
       </div>
     </article>
     <span className="folio">3</span>

@@ -2013,3 +2013,6 @@ body:has(.bar-panel) .demo-cue:not(.is-touch){top:max(76px,calc(100% - 640px))!i
 /* the plan always fits the drawing area (it keeps its shape inside this box) */
 .cad-plan{position:absolute;left:0;top:52px;width:100%;height:calc(100% - 72px);max-width:none;max-height:none;padding:0}
 @media (max-width:700px){.cad-plan{top:44px;height:calc(100% - 56px);padding:0}}
+
+/* Moving around: the action sits on the right, like the Things to explore list */
+.help-panel ul:not(.explore) li{justify-content:space-between;text-align:right}
