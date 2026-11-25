@@ -7,7 +7,7 @@ import { buildCollisionGrid, createWalkTester } from './collision'
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
 import { toLocal, isLocked } from './orientation'
 import { ACHIEVEMENTS } from './achievements'
-import { PHONE, BOOK, CAMERA_SCREEN, createOpenBook, createDigitalCamera, createTableLamp, createGlobe, createCertificateWall, createPolaroid, createModelAirplane, createPhone, createFloorPlant, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight, createFileFolder, createShihTzu, DOG_COATS, createDogBowl, createPlushDuck, FOLDER } from './props'
+import { PHONE, BOOK, CAMERA_SCREEN, createOpenBook, createDigitalCamera, createTableLamp, createGlobe, createCertificateWall, createPolaroid, createModelAirplane, createPhone, createFloorPlant, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight, createFileFolder, createShihTzu, DOG_COATS, createDogBowl, createPlushDuck, FOLDER, createCubeShelf, createBackpack, createPenStand } from './props'
 import { createDesktopTexture, BEACH_PHOTO_URL } from './screens'
 
 const MODEL_URL = '/models/home-office.glb?v=3'
@@ -328,10 +328,14 @@ function createScene(canvas, handlers) {
           pillow.position.copy(pillow.parent.worldToLocal(world)); pillow.updateMatrixWorld(true)
         }
       }
-      const trimMaterial=new THREE.MeshStandardMaterial({color:'#3f403e',roughness:.48,metalness:.08})
-      const trimDepth=.075,trim=.065,windowW=1.24,windowH=1.9,bottom=.075,top=1.975,mid=1.06,frontY=-.163
-      const rails=[[-windowW/2-trim/2,(top+bottom)/2,trim,top-bottom+trim*2],[windowW/2+trim/2,(top+bottom)/2,trim,top-bottom+trim*2],[0,bottom-trim/2,windowW,trim],[0,top+trim/2,windowW,trim],[0,mid,windowW,trim*.8]]
-      for(const [x,z,w,h] of rails){const rail=new THREE.Mesh(new THREE.BoxGeometry(w,trimDepth,h),trimMaterial);rail.position.set(x,frontY,z);rail.castShadow=true;rail.renderOrder=11;windowNode.add(rail)}
+      // Black steel-look frame with divided lights: a centre mullion and a transom make four sashes, and
+      // slim glazing bars split each sash into four panes (they cast a window-grid of sunlight into the room)
+      const trimMaterial=new THREE.MeshStandardMaterial({color:'#17181a',roughness:.55,metalness:.12})
+      const trimDepth=.075,trim=.06,windowW=1.24,windowH=1.9,bottom=.075,top=1.975,mid=1.06,frontY=-.163
+      const bar=.022,bars=[]
+      for(const [z0,z1] of [[bottom,mid],[mid,top]]) for(const [x0,x1] of [[-windowW/2,0],[0,windowW/2]]){ bars.push([(x0+x1)/2,(z0+z1)/2,bar,z1-z0],[(x0+x1)/2,(z0+z1)/2,x1-x0,bar]) }
+      const rails=[[-windowW/2-trim/2,(top+bottom)/2,trim,top-bottom+trim*2],[windowW/2+trim/2,(top+bottom)/2,trim,top-bottom+trim*2],[0,bottom-trim/2,windowW,trim],[0,top+trim/2,windowW,trim],[0,mid,windowW,trim*.8],[0,(top+bottom)/2,trim*.8,top-bottom],...bars]
+      for(const [x,z,w,h] of rails){const thin=w<=bar||h<=bar;const rail=new THREE.Mesh(new THREE.BoxGeometry(w,thin?trimDepth*.6:trimDepth,h),trimMaterial);rail.position.set(x,frontY+(thin?trimDepth*.2:0),z);rail.castShadow=true;rail.renderOrder=11;windowNode.add(rail)}
       const glassTint=new THREE.Mesh(new THREE.PlaneGeometry(windowW,windowH),new THREE.MeshBasicMaterial({color:'#dceaf0',transparent:true,opacity:.12,side:THREE.DoubleSide,depthTest:true,depthWrite:false}))
       glassTint.rotation.x=Math.PI/2;glassTint.position.set(0,-.158,1.025);glassTint.renderOrder=12;windowNode.add(glassTint)
       const sill=new THREE.Mesh(new THREE.BoxGeometry(windowW+.18,.18,.095),new THREE.MeshStandardMaterial({color:'#e4d4bb',roughness:.65}));sill.position.set(0,-.14,bottom-.08);sill.castShadow=true;windowNode.add(sill)
@@ -361,7 +365,7 @@ function createScene(canvas, handlers) {
 
     // ---- Night lighting ------------------------------------------------------
     const worldPos = (object) => object.getWorldPosition(new THREE.Vector3())
-    // Desk lamp: always on. The bulb glows, a soft point light warms the wall and a
+    // Desk lamp: on with the other lamps at dusk, off by day. The bulb glows, a soft point light warms the wall and a
     // spotlight throws a pool of light onto the desk below the shade.
     const filament = find('filament'), lampBase = find('base')
     const deskTopY = lampBase ? new THREE.Box3().setFromObject(lampBase).min.y : floorY + .77
@@ -370,10 +374,10 @@ function createScene(canvas, handlers) {
       filament.traverse((o) => { if (o.isMesh) o.material = bulb })
       const p = worldPos(filament)
       const lamp = new THREE.PointLight('#ffc983', 0, 3, 1.7); lamp.position.copy(p).add(new THREE.Vector3(0, -.06, 0)); scene.add(lamp)
-      alwaysOnLights.push({ light: lamp, day: 1.1, night: 1.8, glow: bulb, glowMax: 3 })
+      nightLights.push({ light: lamp, max: 1.1, glow: bulb, glowMax: 2.2 }) // off by day, like the other lamps; softer
       const pool = new THREE.SpotLight('#ffcb88', 0, 2.2, .75, .7, 1.6); pool.position.copy(p).add(new THREE.Vector3(0, -.04, 0))
       pool.target.position.set(p.x, deskTopY, p.z); scene.add(pool); scene.add(pool.target)
-      alwaysOnLights.push({ light: pool, day: 4, night: 3 })
+      nightLights.push({ light: pool, max: 1.8 })
     }
     // A phone lying beside the lamp base, on the chair side of the desk.
     if (lampBase) {
@@ -556,6 +560,15 @@ function createScene(canvas, handlers) {
       let cushion = null; const pillows = []
       model.traverse((o) => { if (!o.isMesh) return; const n = (o.material?.name || '').toLowerCase(); if (n === 'cushion') cushion = o; else if (n === 'pillow 1' || n === 'pillow 2') pillows.push(o) })
       if (cushion) {
+        // nudge the front (yellow) pillow a little further onto the grey one, to make room for both dogs
+        // (it sits in front of the back pillow, toward the room, rather than through it); the back pillow is orange
+        for (const pl of pillows) {
+          const nm = (pl.material?.name || '').toLowerCase()
+          if (nm === 'pillow 1') { pl.material = pl.material.clone(); pl.material.color.set(pl.material.map ? '#f0a060' : '#d9773a') }
+          if (nm !== 'pillow 2') continue
+          const w = pl.getWorldPosition(new THREE.Vector3()); w.x -= .1; w.z += .13
+          pl.parent.updateWorldMatrix(true, false); pl.position.copy(pl.parent.worldToLocal(w)); pl.updateMatrixWorld(true)
+        }
         const cb = new THREE.Box3().setFromObject(cushion), cc = cb.getCenter(new THREE.Vector3()), mid = roomBounds.getCenter(new THREE.Vector3())
         const alongX = cb.max.x - cb.min.x > cb.max.z - cb.min.z
         const inward = alongX ? new THREE.Vector3(0, 0, Math.sign(mid.z - cc.z)) : new THREE.Vector3(Math.sign(mid.x - cc.x), 0, 0)
@@ -569,8 +582,8 @@ function createScene(canvas, handlers) {
         const face = Math.atan2(inward.x, inward.z)
         // where each dog sits (known now, so the petting spot exists before the model arrives)
         const seats = [
-          { name: 'Rio', at: .34, back: .03, turn: -.32, coat: DOG_COATS.white, height: .4 },
-          { name: 'Bruno', at: .78, back: -.05, turn: -.58, coat: DOG_COATS.bruno, height: .43 },
+          { name: 'Rio', at: .1, back: .03, turn: -.1, coat: DOG_COATS.white, height: .4 },
+          { name: 'Bruno', at: .66, back: -.02, turn: -.16, coat: DOG_COATS.bruno, height: .43 },
         ].map((d) => { const p = cc.clone().addScaledVector(along, side * d.at * half).addScaledVector(inward, d.back * depth); p.y = seatY(p.x, p.z) - .003; return { ...d, p } })
         petGroup = new THREE.Group(); petGroup.name = 'pets'; scene.add(petGroup)
         // their plush duck on the cushion in front of them
@@ -590,8 +603,15 @@ function createScene(canvas, handlers) {
           for (const s of seats) {
             const d = createShihTzu(src, { coat: s.coat, height: s.height, frost: s.coat === DOG_COATS.bruno ? '#7a5a40' : null }); d.name = s.name
             d.position.copy(s.p); d.rotation.y = face + side * s.turn
-            d.userData.base = { y: s.p.y, ry: d.rotation.y, h: s.height }
             petGroup.add(d)
+            // keep every paw on the cushion: if the dog pokes past its ends (the side wall) or its back edge
+            // (the window), slide it back in with a little margin
+            d.updateMatrixWorld(true)
+            const db = new THREE.Box3().setFromObject(d), m = .025
+            const dx = Math.max(0, cb.min.x + m - db.min.x) - Math.max(0, db.max.x - (cb.max.x - m))
+            const dz = Math.max(0, cb.min.z + m - db.min.z) - Math.max(0, db.max.z - (cb.max.z - m))
+            if (dx || dz) { d.position.x += dx; d.position.z += dz; d.position.y = seatY(d.position.x, d.position.z) - .003 }
+            d.userData.base = { y: d.position.y, ry: d.rotation.y, h: s.height }
           }
         }
       }
@@ -678,6 +698,57 @@ function createScene(canvas, handlers) {
         for (const o of parts) { o.getWorldPosition(w).add(shift); o.parent.updateWorldMatrix(true, false); o.position.copy(o.parent.worldToLocal(w)); o.updateMatrixWorld(true) }
       }
     }
+    // A second under-desk cabinet beside the first: same plywood door and handle, under the drawer row
+    {
+      const door = find('Cube020'), handle = find('handle003'), drawer = find('Cube007')
+      if (door && handle) {
+        const db = new THREE.Box3().setFromObject(door), dz = db.max.z - db.min.z, gap = .004
+        const topY = drawer ? new THREE.Box3().setFromObject(drawer).min.y - .006 : db.max.y
+        const dir = Math.sign((drawer ? new THREE.Box3().setFromObject(drawer).getCenter(new THREE.Vector3()).z : db.min.z - 1) - db.getCenter(new THREE.Vector3()).z) || -1
+        const zFar = dir < 0 ? db.min.z - gap : db.max.z + gap, zNear = zFar + dir * dz, zc = (zFar + zNear) / 2
+        const mat = door.material, h = topY - db.min.y
+        const newDoor = new THREE.Mesh(new THREE.BoxGeometry(db.max.x - db.min.x, h, dz), mat)
+        newDoor.position.set((db.min.x + db.max.x) / 2, db.min.y + h / 2, zc); newDoor.castShadow = newDoor.receiveShadow = true; newDoor.name = 'desk-cabinet-2'; scene.add(newDoor)
+        // carcass: the side panel facing the open knee space, a plinth and a top under the drawers
+        const back = db.max.x + .65, depth = back - db.max.x, side = new THREE.Mesh(new THREE.BoxGeometry(depth, h + (db.min.y - floorY), .018), mat)
+        side.position.set(db.max.x + depth / 2, floorY + (h + db.min.y - floorY) / 2, zNear - dir * .009); side.castShadow = side.receiveShadow = true; scene.add(side)
+        const plinth = new THREE.Mesh(new THREE.BoxGeometry(.018, db.min.y - floorY, dz), new THREE.MeshStandardMaterial({ color: '#2b2622', roughness: .8 }))
+        plinth.position.set(db.max.x + .03, floorY + (db.min.y - floorY) / 2, zc); scene.add(plinth)
+        // handle: a copy of the first one, at the same height on the opposite (knee-space) edge
+        const hb = new THREE.Box3().setFromObject(handle), h2 = handle.clone(); h2.material = handle.material
+        handle.parent.add(h2); h2.updateMatrixWorld(true)
+        const handleEdge = Math.abs(hb.getCenter(new THREE.Vector3()).z - db.min.z) < Math.abs(hb.getCenter(new THREE.Vector3()).z - db.max.z) ? 'min' : 'max'
+        const offset = handleEdge === 'min' ? hb.getCenter(new THREE.Vector3()).z - db.min.z : db.max.z - hb.getCenter(new THREE.Vector3()).z
+        const targetZ = dir < 0 ? (zNear < zFar ? zNear + offset : zNear - offset) : (zNear > zFar ? zNear - offset : zNear + offset)
+        const targetY = Math.min(hb.getCenter(new THREE.Vector3()).y, db.min.y + h * .62)
+        const w0 = new THREE.Vector3(); h2.getWorldPosition(w0)
+        const shift = new THREE.Vector3(0, targetY - hb.getCenter(new THREE.Vector3()).y, targetZ - hb.getCenter(new THREE.Vector3()).z)
+        h2.position.copy(h2.parent.worldToLocal(w0.add(shift))); h2.updateMatrixWorld(true)
+      }
+    }
+    // A pen stand on the desk just beside the iMac, on the bonsai side, toward the wall
+    {
+      const imacN = find('Apple iMac 27 - display'), top = find('Cube001'), bonsaiObj = scene.getObjectByName('bonsai')
+      if (imacN && top) {
+        const ib = new THREE.Box3().setFromObject(imacN), tb = new THREE.Box3().setFromObject(top), stand = createPenStand()
+        const bz = bonsaiObj ? new THREE.Box3().setFromObject(bonsaiObj).max.z : ib.min.z - .3
+        const toBonsai = Math.sign(bz - ib.getCenter(new THREE.Vector3()).z) || -1
+        const edge = toBonsai < 0 ? ib.min.z : ib.max.z
+        stand.position.set(Math.min(tb.max.x - .09, ib.getCenter(new THREE.Vector3()).x + .03), tb.max.y, edge + toBonsai * .1)
+        stand.rotation.y = .6; scene.add(stand)
+      }
+    }
+    // A black backpack standing at the lamp end of the desk, its back to the wall, past the lamp
+    {
+      const top = find('Cube001'), lampObj = find('lamp')
+      if (top) {
+        const tb = new THREE.Box3().setFromObject(top), bag = createBackpack()
+        const lampEnd = lampObj ? new THREE.Box3().setFromObject(lampObj).max.z : tb.max.z - .4
+        bag.position.set(tb.max.x - .135, tb.max.y, Math.min(tb.max.z - .17, (lampEnd + tb.max.z) / 2 + .02))
+        bag.rotation.y = -Math.PI / 2 - .3 // front toward the room, turned a touch toward the chair
+        scene.add(bag)
+      }
+    }
     grid = buildCollisionGrid(meshColliders, roomBounds, floorY)
     const imac = find('Apple iMac 27 - display')
     if (imac) { const p = imac.getWorldPosition(new THREE.Vector3()); computer = { x: p.x, z: p.z } }
@@ -694,6 +765,21 @@ function createScene(canvas, handlers) {
         wall.position.set(hit.point.x + n.x * .004, ib.max.y + .1 + wall.userData.size.h / 2 + .06, ic.z)
         wall.lookAt(wall.position.clone().add(n))
         scene.add(wall); achievementsWall = wall
+        // the interlocking car shelf on the same wall, toward the door, level with the certificates
+        {
+          const shelf = createCubeShelf({ wood: find('Cube.027')?.material || find('Cube001')?.material }), along = new THREE.Vector3(0, 1, 0).cross(n).normalize(), sz = shelf.userData.size
+          shelf.position.copy(wall.position).addScaledVector(along, wall.userData.size.w / 2 + .28).addScaledVector(n, -.002)
+          shelf.position.y = wall.position.y - sz.h / 2 + .03
+          shelf.lookAt(shelf.position.clone().add(n)); scene.add(shelf)
+          // its LEDs work like the long wall shelves': dim by day, full when the lamps come on; the two big
+          // boxes also get a real light shining down onto what's inside
+          shelf.userData.lights.forEach((l, k) => {
+            if (k === 1 || k === 2) {
+              const area = new THREE.RectAreaLight('#ffd29a', 0, l.w, l.d); area.position.set(l.x, l.y, l.z); area.rotation.x = -Math.PI / 2; shelf.add(area)
+              moodLights.push({ light: area, max: 5, glow: shelf.userData.glow, glowMax: 2.6 })
+            }
+          })
+        }
         // a picture light over the cluster, like the one above the beach print
         const { group: pl, glow: plGlow, lightPoint: plPoint } = createPictureLight(.95)
         pl.quaternion.copy(wall.quaternion); pl.position.copy(wall.position).add(new THREE.Vector3(0, wall.userData.size.h / 2 + .09, 0))

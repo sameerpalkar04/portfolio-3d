@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import OfficeScene from './OfficeScene'
 import Loader from './Loader'
-import { viewW, viewH, fracAlong, phoneLandscape, setPortraitLock } from './orientation'
+import { viewW, viewH, fracAlong, phoneLandscape, setPortraitLock, isLocked } from './orientation'
 import { ACHIEVEMENTS } from './achievements'
 import { DesktopOS, MAC_DOCK } from './MacOS'
 import { RESUME_URL, RESUME_VIEW, RESUME_DOWNLOAD, RESUME_NAME, loadResume } from './resume'
@@ -376,7 +376,7 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot: hotspotNow, onGo: goNo
     <AnimatePresence>{here && !panel && <motion.button key="sheet-interact" className="fab-action sheet-interact" onClick={onOpen} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .2 }}>INTERACT <Arrow/></motion.button>}</AnimatePresence>
     <div className="onebar">
       <nav className="onebar-nav" aria-label="Controls">
-        {[['work', 'Work', workLocked], ['play', 'Life', playLocked], ['settings', 'Settings', false], ['help', 'Help', false]].map(([id, label, off]) =>
+        {[['work', 'Work', workLocked], ['play', 'Life', playLocked], ['settings', 'Settings', locked], ['help', 'Help', false]].map(([id, label, off]) =>
           <button key={id} className={`ob-btn${panel === id || (!panel && atGroup === id) ? ' on' : ''}${teach === id ? ' teach' : ''}`} onClick={() => toggle(id)} disabled={off} aria-expanded={panel === id}><span className="ob-ico">{OB_ICONS[id]}</span>{label}</button>)}
       </nav>
       <div className="ob-nate"><AiButton compact locked={locked}/></div>
@@ -392,8 +392,8 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot: hotspotNow, onGo: goNo
     <nav className={`bottom-bar${keepOpen ? ' has-fun' : ''}`} aria-label="Controls">
       <div className="bar-section sec-time">
         {compact
-          ? <button className={`bar-btn settings-btn${panel === 'time' ? ' on' : ''}`} onClick={() => toggle('time')} aria-expanded={panel === 'time'} aria-label="Settings" title="Settings">{OB_ICONS.settings}</button>
-          : <button className={`bar-icon ${isDark(hour) ? 'is-night' : 'is-day'}${panel === 'time' ? ' open' : ''}`} onClick={() => toggle('time')} aria-expanded={panel === 'time'} title="Time of day">{isDark(hour) ? <MoonIcon/> : <SunIcon/>}</button>}
+          ? <button className={`bar-btn settings-btn${panel === 'time' ? ' on' : ''}`} onClick={() => toggle('time')} disabled={locked} aria-expanded={panel === 'time'} aria-label="Settings" title="Settings">{OB_ICONS.settings}</button>
+          : <button className={`bar-icon ${isDark(hour) ? 'is-night' : 'is-day'}${panel === 'time' ? ' open' : ''}`} onClick={() => toggle('time')} disabled={locked} aria-expanded={panel === 'time'} title={locked ? 'Finish the walkthrough first' : 'Time of day'}>{isDark(hour) ? <MoonIcon/> : <SunIcon/>}</button>}
       </div>
       <div className="bar-section sec-help">
         <button className={`bar-btn${panel === 'help' ? ' on' : ''}`} onClick={() => toggle('help')} aria-expanded={panel === 'help'}>Instructions</button>
@@ -565,8 +565,8 @@ function TourCue({ step, onDone, moveMode, mini = false }) {
     }
     if (step === 'look') {
       let down = null, moved = 0, done = false
-      const onDown = (e) => { if (e.target.closest?.('.office-canvas')) { down = { x: e.clientX, y: e.clientY }; moved = 0 } }
-      const onMove = (e) => { if (!down || done) return; moved += Math.hypot(e.clientX - down.x, e.clientY - down.y); down = { x: e.clientX, y: e.clientY }; if (moved > 60) { done = true; window.setTimeout(onDone, 400) } }
+      const onDown = (e) => { if (!e.target.closest?.('button,a,input,.bar-panel,.hud-dock')) { down = { x: e.clientX, y: e.clientY }; moved = 0 } }
+      const onMove = (e) => { if (!down || done) return; moved += Math.hypot(e.clientX - down.x, e.clientY - down.y); down = { x: e.clientX, y: e.clientY }; if (moved > 18) { done = true; window.setTimeout(onDone, 300) } }
       const onUp = () => { down = null }
       window.addEventListener('pointerdown', onDown); window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp)
       return () => { window.removeEventListener('pointerdown', onDown); window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp) }
@@ -603,11 +603,11 @@ function ModeChoice({ onPick }) {
 
 // The iPhone on the desk: wakes up to a lock screen whose notifications are the ways to reach me.
 const CONTACTS = [
-  { app: 'Mail', href: 'mailto:palkarsameer04@gmail.com', title: 'Email me', body: 'palkarsameer04@gmail.com', tile: '#1a82fb',
+  { app: 'Mail', line: 'palkarsameer04@gmail.com', href: 'mailto:palkarsameer04@gmail.com', title: 'Email me', body: 'palkarsameer04@gmail.com', tile: '#1a82fb',
     icon: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="m4 7 8 6 8-6"/></svg> },
-  { app: 'LinkedIn', href: 'https://www.linkedin.com/in/sameer-palkar-9707b9286/', title: 'Sameer Palkar', body: 'Let’s connect on LinkedIn', tile: '#0a66c2',
+  { app: 'LinkedIn', line: 'Sameer Palkar', href: 'https://www.linkedin.com/in/sameer-palkar-9707b9286/', title: 'Sameer Palkar', body: 'Let’s connect on LinkedIn', tile: '#0a66c2',
     icon: <svg viewBox="0 0 24 24" width="20" height="20" fill="#fff"><path d="M5.3 8.6h3v10h-3zM6.8 4.3a1.75 1.75 0 1 1 0 3.5 1.75 1.75 0 0 1 0-3.5zM10.2 8.6h2.9V10c.4-.8 1.4-1.6 3-1.6 3.1 0 3.7 2 3.7 4.7v5.5h-3v-4.9c0-1.2 0-2.7-1.6-2.7s-1.9 1.3-1.9 2.6v5h-3.1z"/></svg> },
-  { app: 'GitHub', href: 'https://github.com/sameerpalkar04', title: 'sameerpalkar04', body: 'See what I’m building on GitHub', tile: '#1b1f24',
+  { app: 'GitHub', line: 'sameerpalkar04', href: 'https://github.com/sameerpalkar04', title: 'sameerpalkar04', body: 'See what I’m building on GitHub', tile: '#1b1f24',
     icon: <svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M12 2.5a9.6 9.6 0 0 0-3 18.7c.5.1.7-.2.7-.5v-1.7c-2.7.6-3.2-1.2-3.2-1.2-.4-1.1-1.1-1.4-1.1-1.4-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.9.8.1-.6.3-1.1.6-1.3-2.1-.2-4.4-1.1-4.4-4.8 0-1 .4-1.9 1-2.6-.1-.3-.4-1.2.1-2.6 0 0 .8-.3 2.6 1a9 9 0 0 1 4.8 0c1.8-1.3 2.6-1 2.6-1 .5 1.4.2 2.3.1 2.6.6.7 1 1.6 1 2.6 0 3.7-2.3 4.6-4.4 4.8.3.3.7.9.7 1.8v2.6c0 .3.2.6.7.5A9.6 9.6 0 0 0 12 2.5z"/></svg> },
 ]
 // Socials Nate mentions (or the visitor asks for) become tappable buttons under his reply.
@@ -618,7 +618,7 @@ function socialsFor(reply = '', question = '') {
   return /\b(socials?|contact|reach|connect|get in touch|handles?)\b/i.test(question) ? CONTACTS : []
 }
 function PhoneScreen({ onClose, getRect }) {
-  const [now, setNow] = useState(new Date())
+  const [now, setNow] = useState(new Date()), [tapped, setTapped] = useState(false)
   const [rect, setRect] = useState(null)
   useEffect(() => { const t = window.setInterval(() => setNow(new Date()), 15000); return () => window.clearInterval(t) }, [])
   // Follow the phone's screen in the 3D view (it appears once the camera has settled over it).
@@ -632,6 +632,25 @@ function PhoneScreen({ onClose, getRect }) {
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
   }, [getRect])
+  // the cue only needs a moment: it fades out ~3.5 s after the screen appears (or on the first tap)
+  // phones: the cue sits beside Nate's button in the bottom corner instead of over the phone
+  const [cueBox, setCueBox] = useState(null)
+  useEffect(() => {
+    if (!isTouch()) return undefined
+    let raf = 0
+    const place = () => {
+      const nate = document.querySelector('.touch-fabs .ai-wrap'), r = nate?.getBoundingClientRect()
+      if (r && r.width && !isLocked()) {
+        const box = { left: 14, right: Math.round(window.innerWidth - r.left + 10), bottom: Math.round(window.innerHeight - r.bottom), height: Math.round(r.height) }
+        setCueBox((b) => (b && b.right === box.right && b.bottom === box.bottom && b.height === box.height ? b : box))
+      } else setCueBox(null)
+      raf = requestAnimationFrame(place)
+    }
+    raf = requestAnimationFrame(place)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+  const shown = !!rect
+  useEffect(() => { if (!shown) return undefined; const t = window.setTimeout(() => setTapped(true), 4500); return () => window.clearTimeout(t) }, [shown])
   const time = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).replace(/\s?[AP]M$/i, '')
   const date = now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
   return <motion.div className="phone-overlay" onClick={onClose} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
@@ -645,13 +664,20 @@ function PhoneScreen({ onClose, getRect }) {
       <div className="phone-notes">
         {CONTACTS.map((c, i) => <motion.a key={c.app} className="phone-note" href={c.href} target={c.href.startsWith('http') ? '_blank' : undefined} rel="noreferrer"
           initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .55 + i * .12, duration: .45, ease: [.2, .8, .2, 1] }}
-          whileHover={{ y: -1, transition: { duration: .15 } }} whileTap={{ scale: .98, transition: { duration: .1 } }}>
+          onClick={() => setTapped(true)} whileHover={{ y: -1, transition: { duration: .15 } }} whileTap={{ scale: .98, transition: { duration: .1 } }}>
           <span className="note-icon" style={{ background: c.tile }}>{c.icon}</span>
-          <span className="note-text"><span className="note-head"><b>{c.app}</b><small>{i === 0 ? 'now' : `${i * 3}m ago`}</small></span><strong>{c.title}</strong><span>{c.body}</span></span>
+          <span className="note-text"><span className="note-head"><b>{c.app}</b><small>{i === 0 ? 'now' : `${i * 3}m ago`}</small></span><span>{c.line}</span></span>
         </motion.a>)}
       </div>
       <div className="phone-home"/>
     </div>}
+    {/* the same cue box as the camera and résumé: what the notifications do */}
+    <AnimatePresence>{rect && !tapped && <motion.div key="note-cue" className={`look-cue cam-cue phone-cue${isTouch() ? ' is-touch' : ''}${cueBox ? ' at-fab' : ''}`} onClick={(e) => e.stopPropagation()}
+      style={cueBox ? { left: cueBox.left, right: cueBox.right, bottom: cueBox.bottom, height: cueBox.height } : undefined}
+      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0, transition: { delay: 1, duration: .35 } }} exit={{ opacity: 0, y: -6, transition: { duration: .25 } }}>
+      <span className="cue-cam"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="12" width="18" height="6" rx="2" opacity=".45"/><path d="M14.5 15.5v4.2l1.3-1.1 1 2.1 1-.5-1-2.1h1.7z" fill="currentColor"/></svg></span>
+      <span className="cue-text"><b>{isTouch() ? 'Tap a notification to open it' : 'Click a notification to open it'}</b><small>{cueBox ? 'Email, LinkedIn or GitHub' : 'Email me, or find me on LinkedIn and GitHub'}</small></span>
+    </motion.div>}</AnimatePresence>
   </motion.div>
 }
 

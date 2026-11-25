@@ -25,10 +25,33 @@ export function createPhone() {
   const glassGeo = new THREE.ShapeGeometry(roundedRect(W - .0018, L - .0018, R - .0009), 14); glassGeo.rotateX(-Math.PI / 2)
   const glass = new THREE.Mesh(glassGeo, new THREE.MeshPhysicalMaterial({ color: '#050506', roughness: .08, metalness: 0, clearcoat: 1, clearcoatRoughness: .04 }))
   glass.position.y = T + .0002; phone.add(glass)
-  const displayGeo = new THREE.ShapeGeometry(roundedRect(PHONE.displayW, PHONE.displayL, PHONE.displayR), 14); displayGeo.rotateX(-Math.PI / 2)
-  const display = new THREE.Mesh(displayGeo, new THREE.MeshPhysicalMaterial({ color: '#0b0c10', roughness: .05, metalness: 0, clearcoat: 1, clearcoatRoughness: .03 }))
+  const displayGeo = new THREE.ShapeGeometry(roundedRect(PHONE.displayW, PHONE.displayL, PHONE.displayR), 14)
+  // UVs 0..1 across the display (the shape's own UVs are in metres), top of the screen = island end
+  { const uv = displayGeo.attributes.uv; for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) / PHONE.displayW + .5, uv.getY(k) / PHONE.displayL + .5); uv.needsUpdate = true }
+  displayGeo.rotateX(-Math.PI / 2)
+  // always-on display: a black screen with a small, dim grey clock (kept to the real time)
+  const aod = document.createElement('canvas'); aod.width = 360; aod.height = 740
+  const aodTex = new THREE.CanvasTexture(aod); aodTex.colorSpace = THREE.SRGBColorSpace; aodTex.anisotropy = 8
+  // same layout as the phone's lock screen (App: .phone-clock): the short date, then the tall, condensed time
+  const drawAod = () => {
+    const g = aod.getContext('2d'), now = new Date(), W = aod.width
+    g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#000'; g.fillRect(0, 0, W, aod.height)
+    g.textAlign = 'center'; g.textBaseline = 'top'
+    g.fillStyle = '#76777d'; g.font = `600 ${Math.round(W * .056)}px -apple-system, BlinkMacSystemFont, "SF Pro Text", Helvetica, Arial, sans-serif`
+    g.fillText(now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }), W / 2, aod.height * .105)
+    const t = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).replace(/\s?[AP]M$/i, '')
+    g.save(); g.translate(W / 2, aod.height * .105 + W * .085); g.scale(1, 1.75)
+    g.fillStyle = '#86878d'; g.font = `600 ${Math.round(W * .3)}px -apple-system, BlinkMacSystemFont, "SF Pro Display", Helvetica, Arial, sans-serif`
+    if ('letterSpacing' in g) g.letterSpacing = `${-W * .009}px`
+    g.fillText(t, 0, 0); g.restore()
+    aodTex.needsUpdate = true
+  }
+  drawAod(); const aodTimer = setInterval(drawAod, 20000)
+  const display = new THREE.Mesh(displayGeo, new THREE.MeshPhysicalMaterial({ color: '#000000', emissive: '#ffffff', emissiveMap: aodTex, emissiveIntensity: .55, roughness: .05, metalness: 0, clearcoat: 1, clearcoatRoughness: .03 }))
   display.position.y = T + .0003; phone.add(display)
-  const islandGeo = new THREE.ShapeGeometry(roundedRect(.019, .0055, .00275), 6); islandGeo.rotateX(-Math.PI / 2)
+  phone.userData.dispose = () => clearInterval(aodTimer)
+  // Dynamic Island: a slim pill
+  const islandGeo = new THREE.ShapeGeometry(roundedRect(.0125, .0048, .0024), 6); islandGeo.rotateX(-Math.PI / 2)
   const island = new THREE.Mesh(islandGeo, new THREE.MeshBasicMaterial({ color: '#000000' }))
   island.position.set(0, T + .0005, -L / 2 + .0095); phone.add(island)
   return phone
@@ -626,8 +649,11 @@ export function createDigitalCamera() {
   const key = new THREE.MeshStandardMaterial({ color: '#4a4b50', roughness: .92, metalness: 0 })
   const keyLight = new THREE.MeshStandardMaterial({ color: '#55565b', roughness: .92, metalness: 0 })
   const back = -D / 2
-  const COL = -.0375 // centre of the control column (local x; seen from behind it sits beside the screen)
-  const wheelY = H / 2, rowTop = H / 2 + .0195, rowLow = H / 2 - .0195, bxL = -.0305, bxR = -.0445 // evenly spaced around the body's middle
+  // the control column, lined up with the screen: its middle (the wheel) level with the screen's middle, the top
+  // and bottom pairs level with the screen's top and bottom edges, and centred in the flat space beside the screen
+  const scrEdge = CAMERA_SCREEN.x - CAMERA_SCREEN.w / 2 - .002, flatEdge = -W / 2 + .004
+  const COL = (scrEdge + flatEdge) / 2
+  const wheelY = CAMERA_SCREEN.y, rowTop = wheelY + CAMERA_SCREEN.h / 2 - .0034, rowLow = wheelY - CAMERA_SCREEN.h / 2 + .0034, bxL = COL + .0068, bxR = COL - .0068
   const button = (x, y, r, depth, mat) => { const b = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.04, depth, 28), mat); b.rotation.x = Math.PI / 2; b.position.set(x, y, back - depth / 2); cam.add(b); return b }
   // wheel: a raised ring, a recessed well and the OK button
   const wheel = new THREE.Mesh(new THREE.TorusGeometry(.0083, .0017, 12, 40), key); wheel.position.set(COL, wheelY, back - .0012); wheel.rotation.y = Math.PI; cam.add(wheel)
@@ -635,7 +661,7 @@ export function createDigitalCamera() {
   button(COL, wheelY, .0039, .0022, keyLight)
   for (const [x, y] of [[bxL, rowTop], [bxR, rowTop], [bxL, rowLow], [bxR, rowLow]]) button(x, y, .0034, .0018, key)
   // status light (green)
-  const led = new THREE.Mesh(new THREE.CircleGeometry(.0012, 12), new THREE.MeshStandardMaterial({ color: '#2fd36b', emissive: '#2fd36b', emissiveIntensity: 1.4 })); led.rotation.y = Math.PI; led.position.set(-.025, H - .0055, back - .0003); cam.add(led)
+  const led = new THREE.Mesh(new THREE.CircleGeometry(.0012, 12), new THREE.MeshStandardMaterial({ color: '#2fd36b', emissive: '#2fd36b', emissiveIntensity: 1.4 })); led.rotation.y = Math.PI; led.position.set(COL, rowTop, back - .0003); cam.add(led)
   // printed symbols: canvas decal over the column (canvas left = the screen side)
   const DW = .031, DH = H, PX = 12000, SHARP = 3, c = document.createElement('canvas'); c.width = Math.round(DW * PX * SHARP); c.height = Math.round(DH * PX * SHARP)
   const g = c.getContext('2d'); g.scale(SHARP, SHARP); const P = (x, y) => [(COL + DW / 2 - x) * PX, (H - y) * PX]
@@ -1097,5 +1123,145 @@ export function createPlushDuck() {
   add(ball, bill, [0, .094, .058], [.022, .009, .02])                    // bill
   add(ball, eye, [.019, .108, .05], [.0055, .0065, .004])
   add(ball, eye, [-.019, .108, .05], [.0055, .0065, .004])
+  return g
+}
+
+// ── Interlocking cube shelf with model cars ──
+// Four dark-wood frames that overlap like the classic "intersecting cubes" wall shelf, each with a warm
+// LED strip under its top board and die-cast cars parked inside; small potted plants sit on top.
+// Local frame: x along the wall, y up, z out from the wall (back of the shelf at z = 0).
+function modelCar(color, len = .085) {
+  const car = new THREE.Group(), w = len * .45, h = len * .2
+  const paint = new THREE.MeshStandardMaterial({ color, roughness: .28, metalness: .55 })
+  const dark = new THREE.MeshStandardMaterial({ color: '#16181c', roughness: .25, metalness: .3 })
+  const tyre = new THREE.MeshStandardMaterial({ color: '#111', roughness: .8 })
+  const rim = new THREE.MeshStandardMaterial({ color: '#c9ccd2', roughness: .3, metalness: .9 })
+  const body = new THREE.Mesh(new RoundedBoxGeometry(len, h, w, 2, h * .35), paint); body.position.y = h * .5 + len * .06; car.add(body)
+  // cabin: a tapered glasshouse set a little back from the middle
+  const cab = new THREE.Mesh(new RoundedBoxGeometry(len * .48, h * .8, w * .86, 2, h * .3), dark); cab.position.set(-len * .05, h + len * .06 + h * .3, 0); cab.scale.set(1, 1, 1); car.add(cab)
+  const roof = new THREE.Mesh(new RoundedBoxGeometry(len * .34, h * .14, w * .8, 1, h * .06), paint); roof.position.set(-len * .07, h + len * .06 + h * .72, 0); car.add(roof)
+  const r = len * .1
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(r, r, w * .2, 16), tyre); t.rotation.x = Math.PI / 2; t.position.set(sx * len * .32, r, sz * w * .46); car.add(t)
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r * .6, r * .6, w * .21, 12), rim); m.rotation.x = Math.PI / 2; m.position.copy(t.position); car.add(m)
+  }
+  return car
+}
+function pottedPlant(kind = 'grass') {
+  const g = new THREE.Group()
+  const pot = new THREE.Mesh(new THREE.CylinderGeometry(.032, .026, .05, 24), new THREE.MeshStandardMaterial({ color: '#f2f0ec', roughness: .5 })); pot.position.y = .025; g.add(pot)
+  const soil = new THREE.Mesh(new THREE.CircleGeometry(.029, 20), new THREE.MeshStandardMaterial({ color: '#3a2b20', roughness: 1 })); soil.rotation.x = -Math.PI / 2; soil.position.y = .047; g.add(soil)
+  const leaf = new THREE.MeshStandardMaterial({ color: kind === 'grass' ? '#6f9a52' : '#7f9a5a', roughness: .7, side: THREE.DoubleSide })
+  const n = kind === 'grass' ? 16 : 9
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + i * .7, tilt = kind === 'grass' ? .35 + (i % 4) * .12 : .55 + (i % 3) * .15, len = kind === 'grass' ? .09 + (i % 5) * .012 : .055 + (i % 3) * .01
+    const geo = new THREE.ConeGeometry(kind === 'grass' ? .004 : .011, len, 4, 1, true); geo.translate(0, len / 2, 0)
+    const b = new THREE.Mesh(geo, leaf); b.position.y = .047; b.rotation.set(Math.cos(a) * tilt, 0, Math.sin(a) * tilt); g.add(b)
+  }
+  return g
+}
+// a little gold cup on a dark plinth
+function trophy(h = .15) {
+  const g = new THREE.Group()
+  const gold = new THREE.MeshStandardMaterial({ color: '#d6a63d', roughness: .28, metalness: 1 })
+  const plinth = new THREE.MeshStandardMaterial({ color: '#1d1a18', roughness: .5 })
+  const base = new THREE.Mesh(new RoundedBoxGeometry(h * .5, h * .16, h * .5, 2, h * .02), plinth); base.position.y = h * .08; g.add(base)
+  const step = new THREE.Mesh(new THREE.CylinderGeometry(h * .14, h * .18, h * .06, 24), gold); step.position.y = h * .19; g.add(step)
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(h * .035, h * .06, h * .22, 16), gold); stem.position.y = h * .33; g.add(stem)
+  const pts = []; for (let k = 0; k <= 12; k++) { const t = k / 12; pts.push(new THREE.Vector2(h * (.06 + .2 * Math.sin(t * Math.PI * .5) ** .8), h * (.44 + t * .42))) }
+  const cup = new THREE.Mesh(new THREE.LatheGeometry(pts, 32), gold); g.add(cup)
+  for (const sx of [-1, 1]) { const hd = new THREE.Mesh(new THREE.TorusGeometry(h * .09, h * .018, 8, 20, Math.PI), gold); hd.rotation.z = sx * Math.PI / 2; hd.position.set(sx * h * .25, h * .7, 0); g.add(hd) }
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(h * .3, h * .07, .002), gold); plate.position.set(0, h * .08, h * .251); g.add(plate)
+  return g
+}
+// Box UVs in metres (so a wood texture keeps its grain size whatever the board's shape)
+function woodUVs(geo, w, h, d, scale = .9) {
+  const pos = geo.attributes.position, nor = geo.attributes.normal, uv = geo.attributes.uv
+  for (let k = 0; k < pos.count; k++) {
+    const x = pos.getX(k) + w / 2, y = pos.getY(k) + h / 2, z = pos.getZ(k) + d / 2, nx = Math.abs(nor.getX(k)), ny = Math.abs(nor.getY(k))
+    const [u, v] = nx > .5 ? [z, y] : ny > .5 ? [x, z] : [x, y]
+    // grain runs along the board's long side
+    uv.setXY(k, (w >= h ? u : v) / scale, (w >= h ? v : u) / scale)
+  }
+  uv.needsUpdate = true; return geo
+}
+// opts.wood: the room's own wood material (so it matches the desk and wall shelves)
+export function createCubeShelf({ wood } = {}) {
+  const shelf = new THREE.Group(); shelf.name = 'car-shelf'
+  wood = wood || new THREE.MeshStandardMaterial({ color: '#c9a77c', roughness: .65 })
+  const glow = new THREE.MeshStandardMaterial({ color: '#fff4e0', emissive: '#ffd59c', emissiveIntensity: 0, roughness: .5 })
+  const T = .02, D = .15
+  // [left, bottom, width, height] of each frame, metres, in the wall plane
+  const frames = [[.14, .6, .24, .24], [.3, .4, .38, .3], [0, .14, .4, .36], [.34, -.04, .3, .26]]
+  const board = (x, y, w, h) => { const m = new THREE.Mesh(woodUVs(new THREE.BoxGeometry(w, h, D), w, h, D), wood); m.position.set(x, y, D / 2); shelf.add(m) }
+  const lights = []
+  for (const [l, b, w, h] of frames) {
+    board(l + w / 2, b + T / 2, w, T); board(l + w / 2, b + h - T / 2, w, T)
+    board(l + T / 2, b + h / 2, T, h - 2 * T); board(l + w - T / 2, b + h / 2, T, h - 2 * T)
+    // LED strip tucked under the top board, toward the front, like the long wall shelves
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(w - 2 * T - .01, .005, .012), glow); strip.position.set(l + w / 2, b + h - T - .003, D - .025); shelf.add(strip)
+    lights.push({ x: l + w / 2, y: b + h - T - .006, z: D / 2, w: w - 2 * T, d: D * .8 })
+  }
+  // contents: cars in the wide upper box and the bottom box, a trophy in the big left box, a vase up top
+  const cars = [[1, .475, '#c8102e'], [1, .6, '#e8e8ea'], [3, .42, '#2357c9'], [3, .56, '#1b1d22']]
+  for (const [fi, x, color] of cars) { const [, b] = frames[fi], c = modelCar(color, .108); c.position.set(x, b + T, D * .52); c.rotation.y = (fi + x * 10) % 2 < 1 ? .18 : -.18; shelf.add(c) }
+  const cup = trophy(.2); cup.position.set(.2, .14 + T, D * .5); shelf.add(cup)
+  const vase = new THREE.Mesh(new THREE.LatheGeometry([[0, 0], [.022, .002], [.03, .03], [.026, .06], [.012, .085], [.014, .095]].map(([x, y]) => new THREE.Vector2(x, y)), 24), new THREE.MeshStandardMaterial({ color: '#f1efea', roughness: .45 }))
+  vase.position.set(.26, .6 + T, D * .5); shelf.add(vase)
+  // plants on top of the left and middle frames
+  const p1 = pottedPlant('grass'); p1.position.set(.08, .14 + .36, D * .5); shelf.add(p1)
+  const p2 = pottedPlant('succulent'); p2.position.set(.55, .4 + .3, D * .5); shelf.add(p2)
+  shelf.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })
+  shelf.userData.size = { w: .68, h: .88, minY: -.04 }
+  shelf.userData.glow = glow; shelf.userData.lights = lights
+  return shelf
+}
+
+// ── A minimal black backpack, standing upright (front faces local +z, bottom at y = 0) ──
+export function createBackpack() {
+  const bag = new THREE.Group(); bag.name = 'desk-backpack'
+  const W = .29, H = .41, D = .13
+  const canvas = new THREE.MeshStandardMaterial({ color: '#161617', roughness: .92 })
+  const leather = new THREE.MeshStandardMaterial({ color: '#1b1b1c', roughness: .55 })
+  const trim = new THREE.MeshStandardMaterial({ color: '#0e0e0f', roughness: .6 })
+  const body = new THREE.Mesh(new RoundedBoxGeometry(W, H, D, 4, .045), canvas); body.position.y = H / 2; bag.add(body)
+  // front panel, slightly raised, with a smooth lower pocket
+  const panel = new THREE.Mesh(new RoundedBoxGeometry(W * .82, H * .8, .02, 3, .03), canvas); panel.position.set(0, H * .5, D / 2 + .004); bag.add(panel)
+  const pocket = new THREE.Mesh(new RoundedBoxGeometry(W * .84, H * .36, .03, 3, .02), leather); pocket.position.set(0, H * .2, D / 2 + .01); bag.add(pocket)
+  const seam = new THREE.Mesh(new THREE.BoxGeometry(W * .8, .004, .004), trim); seam.position.set(0, H * .38, D / 2 + .026); bag.add(seam)
+  // zip pulls: two on the main zip (top left), one on the pocket
+  const pull = (x, y, z, len = .035) => { const p = new THREE.Mesh(new RoundedBoxGeometry(.008, len, .005, 1, .002), trim); p.position.set(x, y, z); bag.add(p) }
+  pull(-W / 2 + .012, H * .78, D * .2); pull(-W * .36, H * .72, D / 2 + .02); pull(-W * .34, H * .3, D / 2 + .028, .03)
+  // top grab handle
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(.03, .006, 8, 20, Math.PI), trim); handle.position.set(0, H - .004, -D * .1); bag.add(handle)
+  // side pockets
+  for (const s of [-1, 1]) { const sp = new THREE.Mesh(new RoundedBoxGeometry(.018, H * .32, D * .8, 2, .008), canvas); sp.position.set(s * (W / 2 + .004), H * .2, 0); bag.add(sp) }
+  // shoulder straps down the back
+  for (const s of [-1, 1]) { const st = new THREE.Mesh(new RoundedBoxGeometry(.05, H * .75, .016, 2, .007), trim); st.position.set(s * .07, H * .5, -D / 2 - .006); bag.add(st) }
+  bag.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })
+  return bag
+}
+
+// ── A pen stand: a matte cup with a few pens and pencils leaning in it (bottom at y = 0) ──
+export function createPenStand() {
+  const g = new THREE.Group(); g.name = 'pen-stand'
+  const R = .036, H = .1
+  const cupMat = new THREE.MeshStandardMaterial({ color: '#2a2b2e', roughness: .7, metalness: .2 })
+  const cup = new THREE.Mesh(new THREE.CylinderGeometry(R, R * .95, H, 32, 1, true), cupMat); cup.position.y = H / 2; g.add(cup)
+  const inner = new THREE.Mesh(new THREE.CylinderGeometry(R * .93, R * .88, H - .004, 32, 1, true), new THREE.MeshStandardMaterial({ color: '#1c1d1f', roughness: .85, side: THREE.BackSide })); inner.position.y = H / 2 + .002; g.add(inner)
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(R * .95, R * .95, .006, 32), cupMat); base.position.y = .003; g.add(base)
+  const lip = new THREE.Mesh(new THREE.TorusGeometry(R * .965, .0022, 8, 40), cupMat); lip.rotation.x = Math.PI / 2; lip.position.y = H; g.add(lip)
+  // [body colour, tip colour, length, lean angle, lean direction, radius]
+  const pens = [['#1f4fa8', '#d9dade', .175, .18, 0, .0045], ['#e8c547', '#f0d7a8', .2, .14, 1.9, .0042], ['#141414', '#c8c9cc', .18, .22, 3.6, .0045], ['#c8102e', '#e9e9eb', .17, .12, 5, .004], ['#f4f4f2', '#2b2b2b', .165, .2, 2.7, .005]]
+  pens.forEach(([body, tip, L, lean, dir, r], k) => {
+    const pen = new THREE.Group()
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(r, r, L, k === 1 ? 6 : 12), new THREE.MeshStandardMaterial({ color: body, roughness: k === 1 ? .6 : .35 })); shaft.position.y = L / 2; pen.add(shaft)
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(r, r * 3, 12), new THREE.MeshStandardMaterial({ color: tip, roughness: .4, metalness: k === 1 ? 0 : .5 })); cap.position.y = L + r * 1.5; pen.add(cap)
+    const off = R * .45
+    pen.position.set(Math.cos(dir) * off * .5, .008, Math.sin(dir) * off * .5)
+    pen.rotation.set(Math.sin(dir) * lean, 0, -Math.cos(dir) * lean)
+    g.add(pen)
+  })
+  g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })
   return g
 }
