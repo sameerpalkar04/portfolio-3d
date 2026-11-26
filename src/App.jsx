@@ -1494,7 +1494,7 @@ function AchievementsView({ certId, getRect, onNext, onPrev, onBack }) {
       const narrow = fabCue ? viewW() - fabCue.right - 14 - 2 * fabCue.height - 16 < 140 : false
       return <>
         {win && wins > 1 && fabCue && <motion.div key="cert-arrows" className="cert-arrows" style={{ left: 14, right: fabCue.right, bottom: fabCue.bottom, height: fabCue.height }}
-          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .3, delay: .3 }}>
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .3, delay: .3 }}>
           <button className="cert-sq dark" aria-label="Previous certificate" onClick={onPrev}>{CERT_ICONS.prev}</button>
           <button className="cert-sq dark" aria-label="Next certificate" onClick={onNext}>{CERT_ICONS.next}</button>
           {/* a small cue between the arrows and Nate: what they flip through */}
@@ -1504,7 +1504,7 @@ function AchievementsView({ certId, getRect, onNext, onPrev, onBack }) {
             but for Nate, so it sits there, filling the space up to Nate */}
         {(win && wins > 1 ? actBox : fabCue) && <motion.button key="cert-back" className="resume-btn cert-back-phone"
           style={win && wins > 1 ? { left: 14, right: 14, bottom: actBox.bottom, height: actBox.height } : { left: 14, right: fabCue.right, bottom: fabCue.bottom, height: fabCue.height }}
-          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .3, delay: .3 }} onClick={onBack}>{CERT_ICONS.all} Back to certificates</motion.button>}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .3, delay: .3 }} onClick={onBack}>{CERT_ICONS.all} Back to certificates</motion.button>}
       </>
     })()}
   </motion.div>
