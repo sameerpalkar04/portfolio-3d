@@ -427,6 +427,9 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot: hotspotNow, onGo: goNo
   </motion.div>
 }
 
+// Close-ups: a click on the empty space around them goes back to the room on a laptop; on a phone stray touches
+// are ignored, only the BACK TO ROOM button does that.
+const backdropClose = (onClose) => (e) => { if (!isTouch()) onClose(e) }
 // First-time cue: "drag to look" on laptops (gone on hover), "use the arrows" on phones (gone on touch).
 const isTouch = () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
 // A cue for whatever the visitor is standing at: what it is and what it opens.
@@ -696,7 +699,7 @@ function PhoneScreen({ onClose, getRect }) {
   useEffect(() => { if (!shown) return undefined; const t = window.setTimeout(() => setTapped(true), 4500); return () => window.clearTimeout(t) }, [shown])
   const time = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).replace(/\s?[AP]M$/i, '')
   const date = now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
-  return <motion.div className="phone-overlay" onClick={onClose} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
+  return <motion.div className="phone-overlay" onClick={backdropClose(onClose)} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
     {rect && <div className="phone-live" onClick={(e) => e.stopPropagation()} style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height, borderRadius: rect.radius }}>
       <motion.div className="phone-wall" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: .1, duration: .6 }}/>
       <div className="phone-island"/>
@@ -956,7 +959,7 @@ function BookPages({ onClose, getRect, setSide }) {
   // under a turning page, the half it's leaving still shows the old spread until it has gone over
   const base = bookSpread(spread, goTo)
   const under = flip ? (() => { const old = bookSpread(flip.from, goTo); return flip.dir > 0 ? [old[0], base[1]] : [base[0], old[1]] })() : base
-  return <motion.div className="phone-overlay" onClick={onClose} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
+  return <motion.div className="phone-overlay" onClick={backdropClose(onClose)} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
     <AnimatePresence>{!solo && rect && hint && <ArrowCue key="arrows" title="Use the arrows to turn the pages" hint="Click ← → or press the arrow keys"/>}</AnimatePresence>
     <AnimatePresence>{solo && rect && hint && <motion.div key="book-cue" className="look-cue cam-cue is-touch book-cue" onClick={stop} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ delay: .3, duration: .35 }}>
       <span className="cue-cam"><SwipeIcon/></span>
@@ -1220,7 +1223,7 @@ function ComputerView({ onClose, getRect }) {
     const [cx, cy] = centre.current
     el.scrollLeft = cx * el.scrollWidth - el.clientWidth / 2; el.scrollTop = cy * el.scrollHeight - el.clientHeight / 2
   }, [zoom])
-  return <motion.div className="phone-overlay mac-overlay" onClick={onClose} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
+  return <motion.div className="phone-overlay mac-overlay" onClick={backdropClose(onClose)} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
     {rect && <>
       <motion.div ref={disp} className={`mac-display${zoom > 1 ? ' is-zoomed' : ''}`} onClick={(e) => e.stopPropagation()} onPointerDownCapture={panDown}
         style={rect.rotated
@@ -1482,7 +1485,7 @@ function MusicPanel({ onClose, onMusic }) {
   const song = SONGS[cur], missing = noPreview[song.id]
   const stop = (e) => e.stopPropagation()
   const phone = isTouch()
-  return <motion.div className="phone-overlay music-overlay" onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
+  return <motion.div className="phone-overlay music-overlay" onClick={backdropClose(onClose)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
     <motion.article ref={card} className="music-card" onClick={stop} initial={false} animate={{ y: 0, opacity: 1 }} exit={{ y: 10, opacity: 0 }} transition={{ delay: .75, duration: .4, ease: [.2, .8, .2, 1] }}>
       <header><h3>On my speaker</h3></header>
       <p className="music-tag">The songs that keep me going.</p>
@@ -1526,7 +1529,7 @@ function MusicPanel({ onClose, onMusic }) {
 // Files (résumé) and the speaker (song picks): a plain card over the room.
 function SpotCard({ app, onClose }) {
   const a = apps.find((x) => x.id === app)
-  return <motion.div className="phone-overlay spot-overlay" onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
+  return <motion.div className="phone-overlay spot-overlay" onClick={backdropClose(onClose)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
     <motion.article className="spot-card" onClick={(e) => e.stopPropagation()} initial={{ y: 14, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 10, opacity: 0 }} transition={{ duration: .3, ease: [.2, .8, .2, 1] }}>
       <span className="section-eyebrow">{a.label}</span><h3>{a.title}</h3>{a.body}
     </motion.article>
@@ -1610,7 +1613,7 @@ function ResumeView({ onClose, getRect, setInsets }) {
   }, [dock, setInsets])
   useEffect(() => () => setInsets({}), [setInsets])
   const stop = (e) => e.stopPropagation()
-  return <motion.div className="phone-overlay resume-overlay" onClick={onClose} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
+  return <motion.div className="phone-overlay resume-overlay" onClick={backdropClose(onClose)} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
     {rect && <>
       <motion.div ref={sheetEl} className="resume-sheet" onClick={stop} style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .35 }} {...zoomHandlers}>
@@ -1675,7 +1678,7 @@ function CameraView({ onClose, getRect }) {
     const key = (e) => { if (natesKeys(e)) return; if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); step(-1) } if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); step(1) } }
     window.addEventListener('keydown', key, true); return () => window.removeEventListener('keydown', key, true)
   })
-  return <motion.div className="phone-overlay" onClick={onClose} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
+  return <motion.div className="phone-overlay" onClick={backdropClose(onClose)} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
     {rect && <>
       {/* rear screen: on an upright phone the camera is turned sideways, so the picture is too */}
       <motion.div className="cam-screen" onClick={(e) => e.stopPropagation()}
