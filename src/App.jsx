@@ -332,13 +332,13 @@ const OB_ICONS = {
 function PlacesPanel({ hotspot, onGo, preview = false }) {
   return <div className="bar-panel fun-panel" role="dialog" aria-label="Places">
     <h4>Work</h4>
-    {SPOTS.map((s) => <button key={s.id} className={`fun-row${hotspot === s.id ? ' here' : ''}${preview ? ' is-preview' : ''}`} disabled={preview} onClick={() => onGo(s.id)}><span className="fun-ico">{CUES[s.id]?.icon}</span><span className="fun-text"><b>{s.object}</b><small>{s.opens}</small></span>{hotspot === s.id ? <small className="fun-here">You’re here</small> : <Arrow size={14}/>}</button>)}
+    {SPOTS.map((s) => <button key={s.id} className={`fun-row${hotspot === s.id ? ' here' : ''}${preview ? ' is-preview' : ''}`} disabled={preview} onClick={() => onGo(s.id)}><span className="fun-ico">{CUES[s.id]?.icon}</span><span className="fun-text"><b>{s.object}</b><small>{s.opens}</small></span>{hotspot === s.id && <small className="fun-here">You’re here</small>}</button>)}
   </div>
 }
-function FunPanel({ onGo, preview = false }) {
+function FunPanel({ onGo, hotspot, preview = false }) {
   return <div className="bar-panel fun-panel" role="dialog" aria-label="Fun stuff">
     <h4>Off the clock</h4>
-    {FUN_SPOTS.map((f) => <button key={f.id} className={`fun-row${preview ? ' is-preview' : ''}`} disabled={preview} onClick={() => onGo(f.id)}><span className="fun-ico">{CUES[f.id]?.icon}</span><span className="fun-text"><b>{f.label}</b><small>{f.sub}</small></span><Arrow size={14}/></button>)}
+    {FUN_SPOTS.map((f) => <button key={f.id} className={`fun-row${hotspot === f.id ? ' here' : ''}${preview ? ' is-preview' : ''}`} disabled={preview} onClick={() => onGo(f.id)}><span className="fun-ico">{CUES[f.id]?.icon}</span><span className="fun-text"><b>{f.label}</b><small>{f.sub}</small></span>{hotspot === f.id && <small className="fun-here">You’re here</small>}</button>)}
   </div>
 }
 const BAR_FOLD = 900 // px: below this the laptop bar folds the five shortcuts into Work (keeps clear of Nate)
@@ -403,9 +403,10 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot: hotspotNow, onGo: goNo
     {panel === 'settings' && <SettingsPanel hour={hour} auto={auto} onHour={onHour} onAuto={onAuto} moveMode={moveMode} onMoveMode={(m) => { onMoveMode?.(m); setPanel(null) }} onView={(v) => { setPanel(null); onView?.(v) }}/>}
     {panel === 'help' && <HelpPanel moveMode={moveMode}/>}
     {panel === 'work' && <PlacesPanel preview={!!teach} hotspot={locked ? null : hotspot} onGo={(id) => { setPanel(null); onGo(id) }}/>}
-    {panel === 'play' && <FunPanel preview={!!teach} onGo={(id) => { setPanel(null); onGo(id) }}/>}
-    <AnimatePresence>{here && !panel && <motion.button key="sheet-interact" className="fab-action sheet-interact" onClick={onOpen} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .2 }}>INTERACT <Arrow/></motion.button>}</AnimatePresence>
+    {panel === 'play' && <FunPanel preview={!!teach} hotspot={locked ? null : hotspot} onGo={(id) => { setPanel(null); onGo(id) }}/>}
     <div className="onebar">
+      {/* INTERACT sits just above the bar and stays put; an open Work / Life / Settings card simply covers it */}
+      <AnimatePresence>{here && <motion.button key="sheet-interact" className="fab-action sheet-interact" onClick={onOpen} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .2 }}>INTERACT <Arrow/></motion.button>}</AnimatePresence>
       <nav className="onebar-nav" aria-label="Controls">
         {[['work', 'Work', workLocked], ['play', 'Life', playLocked], ['settings', 'Settings', locked && teach !== 'settings'], ['help', 'Help', false]].map(([id, label, off]) =>
           <button key={id} className={`ob-btn${panel === id || (!panel && atGroup === id) ? ' on' : ''}${teach === id ? ' teach' : ''}`} onClick={() => toggle(id)} disabled={off} aria-expanded={panel === id}><span className="ob-ico">{OB_ICONS[id]}</span>{label}</button>)}
@@ -416,7 +417,7 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot: hotspotNow, onGo: goNo
   return <motion.div key="dock" ref={ref} className={`hud-dock${compact ? ' is-sheet' : ''}${keepOpen ? ' is-buttons' : ''}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .45, ease: [.2, .8, .2, 1] }}>
     {panel === 'time' && <SettingsPanel hour={hour} auto={auto} onHour={onHour} onAuto={onAuto} controls={compact} moveMode={moveMode} onMoveMode={(m) => { onMoveMode?.(m); setPanel(null) }} onView={(v) => { setPanel(null); setOpen(false); onView?.(v) }}/>}
     {panel === 'help' && <HelpPanel moveMode={moveMode}/>}
-    {panel === 'fun' && <FunPanel onGo={(id) => { setPanel(null); setOpen(false); onGo(id) }}/>}
+    {panel === 'fun' && <FunPanel hotspot={locked ? null : hotspot} onGo={(id) => { setPanel(null); setOpen(false); onGo(id) }}/>}
     {panel === 'work' && <PlacesPanel hotspot={locked ? null : hotspot} onGo={(id) => { setPanel(null); setOpen(false); onGo(id) }}/>}
     {/* buttons mode: INTERACT only appears above the bar when you're at something */}
     <AnimatePresence>{keepOpen && here && <motion.button key="sheet-interact" className="fab-action sheet-interact" onClick={onOpen} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .2 }}>INTERACT <Arrow/></motion.button>}</AnimatePresence>
@@ -1908,6 +1909,9 @@ export default function App() {
     setMini(tourDone && !taught.current.has(m) ? { mode: m, step: 'walk' } : null)
     taught.current.add(m)
   }, [tourDone])
+  // while that mini how-to runs, the menu is locked just like in the first walkthrough: in buttons mode only
+  // the button being taught (Work, then Life) opens, as a preview; in joystick mode the menu waits
+  const miniOn = !!(touchUI && mini && mini.mode === moveMode && tourDone)
   const miniDone = useCallback(() => setMini((x) => (!x ? null : x.mode === 'buttons' && x.step === 'walk' ? { ...x, step: 'swap' } : null)), [])
   // a short breath between the two buttons steps
   useEffect(() => { if (mini?.step !== 'swap') return undefined; const t = window.setTimeout(() => setMini((x) => (x?.step === 'swap' ? { ...x, step: 'play' } : x)), 350); return () => window.clearTimeout(t) }, [mini])
@@ -1927,12 +1931,12 @@ export default function App() {
   useEffect(() => {
     const scene = sceneRef.current; if (!scene?.setControls) return
     // nothing works until the first cue is on screen (the name intro plays first)
-    scene.setControls(tourStep === 'done' ? { walk: true, look: true, open: true }
+    scene.setControls(tourStep === 'done' ? (miniOn ? { walk: true, look: true, open: false } : { walk: true, look: true, open: true })
       : tourStep === 'walk' ? { walk: showCue && introPhase === 'corner' && (!touchUI || !!moveMode), look: false, open: false }
       : tourStep === 'play' ? { walk: true, look: false, open: false }
       : tourStep === 'look' && !showExplore ? { walk: buttonsMode, look: true, open: false }
       : { walk: false, look: false, open: false })
-  }, [tourStep, showExplore, introPhase, showCue, moveMode, touchUI, buttonsMode])
+  }, [tourStep, showExplore, introPhase, showCue, moveMode, touchUI, buttonsMode, miniOn])
   const setStick = useCallback((x, y) => sceneRef.current?.setStick?.(x, y), [])
   // disco lights (at the speaker): on Back, the room returns to normal first, then the camera pans out
   const [disco, setDisco] = useState(false)
@@ -2051,9 +2055,12 @@ export default function App() {
         {!isTouch() && <div className="ai-dock"><AiButton locked={tourStep !== 'done'}/></div>}
         <BottomBar hour={hour} auto={manualHour === null} onHour={setManualHour} onAuto={() => { setManualHour(null); setClockHour(systemHour()) }} hotspot={hotspot}
           onGo={(id) => { window.dispatchEvent(new CustomEvent('spot-go')); if (systemOpen) sceneRef.current?.switchTo(id); else sceneRef.current?.goTo(id) }} onOpen={() => sceneRef.current?.openSpot()}
-          interacting={systemOpen} onBack={closeSystem} locked={tourStep !== 'done'}
-          spotsLocked={tourStep !== 'done' && !(tourStep === 'demo' && !showExplore)} workLocked={tourStep !== 'done' && !(tourStep === 'demo' && !showExplore) && !(buttonsMode && tourStep === 'walk')} playLocked={tourStep !== 'done' && !(buttonsMode && tourStep === 'play')}
-          teach={buttonsMode && showCue ? (tourStep === 'walk' ? 'work' : tourStep === 'play' ? 'play' : tourStep === 'settings' ? 'settings' : null) : null}
+          interacting={systemOpen} onBack={closeSystem} locked={tourStep !== 'done' || miniOn}
+          spotsLocked={(tourStep !== 'done' && !(tourStep === 'demo' && !showExplore)) || miniOn}
+          workLocked={(tourStep !== 'done' && !(tourStep === 'demo' && !showExplore) && !(buttonsMode && tourStep === 'walk')) || (miniOn && !(buttonsMode && mini.step === 'walk'))}
+          playLocked={(tourStep !== 'done' && !(buttonsMode && tourStep === 'play')) || (miniOn && !(buttonsMode && mini.step === 'play'))}
+          teach={buttonsMode && showCue ? (tourStep === 'walk' ? 'work' : tourStep === 'play' ? 'play' : tourStep === 'settings' ? 'settings' : null)
+            : miniOn && buttonsMode ? (mini.step === 'walk' ? 'work' : mini.step === 'play' ? 'play' : null) : null}
           buttonsMode={buttonsMode} moveMode={moveMode} onMoveMode={changeMode} onView={requestView}
           showDisco={systemOpen && systemApp === 'music'} disco={disco} onDisco={() => setDisco((d) => !d)}/>
         {touchUI && moveMode === 'joystick' && !systemOpen && <Joystick onStick={setStick}/>}

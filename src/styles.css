@@ -2221,3 +2221,15 @@ body.menu-open .cert-arrows,body.menu-open .cert-back-phone{visibility:hidden;po
 /* walkthrough, settings step: the panel looks exactly the same, but its slider and buttons don't respond
    (the panel itself still takes the tap, so it doesn't fall through to the room or close the panel) */
 body.tour-settings .bar-panel.time-panel *{pointer-events:none!important;cursor:default!important}
+
+/* Work / Life lists: the highlighted row (You're here) sits 6px inside the panel, so its corners are the panel's
+   radius minus that 6px; the row's own padding keeps the text where it was */
+.fun-panel{padding-left:6px!important;padding-right:6px!important;padding-bottom:6px!important}
+.fun-row{padding:9px 14px;border-radius:calc(var(--box-r) - 7px)!important} /* 1px border + 6px padding */
+.fun-panel h4{margin-left:14px!important;margin-right:14px!important}
+
+/* phones, buttons mode: INTERACT is anchored to the bar (not the whole dock, which grows when a card opens),
+   and the cards are drawn in front of it */
+.hud-dock.is-onebar .onebar{position:relative}
+.hud-dock.is-onebar .onebar .sheet-interact{position:absolute;right:0;bottom:calc(100% + 10px);z-index:1}
+.hud-dock.is-onebar>.bar-panel{position:relative;z-index:5}

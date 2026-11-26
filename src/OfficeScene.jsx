@@ -1495,9 +1495,12 @@ function createScene(canvas, handlers) {
     if(computer){
       const dx=computer.x-state.x, dz=computer.z-state.z, d=Math.hypot(dx,dz)
       const a=Math.abs(Math.atan2(Math.sin(Math.atan2(-dx,-dz)-state.yaw),Math.cos(Math.atan2(-dx,-dz)-state.yaw)))
-      const near=d<2.1&&a<1.05
+      const near=d<2.1&&a<1.05&&!travel // (not mid-glide: see below)
       if(near!==state.deskNear){state.deskNear=near;handlers.onDeskNear?.(near)}
     }
+    // while the camera glides to a place picked from the bar (or the walkthrough demo), nothing it passes on the
+    // way counts: no cue flashes up mid-pan; the destination's cue shows the moment it arrives
+    if(travel)active=null
     if(active!==state.hotspot){state.hotspot=active;state.nearby=!!active;handlers.onHotspot?.(active?active.id:null);handlers.onNearby?.(!!active)}
     camera.position.set(state.x,roomBounds?floorY+EYE_HEIGHT:EYE_HEIGHT,state.z);camera.rotation.set(state.pitch,state.yaw,0)
     if(focus){
