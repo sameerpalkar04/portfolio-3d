@@ -1407,7 +1407,9 @@ function createScene(canvas, handlers) {
     tickPets(dt)
     // disco mode forces night; turning it off eases back to the time of day
     const lt=discoOn?{night:1,warm:0}:lightTarget
-    light.night=THREE.MathUtils.damp(light.night,lt.night,2.2,dt); light.warm=THREE.MathUtils.damp(light.warm,lt.warm,2.2,dt)
+    // the time of day follows the slider almost at once (~0.08 s), however fast it moves; only disco keeps its slow fade
+    const lightRate=(discoOn||disco>.01)?2.2:13
+    light.night=THREE.MathUtils.damp(light.night,lt.night,lightRate,dt); light.warm=THREE.MathUtils.damp(light.warm,lt.warm,lightRate,dt)
     disco+=((discoOn?1:0)-disco)*Math.min(1,dt*1.6); if(!discoOn&&disco<.002)disco=0
     progress=light.night
     night=progress*progress*(3-2*progress)

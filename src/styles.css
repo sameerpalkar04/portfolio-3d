@@ -2208,3 +2208,16 @@ body.menu-open .cert-arrows,body.menu-open .cert-back-phone{visibility:hidden;po
 /* phones, the whole wall: the cue by Nate stays one box the height of Nate's button, smaller text */
 .look-cue.cam-cue.phone-cue.at-fab.wins-cue b{font-size:12px;line-height:1.2}
 .look-cue.cam-cue.phone-cue.at-fab.wins-cue small{font-size:10.5px;line-height:1.2}
+
+/* time of day: icons under the slider are static pictures, not buttons */
+.time-ticks .time-tick{position:absolute;top:0;transform:translateX(-50%);display:grid;place-items:center;width:26px;height:24px;border-radius:6px;color:#80868e;pointer-events:none;transition:color .2s ease}
+.time-ticks .time-tick.on{color:#1d1f22}
+/* the slider glides when its value changes on its own (Auto, arrow keys); while dragging it follows the finger exactly */
+.tslider .tslider-thumb{transition:left .22s cubic-bezier(.2,.8,.2,1)}
+.tslider .tslider-rail i{transition:width .22s cubic-bezier(.2,.8,.2,1)}
+.tslider.dragging .tslider-thumb,.tslider.dragging .tslider-rail i{transition:none}
+.tslider{touch-action:none}
+
+/* walkthrough, settings step: the panel looks exactly the same, but its slider and buttons don't respond
+   (the panel itself still takes the tap, so it doesn't fall through to the room or close the panel) */
+body.tour-settings .bar-panel.time-panel *{pointer-events:none!important;cursor:default!important}

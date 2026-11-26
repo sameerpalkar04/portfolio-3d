@@ -123,20 +123,42 @@ const ALL_SPOTS = [...SPOTS, { id: 'music', object: 'Speaker', opens: 'Song pick
 
 // A slider built from plain elements so dragging works the same with a mouse, a finger or a pen
 // (the native range input fights with touch scrolling on phones). Arrow keys also work.
-function TimeSlider({ value, onChange, label = 'Time of day', vertical = false }) {
-  const track = useRef(null)
-  const set = (clientX, clientY) => { const r = track.current.getBoundingClientRect(); onChange(Math.min(5, Math.max(0, (vertical ? (clientY - r.top) / r.height : fracAlong(r, clientX, clientY)) * 5))) }
-  return <div ref={track} className="tslider" role="slider" tabIndex={0} aria-label={label} aria-valuemin={0} aria-valuemax={5} aria-valuenow={+value.toFixed(2)}
-    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); set(e.clientX, e.clientY) }}
-    onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) set(e.clientX, e.clientY) }}
+function TimeSlider({ value, onChange, onInput, label = 'Time of day', vertical = false }) {
+  const track = useRef(null), dragging = useRef(false), raf = useRef(0), pending = useRef(null), last = useRef(null)
+  // while dragging, the thumb follows the finger from local state at once; the room (an App-wide re-render and
+  // the lighting) is updated at most once a frame, so a burst of pointer moves can't pile up and stall the drag
+  const [drag, setDrag] = useState(null)
+  const shown = drag ?? value
+  useEffect(() => () => cancelAnimationFrame(raf.current), [])
+  const at = (clientX, clientY) => { const r = track.current.getBoundingClientRect(); return Math.min(5, Math.max(0, (vertical ? (clientY - r.top) / r.height : fracAlong(r, clientX, clientY)) * 5)) }
+  const push = (v) => {
+    pending.current = v
+    if (!raf.current) raf.current = requestAnimationFrame(() => { raf.current = 0; if (pending.current != null) { const p = pending.current; pending.current = null; onChange(p) } })
+  }
+  // with onInput, a drag only reports live values (cheap) and commits once on release
+  const move = (e) => { const v = at(e.clientX, e.clientY); last.current = v; setDrag(v); if (onInput) onInput(v); else push(v) }
+  const end = () => {
+    if (!dragging.current) return
+    dragging.current = false
+    if (onInput) { if (last.current != null) onChange(last.current); last.current = null; setDrag(null); return }
+    if (pending.current != null) { cancelAnimationFrame(raf.current); raf.current = 0; const p = pending.current; pending.current = null; onChange(p) }
+    setDrag(null)
+  }
+  return <div ref={track} className={`tslider${drag != null ? ' dragging' : ''}`} role="slider" tabIndex={0} aria-label={label} aria-valuemin={0} aria-valuemax={5} aria-valuenow={+shown.toFixed(2)}
+    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* the pointer is already gone */ } dragging.current = true; move(e) }}
+    onPointerMove={(e) => { if (dragging.current) move(e) }}
+    onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end}
     onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); onChange(Math.min(5, Math.max(0, value + (e.key === 'ArrowRight' ? .1 : -.1)))) } }}>
-    <span className="tslider-rail"><i style={{ width: `calc(17px + (100% - 34px) * ${value / 5})` }}/></span>
-    <span className="tslider-thumb" style={{ left: `calc(17px + (100% - 34px) * ${value / 5})` }}/>
+    <span className="tslider-rail"><i style={{ width: `calc(17px + (100% - 34px) * ${shown / 5})` }}/></span>
+    <span className="tslider-thumb" style={{ left: `calc(17px + (100% - 34px) * ${shown / 5})` }}/>
   </div>
 }
 
 function TimePanel({ hour, auto, onHour, onAuto, children, label = 'Time of day' }) {
-  const value = hourToSlider(hour)
+  // while dragging: this panel and the room's lighting follow (cheap); the rest of the site updates once, on release
+  const [live, setLive] = useState(null)
+  const shownHour = live ?? hour
+  const value = hourToSlider(shownHour)
   // in auto mode show the real system time, kept current
   const [now, setNow] = useState(() => new Date())
   useEffect(() => { const t = window.setInterval(() => setNow(new Date()), 5000); return () => window.clearInterval(t) }, [])
@@ -144,11 +166,14 @@ function TimePanel({ hour, auto, onHour, onAuto, children, label = 'Time of day'
   const phase = PHASES[Math.min(5, Math.round(value))][0]
   return <div className={`bar-panel time-panel${children ? ' settings-panel' : ''}`} role="dialog" aria-label={label}>
     {children && <h4>Time of day</h4>}
-    <div className="panel-head"><b>{phase}</b><span>{auto ? systemTime : clock(hour)}</span></div>
+    <div className="panel-head"><b>{phase}</b><span>{auto && live == null ? systemTime : clock(shownHour)}</span></div>
     <div className="time-row">
       <div className="time-col">
-        <TimeSlider value={value} onChange={(v) => onHour(sliderToHour(v))}/>
-        <div className="time-ticks">{PHASES.map(([name], i) => <button key={name} className={Math.round(value) === i ? 'on' : ''} onClick={() => onHour(PHASES[i][1])} style={{ left: `calc(17px + (100% - 34px) * ${i / 5})` }} title={name} aria-label={name}>{PHASE_ICONS[i]}</button>)}</div>
+        <TimeSlider value={value}
+          onInput={(v) => { const h = sliderToHour(v); setLive(h); window.dispatchEvent(new CustomEvent('time-live', { detail: h })) }}
+          onChange={(v) => { setLive(null); onHour(sliderToHour(v)) }}/>
+        {/* the times of day, as plain pictures under the slider (not buttons) */}
+        <div className="time-ticks" aria-hidden="true">{PHASES.map(([name], i) => <span key={name} className={`time-tick${Math.round(value) === i ? ' on' : ''}`} style={{ left: `calc(17px + (100% - 34px) * ${i / 5})` }}>{PHASE_ICONS[i]}</span>)}</div>
       </div>
       <button className={`auto-btn${auto ? ' on' : ''}`} onClick={onAuto} aria-pressed={auto} title="Follow your clock">Auto</button>
     </div>
@@ -1871,6 +1896,8 @@ export default function App() {
   const onCamSettled = useCallback((v) => { if (v) setCamLanded(true) }, [])
   useEffect(() => { if (!systemOpen) setCamLanded(false) }, [systemOpen])
   useEffect(() => { document.body.classList.toggle('cam-moving', systemOpen && !camLanded); return () => document.body.classList.remove('cam-moving') }, [systemOpen, camLanded])
+  // first-time walkthrough, settings step: the panel is shown as it is, but nothing in it can be used yet
+  useEffect(() => { document.body.classList.toggle('tour-settings', tourStep === 'settings'); return () => document.body.classList.remove('tour-settings') }, [tourStep])
   // phones: each control style is taught once per visit. The one picked at the start is taught by the
   // walkthrough; the first switch to the other one later shows just its own steps (never again after that)
   const taught = useRef(new Set())
@@ -1995,6 +2022,8 @@ export default function App() {
     return () => window.clearTimeout(t)
   }, [sceneReady, loading])
   useEffect(() => { sceneRef.current?.setTimeOfDay(hour) }, [hour, sceneReady])
+  // dragging the time slider lights the room directly, without re-rendering the whole app each move
+  useEffect(() => { const on = (e) => sceneRef.current?.setTimeOfDay(e.detail); window.addEventListener('time-live', on); return () => window.removeEventListener('time-live', on) }, [])
   useEffect(() => { const timer = window.setInterval(() => setClockHour(systemHour()), 60000); return () => window.clearInterval(timer) }, [])
   return <NateCtx.Provider value={nateCtx}><main className="app-shell"><OfficeScene sceneRef={sceneRef} onHotspot={updateHotspot} onDeskNear={updateDeskNear} onSystem={updateSystem} onReady={updateReady} onProgress={updateProgress} onCert={updateCert} onSettled={onCamSettled}/>
     <div className="ambient-vignette"/>
