@@ -840,13 +840,18 @@ export function createCertificateWall({ certs = [] } = {}) {
     [-.376, .2, .34, .243, 'landscape', '#1f3c6e'],
     [0, .2, .16, .215, 'plaque', ''],
     [.376, .2, .34, .243, 'landscape', '#7a5a1c'],
-    [-.504, -.188, .17, .17, 'square', '#2f6f5e'],
-    [-.193, -.188, .2, .26, 'portrait', '#8a1c2b'],
-    [.163, -.188, .26, .186, 'landscape', '#2f6f5e'],
-    [.504, -.188, .17, .17, 'square', '#1f3c6e'],
+    // below them, a zig-zag: trophy · Riviera 2025 · trophy along the top, Riviera 2026 and graVITas'24 tucked
+    // in between, lower down (slots 3–5 the recognitions, 6–7 the trophy prints)
+    [-.15, -.355, .19, .134, 'landscape', '#2f6f5e'],
+    [0, -.122, .19, .134, 'landscape', '#8a1c2b'],
+    [.15, -.355, .19, .134, 'landscape', '#1f3c6e'],
+    [-.261, -.122, .12, .12, 'square', '#2f6f5e'],
+    [.261, -.122, .12, .12, 'square', '#1f3c6e'],
   ]
   const F = .016, M = .022, D = .018
   const loader = new THREE.TextureLoader(), frames = []
+  // the two hackathon wins hang in gold frames; everything else in black
+  const goldMat = new THREE.MeshStandardMaterial({ color: '#c9a24e', roughness: .32, metalness: .85, emissive: '#3a2a08', emissiveIntensity: .25 })
   layout.forEach(([x, y, w, h, kind, accent], slot) => {
     // a real certificate in this slot: its scan, sized to its own proportions
     const cert = certs.find((c) => c.frame === slot)
@@ -854,19 +859,32 @@ export function createCertificateWall({ certs = [] } = {}) {
     const g = new THREE.Group(); g.position.set(x, y, 0); g.name = 'cert-frame'
     const ow = w + 2 * (M + F), oh = h + 2 * (M + F)
     for (const [bw, bh, bx, by] of [[ow, F, 0, (oh - F) / 2], [ow, F, 0, -(oh - F) / 2], [F, oh - 2 * F, -(ow - F) / 2, 0], [F, oh - 2 * F, (ow - F) / 2, 0]]) {
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, D), frameMat); bar.position.set(bx, by, D / 2); g.add(bar)
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, D), cert?.kind === 'win' ? goldMat : frameMat); bar.position.set(bx, by, D / 2); g.add(bar)
     }
     const back = new THREE.Mesh(new THREE.PlaneGeometry(ow - 2 * F, oh - 2 * F), kind === 'plaque' || kind === 'square' ? frameMat : matMat); back.position.z = .004; g.add(back)
     let map
-    if (cert) { map = loader.load(cert.image); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 8 } else map = certificateArt(kind, accent)
-    const art = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map, roughness: .7 })); art.position.z = .005; g.add(art)
+    if (cert) { map = loader.load(cert.image); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 16; map.minFilter = THREE.LinearMipmapLinearFilter; map.generateMipmaps = true } else map = certificateArt(kind, accent)
+    // real certificates: lit a little from within too, so the print reads clean and true to colour under the warm room light
+    const art = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial(cert ? { map, roughness: .75, emissive: '#ffffff', emissiveMap: map, emissiveIntensity: .32 } : { map, roughness: .7 })); art.position.z = .005; g.add(art)
     g.userData = { slot, cert: cert?.id || null, art, outer: { w: ow, h: oh } }
     const glass = new THREE.Mesh(new THREE.PlaneGeometry(ow - 2 * F, oh - 2 * F), new THREE.MeshPhysicalMaterial({ color: '#ffffff', transparent: true, opacity: .06, roughness: .05, clearcoat: 1 })); glass.position.z = D - .002; g.add(glass)
     g.traverse((o) => { if (o.isMesh) { o.castShadow = o !== glass; o.receiveShadow = true } })
+    // the hackathon wins get a small engraved brass plate underneath ("1st place · Yantra 2024")
+    if (cert?.kind === 'win' && cert.plate) {
+      const pw = .15, ph = .022, cv = document.createElement('canvas'); cv.width = 768; cv.height = 112
+      const c = cv.getContext('2d'), gr = c.createLinearGradient(0, 0, 0, 112)
+      gr.addColorStop(0, '#e8cf8a'); gr.addColorStop(.5, '#c9a253'); gr.addColorStop(1, '#a8823c'); c.fillStyle = gr; c.fillRect(0, 0, 768, 112)
+      c.strokeStyle = 'rgba(90,62,20,.55)'; c.lineWidth = 6; c.strokeRect(10, 10, 748, 92)
+      c.fillStyle = '#3d2a0c'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = "600 50px 'Iowan Old Style', 'Palatino Linotype', Georgia, serif"
+      c.fillText(cert.plate, 384, 58)
+      const pt = new THREE.CanvasTexture(cv); pt.colorSpace = THREE.SRGBColorSpace; pt.anisotropy = 8
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(pw, ph, .003), [frameMat, frameMat, frameMat, frameMat, new THREE.MeshStandardMaterial({ map: pt, metalness: .55, roughness: .38, emissive: '#ffffff', emissiveMap: pt, emissiveIntensity: .12 }), frameMat])
+      plate.position.set(0, -oh / 2 - .007 - ph / 2, .0015); plate.castShadow = true; g.add(plate)
+    }
     wall.add(g); frames.push(g)
   })
   wall.userData.frames = frames
-  wall.userData.size = { w: 1.3, h: .74 }
+  wall.userData.size = { w: 1.2, h: .84, cy: -.05 } // cy: the frames' vertical centre, a little below the wall's origin
   return wall
 }
 

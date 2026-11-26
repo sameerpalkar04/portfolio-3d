@@ -360,7 +360,7 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot: hotspotNow, onGo: goNo
     <AnimatePresence>
       {interacting
         ? <motion.div key="back" className="fab-row" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .18 }}>
-            {showDisco && <button className={`fab-disco${disco ? ' on' : ''}`} onClick={onDisco} aria-pressed={disco} aria-label={disco ? 'Turn off disco lights' : 'Turn on disco lights'}><DiscoIcon s={20}/>DISCO</button>}
+            {showDisco && <motion.button initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0, transition: { delay: .8, duration: .35 } }} exit={{ opacity: 0, transition: { duration: .15 } }} className={`fab-disco${disco ? ' on' : ''}`} onClick={onDisco} aria-pressed={disco} aria-label={disco ? 'Turn off disco lights' : 'Turn on disco lights'}><DiscoIcon s={20}/>DISCO</motion.button>}
             <button className="fab-action" onClick={onBack}><Arrow dir="left"/> BACK TO ROOM</button>
           </motion.div>
         : here && <motion.button key="interact" className="fab-action" onClick={onOpen} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .18 }}>INTERACT <Arrow/></motion.button>}
@@ -436,6 +436,7 @@ const isTouch = () => typeof window !== 'undefined' && window.matchMedia?.('(poi
 // certificate close-up: skip ahead to the next one, or back to the whole wall (no more arrows)
 const CERT_ICONS = {
   next: <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4.5 12h14M13 6.5l5.5 5.5-5.5 5.5"/></svg>,
+  prev: <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19.5 12h-14M11 6.5 5.5 12l5.5 5.5"/></svg>,
   all: <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>,
 }
 const SVG = (d) => <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{d}</svg>
@@ -444,7 +445,7 @@ const CUES = {
   projects: { name: 'the computer', does: 'see my projects', icon: SVG(<><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M9 20h6M12 16v4"/></>) },
   resume: { name: 'the files', does: 'view my résumé', icon: SVG(<><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></>) },
   music: { name: 'the speaker', does: 'hear my song picks', icon: SVG(<><rect x="6" y="3" width="12" height="18" rx="3"/><circle cx="12" cy="14" r="3"/><circle cx="12" cy="7.5" r="1"/></>) },
-  achievements: { name: 'my achievements', tap: 'the certificates', does: 'view my achievements', icon: SVG(<><circle cx="12" cy="9" r="5"/><path d="M9 13.5 7.5 21l4.5-2.5 4.5 2.5L15 13.5"/></>) },
+  achievements: { name: 'my achievements', tap: 'the certificates', does: 'view my achievements and recognitions', icon: SVG(<><circle cx="12" cy="9" r="5"/><path d="M9 13.5 7.5 21l4.5-2.5 4.5 2.5L15 13.5"/></>) },
   contact: { name: 'the phone', does: 'get in touch', icon: SVG(<><rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M11 18.5h2"/></>) },
   pets: { name: 'Rio & Bruno', tap: 'the dogs', does: 'pet them', icon: SVG(<><ellipse cx="12" cy="16" rx="4.2" ry="3.4"/><circle cx="6.2" cy="10.6" r="1.7"/><circle cx="9.6" cy="6.8" r="1.7"/><circle cx="14.4" cy="6.8" r="1.7"/><circle cx="17.8" cy="10.6" r="1.7"/></>) },
   photos: { name: 'the camera', does: 'see through my lens', icon: SVG(<><path d="M4 8h3l1.6-2.2h6.8L17 8h3v11H4z"/><circle cx="12" cy="13.3" r="3.4"/></>) },
@@ -663,6 +664,27 @@ function socialsFor(reply = '', question = '') {
   if (picked.length) return picked
   return /\b(socials?|contact|reach|connect|get in touch|handles?)\b/i.test(question) ? CONTACTS : []
 }
+// Phones: a cue box sitting in the bottom bar, from the left edge to just before Nate's button, exactly as tall
+// as the button (null on a laptop, or when the screen is turned sideways)
+function useFabCueBox() {
+  const [cueBox, setCueBox] = useState(null)
+  useEffect(() => {
+    if (!isTouch()) return undefined
+    let raf = 0
+    const place = () => {
+      const nate = document.querySelector('.touch-fabs .ai-wrap'), r = nate?.getBoundingClientRect()
+      if (r && r.width && !isLocked()) {
+        const box = { left: 14, right: Math.round(window.innerWidth - r.left + 10), bottom: Math.round(window.innerHeight - r.bottom), height: Math.round(r.height) }
+        setCueBox((b) => (b && b.right === box.right && b.bottom === box.bottom && b.height === box.height ? b : box))
+      } else setCueBox(null)
+      raf = requestAnimationFrame(place)
+    }
+    raf = requestAnimationFrame(place)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+  return cueBox
+}
+
 function PhoneScreen({ onClose, getRect }) {
   const [now, setNow] = useState(new Date()), [tapped, setTapped] = useState(false)
   const [rect, setRect] = useState(null)
@@ -680,21 +702,7 @@ function PhoneScreen({ onClose, getRect }) {
   }, [getRect])
   // the cue only needs a moment: it fades out ~3.5 s after the screen appears (or on the first tap)
   // phones: the cue sits beside Nate's button in the bottom corner instead of over the phone
-  const [cueBox, setCueBox] = useState(null)
-  useEffect(() => {
-    if (!isTouch()) return undefined
-    let raf = 0
-    const place = () => {
-      const nate = document.querySelector('.touch-fabs .ai-wrap'), r = nate?.getBoundingClientRect()
-      if (r && r.width && !isLocked()) {
-        const box = { left: 14, right: Math.round(window.innerWidth - r.left + 10), bottom: Math.round(window.innerHeight - r.bottom), height: Math.round(r.height) }
-        setCueBox((b) => (b && b.right === box.right && b.bottom === box.bottom && b.height === box.height ? b : box))
-      } else setCueBox(null)
-      raf = requestAnimationFrame(place)
-    }
-    raf = requestAnimationFrame(place)
-    return () => cancelAnimationFrame(raf)
-  }, [])
+  const cueBox = useFabCueBox()
   const shown = !!rect
   useEffect(() => { if (!shown) return undefined; const t = window.setTimeout(() => setTapped(true), 4500); return () => window.clearTimeout(t) }, [shown])
   const time = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).replace(/\s?[AP]M$/i, '')
@@ -1286,7 +1294,7 @@ function useBarSpot() {
 
 // The description of one achievement (laptop: the card on the right; phone: the box under the certificate).
 // the place badge: gold for 1st, silver for 2nd, bronze for 3rd
-const placeTone = (place) => (/^1/.test(place) ? 'gold' : /^2/.test(place) ? 'silver' : /^3/.test(place) ? 'bronze' : 'gold')
+const placeTone = (place) => (/^1/.test(place) ? 'gold' : /^2/.test(place) ? 'silver' : /^3/.test(place) ? 'bronze' : /recogn/i.test(place) ? 'recog' : 'gold')
 const MedalIcon = () => <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 3h8l-2.5 6h-3z"/><circle cx="12" cy="15" r="5.5"/><path d="m12 12.3.9 1.8 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2-1.45-1.4 2-.3z" fill="currentColor" stroke="none"/></svg>
 function CertDetails({ a }) {
   return <>
@@ -1325,7 +1333,7 @@ const SwipeIcon = () => <svg viewBox="0 0 24 24" width="22" height="22" fill="no
 
 // Achievements: the camera faces the framed certificates above the iMac. Click (or tap) a certificate to
 // see it up close with its description; Next pans out to the wall and in to the next one.
-function AchievementsView({ certId, getRect, onNext, onBack }) {
+function AchievementsView({ certId, getRect, onNext, onPrev, onBack }) {
   const phone = isTouch() // phones: the wall is shown sideways; a certificate opens upright with its details below
   const [rect, setRect] = useState(null)
   useEffect(() => {
@@ -1333,8 +1341,13 @@ function AchievementsView({ certId, getRect, onNext, onBack }) {
     const tick = () => {
       const r = getRect(); setRect((p) => (!r ? null : p && p.id === r.id && Math.abs(p.left - r.left) + Math.abs(p.top - r.top) + Math.abs(p.width - r.width) < 1 ? p : r))
       // phones: where the buttons start (the details box stops the same distance above them as below the frame)
-      const b = document.querySelector('.cert-next')?.getBoundingClientRect().top
+      // (and above BACK TO ROOM, which sits higher than a single button on its own)
+      const tops = ['.cert-next', '.touch-fabs .fab-action'].map((q) => document.querySelector(q)?.getBoundingClientRect().top).filter((t) => t > 0)
+      const b = tops.length ? Math.min(...tops) : null
       if (b) setBtnTop((p) => (Math.abs((p || 0) - b) < 1 ? p : b))
+      const act = document.querySelector('.touch-fabs .fab-action')?.getBoundingClientRect()
+      const ab = act && act.width ? { right: Math.round(viewW() - act.left + 10), bottom: Math.round(viewH() - act.bottom), height: Math.round(act.height) } : null
+      setActBox((p) => (!ab ? null : p && p.right === ab.right && p.bottom === ab.bottom && p.height === ab.height ? p : ab))
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
@@ -1342,6 +1355,7 @@ function AchievementsView({ certId, getRect, onNext, onBack }) {
   }, [getRect])
   const dock = useBarSpot()
   const [btnTop, setBtnTop] = useState(null)
+  const [actBox, setActBox] = useState(null)
   // phones: the swipe cue goes away once they drag across the wall
   const [dragged, setDragged] = useState(false)
   useEffect(() => {
@@ -1355,6 +1369,22 @@ function AchievementsView({ certId, getRect, onNext, onBack }) {
   }, [phone, dragged])
   const a = ACHIEVEMENTS.find((x) => x.id === certId)
   const shown = a && rect && rect.id === certId ? a : null
+  const fabCue = useFabCueBox()
+  // laptop: the keyboard's ← → do what the on-screen arrows do, on the two hackathon wins
+  const certWin = !!certId && ACHIEVEMENTS.find((x) => x.id === certId)?.kind !== 'recognition'
+  const [usedArrows, setUsedArrows] = useState(false)
+  const goNext = () => { setUsedArrows(true); onNext?.() }, goPrev = () => { setUsedArrows(true); onPrev?.() }
+  useEffect(() => {
+    if (phone || !certWin) return undefined
+    const key = (e) => {
+      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || /input|textarea|select/i.test(e.target?.tagName || '') || e.target?.isContentEditable) return
+      if (document.body.classList.contains('menu-open')) return
+      if (e.key === 'ArrowRight') { e.preventDefault(); e.stopImmediatePropagation(); setUsedArrows(true); onNext?.() }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopImmediatePropagation(); setUsedArrows(true); onPrev?.() }
+    }
+    window.addEventListener('keydown', key, true)
+    return () => window.removeEventListener('keydown', key, true)
+  }, [phone, certWin, onNext, onPrev])
   const nextStyle = dock ? (dock.mode === 'beside' ? { left: dock.right + 8, bottom: viewH() - dock.mid - 22 } : { right: viewW() - dock.right, bottom: viewH() - dock.top + 8 }) : undefined
   return <motion.div className="phone-overlay achv-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
     <AnimatePresence>{!certId && <motion.div key="wall" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .25 }}>
@@ -1363,12 +1393,18 @@ function AchievementsView({ certId, getRect, onNext, onBack }) {
         // phones: one box with two rows, like the cue at the desk corner
         ? <AnimatePresence>{!dragged && <motion.div key="swipe-cue" className="look-cue cam-cue desk-cue is-touch" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0, transition: { delay: .8, duration: .35 } }} exit={{ opacity: 0, y: -6, transition: { duration: .25 } }}>
             <span className="dc-row on"><span className="cue-cam"><SwipeIcon/></span><span className="cue-text"><b>Swipe left to see the whole wall</b><small>Drag across to move along it</small></span></span>
-            <span className="dc-row on"><span className="cue-cam">{CUES.achievements.icon}</span><span className="cue-text"><b>Tap a certificate to view it</b><small>See what each achievement was for</small></span></span>
           </motion.div>}</AnimatePresence>
         : <motion.div className="look-cue cam-cue achv-cue" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .8, duration: .35 }}>
             <span className="cue-cam">{CUES.achievements.icon}</span>
-            <span className="cue-text"><b>Click a certificate to view it</b><small>See what each achievement was for</small></span>
+            <span className="cue-text"><b>Start with the two hackathon wins at the top</b><small>Or click any certificate to see what it was for</small></span>
           </motion.div>}
+    </motion.div>}</AnimatePresence>
+    {/* phones: by Nate's button, for as long as the whole wall is on screen: the top two are the hackathon wins */}
+    <AnimatePresence>{phone && !certId && fabCue && <motion.div key="wins-cue" className="look-cue cam-cue phone-cue is-touch at-fab wins-cue"
+      style={{ left: fabCue.left, right: fabCue.right, bottom: fabCue.bottom, height: fabCue.height }}
+      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0, transition: { delay: .8, duration: .35 } }} exit={{ opacity: 0, transition: { duration: .2 } }}>
+      <span className="cue-cam">{CUES.achievements.icon}</span>
+      <span className="cue-text"><b>Top 2 are hackathon wins</b><small>Start there, or tap any one</small></span>
     </motion.div>}</AnimatePresence>
     <AnimatePresence>{shown && (phone
       // phone: the framed certificate on the wall up top (the room stays in view), its details below
@@ -1389,12 +1425,45 @@ function AchievementsView({ certId, getRect, onNext, onBack }) {
           </motion.article>
         </div>)}</AnimatePresence>
     {/* beside the bar (laptop) or bottom-left (phone): back to the whole wall, and on to the next certificate */}
-    {certId && <motion.div className={`resume-actions cert-next${dock ? (dock.mode === 'above' ? ' row' : '') : ' stacked'}`} style={nextStyle}
+    {/* laptop: like the camera, the cue sits just above the bottom bar */}
+    <AnimatePresence>{!phone && certWin && !usedArrows && ACHIEVEMENTS.filter((x) => x.kind !== 'recognition').length > 1 && <ArrowCue key="cert-arrows-cue" title="Use the arrows to switch between the hackathon wins" hint="Click ← → or press the arrow keys"/>}</AnimatePresence>
+    {certId && !phone && <motion.div className={`resume-actions cert-next${dock ? (dock.mode === 'above' ? ' row' : '') : ' stacked'}`} style={nextStyle}
       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .3 }}>
       {/* like the résumé: the dark button on top, the white one level with the bar */}
-      {ACHIEVEMENTS.length > 1 && <button className="resume-btn primary" onClick={onNext}>{CERT_ICONS.next} Next certificate</button>}
-      <button className="resume-btn" onClick={onBack}>{CERT_ICONS.all} Back to certificates</button>
+      {(() => {
+        // the hackathon wins: next / previous go between the two of them only. A certificate of recognition has
+        // just the way back to the whole wall (pick another there).
+        const cur = ACHIEVEMENTS.find((x) => x.id === certId), win = cur?.kind !== 'recognition'
+        const wins = ACHIEVEMENTS.filter((x) => x.kind !== 'recognition')
+        if (win && wins.length > 1) return <>
+          <span className="cert-arrows lap">
+            <button className="cert-sq dark" aria-label="Previous certificate" title="Previous certificate" onClick={goPrev}>{CERT_ICONS.prev}</button>
+            <button className="cert-sq dark" aria-label="Next certificate" title="Next certificate" onClick={goNext}>{CERT_ICONS.next}</button>
+          </span>
+          <button className="resume-btn" onClick={onBack}>{CERT_ICONS.all} Back to certificates</button>
+        </>
+        return <button className="resume-btn" onClick={onBack}>{CERT_ICONS.all} Back to certificates</button>
+      })()}
     </motion.div>}
+    {/* phones: no third row: small square arrows beside Nate (the two wins only), and the way back to the wall
+        beside BACK TO ROOM, the same height as it */}
+    {certId && phone && (() => {
+      const win = ACHIEVEMENTS.find((x) => x.id === certId)?.kind !== 'recognition'
+      const wins = ACHIEVEMENTS.filter((x) => x.kind !== 'recognition').length
+      // the joystick layout has the menu button by Nate too, so less room for the cue
+      const narrow = fabCue ? viewW() - fabCue.right - 14 - 2 * fabCue.height - 16 < 140 : false
+      return <>
+        {win && wins > 1 && fabCue && <motion.div key="cert-arrows" className="cert-arrows" style={{ left: 14, right: fabCue.right, bottom: fabCue.bottom, height: fabCue.height }}
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .3 }}>
+          <button className="cert-sq dark" aria-label="Previous certificate" onClick={onPrev}>{CERT_ICONS.prev}</button>
+          <button className="cert-sq dark" aria-label="Next certificate" onClick={onNext}>{CERT_ICONS.next}</button>
+          {/* a small cue between the arrows and Nate: what they flip through */}
+          <span className={`cert-arrow-cue${narrow ? ' narrow' : ''}`}><b>{narrow ? 'Hack wins' : 'Hackathon wins'}</b><small>Tap arrows to switch</small></span>
+        </motion.div>}
+        {actBox && <motion.button key="cert-back" className="resume-btn cert-back-phone" style={{ left: 14, bottom: actBox.bottom, height: actBox.height }}
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .3 }} onClick={onBack}>{CERT_ICONS.all} Back to certificates</motion.button>}
+      </>
+    })()}
   </motion.div>
 }
 
@@ -1486,7 +1555,7 @@ function MusicPanel({ onClose, onMusic }) {
   const stop = (e) => e.stopPropagation()
   const phone = isTouch()
   return <motion.div className="phone-overlay music-overlay" onClick={backdropClose(onClose)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
-    <motion.article ref={card} className="music-card" onClick={stop} initial={false} animate={{ y: 0, opacity: 1 }} exit={{ y: 10, opacity: 0 }} transition={{ delay: .75, duration: .4, ease: [.2, .8, .2, 1] }}>
+    <motion.article ref={card} className="music-card" onClick={stop} initial={false} animate={{ y: 0, opacity: 1 }} exit={{ y: 10, opacity: 0, transition: { delay: 0, duration: .18 } }} transition={{ delay: .75, duration: .4, ease: [.2, .8, .2, 1] }}>
       <header><h3>On my speaker</h3></header>
       <p className="music-tag">The songs that keep me going.</p>
       {/* now playing (phones: it sits beside the buttons at the bottom instead) */}
@@ -1511,7 +1580,7 @@ function MusicPanel({ onClose, onMusic }) {
         </div>
       </li>)}</ol>
     </motion.article>
-    {phone && <motion.div className={`np-dock${playing ? ' is-playing' : ''}`} onClick={stop} initial={false} animate={{ y: 0, opacity: 1 }} exit={{ y: 8, opacity: 0 }} transition={{ delay: .85, duration: .35 }}>
+    {phone && <motion.div className={`np-dock${playing ? ' is-playing' : ''}`} onClick={stop} initial={false} animate={{ y: 0, opacity: 1 }} exit={{ y: 8, opacity: 0, transition: { delay: 0, duration: .18 } }} transition={{ delay: .85, duration: .35 }}>
       <img src={song.art} alt="" width="38" height="38"/>
       <div className="np-dock-text">
         <small>{missing ? 'No preview' : loading ? 'Loading…' : playing ? 'Now playing' : 'Tap play'}</small>
@@ -1701,8 +1770,8 @@ function CameraView({ onClose, getRect }) {
         <button className="cam-nav stack-nav down" onClick={(e) => { e.stopPropagation(); step(1) }} disabled={n < 2} aria-label="Next photo"><Arrow dir="down" size={22}/></button>
         <div className="rotate-hint"><RotateIcon/>Rotate your phone for a bigger view</div>
       </> : <>
-        <button className="cam-nav" style={{ left: Math.max(8, rect.bodyLeft - 56 - 22), top: rect.top + rect.height / 2 - 28 }} onClick={(e) => { e.stopPropagation(); step(-1) }} disabled={n < 2} aria-label="Previous photo"><Arrow dir="left" size={22}/></button>
-        <button className="cam-nav" style={{ left: Math.min(viewW() - 64, rect.bodyRight + 22), top: rect.top + rect.height / 2 - 28 }} onClick={(e) => { e.stopPropagation(); step(1) }} disabled={n < 2} aria-label="Next photo"><Arrow dir="right" size={22}/></button>
+        <button className="cam-nav side" style={{ left: Math.max(12, rect.bodyLeft - 68 - 48), top: rect.top + rect.height / 2 - 34 }} onClick={(e) => { e.stopPropagation(); step(-1) }} disabled={n < 2} aria-label="Previous photo"><Arrow dir="left" size={26}/></button>
+        <button className="cam-nav side" style={{ left: Math.min(viewW() - 68 - 12, rect.bodyRight + 48), top: rect.top + rect.height / 2 - 34 }} onClick={(e) => { e.stopPropagation(); step(1) }} disabled={n < 2} aria-label="Next photo"><Arrow dir="right" size={26}/></button>
       </>}
     </>}
   </motion.div>
@@ -1942,7 +2011,7 @@ export default function App() {
       : systemApp === 'music'
       ? <MusicPanel key="music" onClose={closeSystem} onMusic={setMusic}/>
       : systemApp === 'achievements'
-      ? <AchievementsView key="achievements" certId={certId} getRect={getCertRect} onNext={() => sceneRef.current?.nextCert()} onBack={() => sceneRef.current?.backToWall()}/>
+      ? <AchievementsView key="achievements" certId={certId} getRect={getCertRect} onNext={() => sceneRef.current?.nextCert(1)} onPrev={() => sceneRef.current?.nextCert(-1)} onBack={() => sceneRef.current?.backToWall()}/>
       : systemApp === 'resume'
       ? <ResumeView key="resume" onClose={closeSystem} getRect={getResumeRect} setInsets={setResumeInsets}/>
       : <SpotCard key={systemApp} app={systemApp} onClose={closeSystem}/>)}</AnimatePresence>

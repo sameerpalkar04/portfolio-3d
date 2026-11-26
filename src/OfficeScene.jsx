@@ -971,7 +971,8 @@ function createScene(canvas, handlers) {
     wall.updateWorldMatrix(true,false)
     const {w,h}=wall.userData.size, n=new THREE.Vector3(0,0,1).transformDirection(wall.matrixWorld)
     const W=canvas.clientWidth, H=canvas.clientHeight, aspect=W/H, fov=36, t=Math.tan(THREE.MathUtils.degToRad(fov/2))
-    const center=wall.getWorldPosition(new THREE.Vector3())
+    // the frames' centre (the zig-zag hangs a little lower than the wall's origin)
+    const center=wall.getWorldPosition(new THREE.Vector3()).addScaledVector(new THREE.Vector3(0,1,0).transformDirection(wall.matrixWorld),wall.userData.size.cy||0)
     // never back out through the opposite wall: stay inside the room
     const back=new THREE.Raycaster(center.clone().addScaledVector(n,.05),n,0,10).intersectObject(model,true).find((x)=>x.object.visible)
     const maxDist=back?Math.max(.4,back.distance+.05-.25):2
@@ -980,8 +981,8 @@ function createScene(canvas, handlers) {
       // screen: swipe sideways along it (wallPan, starting at its left end). The two cues sit above.
       const right=new THREE.Vector3(1,0,0).transformDirection(wall.matrixWorld), wUp=new THREE.Vector3(0,1,0).transformDirection(wall.matrixWorld)
       const top=214, bottom=160, usable=(H-top-bottom)/H
-      let tt=t, dist=(h*.4)/(tt*usable)
-      if(dist>maxDist){dist=maxDist;tt=(h*.4)/(dist*usable)} // no room to back off: a wider lens instead
+      let tt=t, dist=(h*.5)/(tt*usable) // the whole height of the wall, top row to the zig-zag below
+      if(dist>maxDist){dist=maxDist;tt=(h*.5)/(dist*usable)} // no room to back off: a wider lens instead
       const visHalf=tt*aspect*dist
       wallPanMax=Math.max(0,w/2+.02-visHalf); wallPxPerM=W/(2*visHalf)
       if(wallPan==null)wallPan=-wallPanMax
@@ -1074,9 +1075,12 @@ function createScene(canvas, handlers) {
   const certIds=()=>ACHIEVEMENTS.map((a)=>a.id).filter((id)=>certFrame(id))
   const openCert=(id)=>{ if(certSel===id)return; certSel=id; refocus(certView(id)); handlers.onCert?.(id) }
   const backToWall=()=>{ if(!certSel)return; const f=certFrame(certSel); if(f)wallPan=f.position.x; certSel=null; refocus(wallView()); handlers.onCert?.(null) }
-  const nextCert=()=>{
-    const ids=certIds(); if(!ids.length)return
-    const j=ids[(ids.indexOf(certSel)+1)%ids.length]
+  // Next goes round the same group: the hackathon wins, or the certificates of recognition
+  const nextCert=(step=1)=>{
+    const kind=(id)=>ACHIEVEMENTS.find((a)=>a.id===id)?.kind||'win'
+    const all=certIds(); if(!all.length)return
+    const ids=certSel?all.filter((id)=>kind(id)===kind(certSel)):all
+    const j=ids[(ids.indexOf(certSel)+step+ids.length)%ids.length]
     if(!certSel){openCert(j);return}
     certSel=j; refocus(wallBackView(),certView(j)); handlers.onCert?.(j)
   }
@@ -1447,14 +1451,15 @@ function createScene(canvas, handlers) {
     if (groundMaterial) groundMaterial.color.setRGB(1-.62*night,1-.58*night,1-.5*night)
     // keys, plus the phone's on-screen joystick (analog: a small push walks or turns slowly)
     const wantTurn=state.system?0:THREE.MathUtils.clamp(Number(keys.has('arrowright'))-Number(keys.has('arrowleft'))+stick.x,-1,1), wantFwd=state.system?0:THREE.MathUtils.clamp(Number(keys.has('arrowup'))-Number(keys.has('arrowdown'))+stick.y,-1,1)
-    const ease=1-Math.exp(-dt*(SNAPPY?13:9)) // ~110 ms to catch up with the stick (~75 ms for keys)
-    smoothTurn+=(wantTurn-smoothTurn)*ease; smoothFwd+=(wantFwd-smoothFwd)*ease
+    // laptop keys answer almost at once (~45 ms); turning lets go a touch faster still, so a tap doesn't overshoot
+    const ease=1-Math.exp(-dt*(SNAPPY?22:9)), turnEase=1-Math.exp(-dt*(SNAPPY?(wantTurn?24:30):9)) // ~110 ms for the phone's stick
+    smoothTurn+=(wantTurn-smoothTurn)*turnEase; smoothFwd+=(wantFwd-smoothFwd)*ease
     if(Math.abs(smoothTurn)<.004&&!wantTurn)smoothTurn=0; if(Math.abs(smoothFwd)<.004&&!wantFwd)smoothFwd=0
     const turn=smoothTurn, forward=smoothFwd
-    if(turn&&!state.system)state.yaw-=turn*(SNAPPY?1.9:1.6)*dt
+    if(turn&&!state.system)state.yaw-=turn*(SNAPPY?2.7:1.6)*dt // laptop: ~155° a second
     if(forward&&!state.system&&walkBounds){
       // forward = +1 walks ahead, -1 walks backwards.
-      const step=WALK_SPEED*dt
+      const step=WALK_SPEED*(SNAPPY?1.25:1)*dt // laptop walks a little faster
       walkDirection.set(-Math.sin(state.yaw)*forward,0,-Math.cos(state.yaw)*forward)
       const nextX=state.x+walkDirection.x*step, nextZ=state.z+walkDirection.z*step
       const stuck=!isFree(state.x,state.z) // never trap someone who starts inside a collider
@@ -1632,7 +1637,7 @@ function createScene(canvas, handlers) {
     setBookSide(side){ if(side===bookSide)return; bookSide=side; if(state.system&&focus?.to.id==='about'&&sideways())refocus(focusView('about'),null,true) },
     // achievements: open / step through / leave the certificates
     openCert(id){ if(inAchievements())openCert(id) },
-    nextCert(){ if(inAchievements())nextCert() },
+    nextCert(step=1){ if(inAchievements())nextCert(step) },
     backToWall(){ backToWall() },
     // the certificate on screen once the camera has settled on it: {id, left, top, width, height} (null until then)
     certRect(){

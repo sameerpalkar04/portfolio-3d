@@ -2172,3 +2172,39 @@ body:has(.bar-panel) .demo-cue:not(.is-touch){top:max(76px,calc(100% - 640px))!i
    open menu never cover it, so none of them has to jump out of the way */
 .office-hud .look-cue.tour-cue:not(.is-touch),.office-hud .look-cue.demo-cue:not(.is-touch),body:has(.bar-panel) .office-hud .demo-cue:not(.is-touch){top:auto!important;bottom:296px!important;transition:none!important} /* just above the Settings card */
 .office-hud .look-cue.tour-cue.is-touch,.office-hud .look-cue.demo-cue.is-touch,.office-hud.is-buttons .look-cue.is-touch.tour-cue{top:calc(78px + env(safe-area-inset-top))!important;bottom:auto!important;transition:none!important}
+
+/* certificates of recognition: a quieter label than the hackathon medals */
+.cert-place.recog{background:#eef0f3;color:#454a52;border-color:#dfe2e7}
+.cert-place.recog svg{color:#6b7079}
+
+/* phones, an open certificate: square prev/next arrows beside Nate, and "Back to certificates" beside BACK TO ROOM */
+.cert-arrows{position:fixed;z-index:30;display:flex;gap:8px;pointer-events:auto}
+.cert-sq{aspect-ratio:1;height:100%;display:grid;place-items:center;padding:0;border:1px solid #dcdee2;background:#fff;color:#1d1f22;border-radius:var(--box-r,14px);box-shadow:0 1px 2px rgba(0,0,0,.12),0 4px 12px rgba(0,0,0,.16);cursor:pointer}
+.cert-sq svg{width:20px;height:20px}
+.cert-sq.dark{background:#1d1f22;border-color:#1d1f22;color:#fff}
+.cert-back-phone{position:fixed;z-index:30;pointer-events:auto;font-size:13px;padding:0 14px;border-radius:var(--box-r,14px)!important}
+body.menu-open .cert-arrows,body.menu-open .cert-back-phone{visibility:hidden;pointer-events:none}
+
+.cert-arrow-cue{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:2px;padding:0 12px;background:#fff;border:1px solid #dcdee2;border-radius:var(--box-r,14px);box-shadow:0 1px 2px rgba(0,0,0,.12),0 4px 12px rgba(0,0,0,.16);font-family:'DM Sans',system-ui,sans-serif;color:#1d1f22;pointer-events:none}
+.cert-arrow-cue b{font-size:12.5px;font-weight:600;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cert-arrow-cue small{font-size:11px;color:#6b6f76;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cert-arrows .cert-sq{flex:0 0 auto}
+
+/* laptop: the arrows and their cue as one row above Back to certificates (which stays level with the bar) */
+.cert-arrows.lap{position:static;display:flex;gap:8px;height:44px}
+.resume-actions.cert-next .cert-arrows.lap .cert-sq{border-radius:var(--box-r,10px)}
+.cert-arrows.lap .cert-arrow-cue{flex:0 0 auto}
+.cert-arrow-cue.narrow{padding:0 9px}
+.cert-arrow-cue.narrow small{white-space:normal;font-size:10.5px;line-height:1.1}
+.cert-arrow-cue.narrow b{font-size:12px}
+
+/* laptop camera: bigger side arrows with more room from the camera body */
+.cam-nav.side{width:68px;height:68px;border-radius:14px}
+
+/* laptop: the two arrows split the width of Back to certificates, a little gap between them */
+.resume-actions.cert-next .cert-arrows.lap{display:grid;grid-template-columns:1fr 1fr;gap:8px;height:44px;width:100%}
+.resume-actions.cert-next .cert-arrows.lap .cert-sq{aspect-ratio:auto;width:100%;height:100%}
+
+/* phones, the whole wall: the cue by Nate stays one box the height of Nate's button, smaller text */
+.look-cue.cam-cue.phone-cue.at-fab.wins-cue b{font-size:12px;line-height:1.2}
+.look-cue.cam-cue.phone-cue.at-fab.wins-cue small{font-size:10.5px;line-height:1.2}
