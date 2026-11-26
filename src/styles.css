@@ -2233,3 +2233,17 @@ body.tour-settings .bar-panel.time-panel *{pointer-events:none!important;cursor:
 .hud-dock.is-onebar .onebar{position:relative}
 .hud-dock.is-onebar .onebar .sheet-interact{position:absolute;right:0;bottom:calc(100% + 10px);z-index:1}
 .hud-dock.is-onebar>.bar-panel{position:relative;z-index:5}
+
+/* phones: the "Hackathon wins" cue between the arrows and Nate, centred */
+.cert-arrow-cue{align-items:center;text-align:center}
+/* a certificate open: no BACK TO ROOM (back to the wall first). On phones it keeps its place, invisible, so the
+   buttons that line up with it stay put */
+body.cert-viewing .touch-fabs .fab-action{visibility:hidden!important;pointer-events:none!important}
+body.cert-viewing .bottom-bar .bar-open.is-back{display:none!important}
+
+/* joystick: back in the room it fades in once the close-up's cues have faded, instead of popping in over them */
+@keyframes joyIn{from{opacity:0}to{opacity:1}}
+.joystick{animation:joyIn .3s .2s both}
+
+/* phones: Back to certificates stretches across its row, label centred */
+.cert-back-phone{justify-content:center}

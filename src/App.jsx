@@ -382,9 +382,10 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot: hotspotNow, onGo: goNo
   // phones in buttons mode: the full bar stays open in the room (close-ups keep the floating buttons)
   const sheet = compact && (open || (buttonsMode && !interacting))
   if (compact && !sheet) return <motion.div key="fabs" className="touch-fabs" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4 }}>
-    <AnimatePresence>
+    {/* one at a time: BACK TO ROOM leaves before INTERACT comes in, so the two never stack and push the column up */}
+    <AnimatePresence mode="wait">
       {interacting
-        ? <motion.div key="back" className="fab-row" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .18 }}>
+        ? <motion.div key="back" className="fab-row" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: .1 } }} transition={{ duration: .18 }}>
             {showDisco && <motion.button initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0, transition: { delay: .8, duration: .35 } }} exit={{ opacity: 0, transition: { duration: .15 } }} className={`fab-disco${disco ? ' on' : ''}`} onClick={onDisco} aria-pressed={disco} aria-label={disco ? 'Turn off disco lights' : 'Turn on disco lights'}><DiscoIcon s={20}/>DISCO</motion.button>}
             <button className="fab-action" onClick={onBack}><Arrow dir="left"/> BACK TO ROOM</button>
           </motion.div>
@@ -1360,6 +1361,7 @@ const SwipeIcon = () => <svg viewBox="0 0 24 24" width="22" height="22" fill="no
 // Achievements: the camera faces the framed certificates above the iMac. Click (or tap) a certificate to
 // see it up close with its description; Next pans out to the wall and in to the next one.
 function AchievementsView({ certId, getRect, onNext, onPrev, onBack }) {
+  const winRef = useRef(true)
   const phone = isTouch() // phones: the wall is shown sideways; a certificate opens upright with its details below
   const [rect, setRect] = useState(null)
   useEffect(() => {
@@ -1368,7 +1370,9 @@ function AchievementsView({ certId, getRect, onNext, onPrev, onBack }) {
       const r = getRect(); setRect((p) => (!r ? null : p && p.id === r.id && Math.abs(p.left - r.left) + Math.abs(p.top - r.top) + Math.abs(p.width - r.width) < 1 ? p : r))
       // phones: where the buttons start (the details box stops the same distance above them as below the frame)
       // (and above BACK TO ROOM, which sits higher than a single button on its own)
-      const tops = ['.cert-next', '.touch-fabs .fab-action'].map((q) => document.querySelector(q)?.getBoundingClientRect().top).filter((t) => t > 0)
+      // (a hackathon win keeps a second row of buttons, level with the hidden BACK TO ROOM; a recognition has only
+      // the bottom row, level with Nate)
+      const tops = ['.cert-next', winRef.current ? '.touch-fabs .fab-action' : '.touch-fabs .ai-wrap'].map((q) => document.querySelector(q)?.getBoundingClientRect().top).filter((t) => t > 0)
       const b = tops.length ? Math.min(...tops) : null
       if (b) setBtnTop((p) => (Math.abs((p || 0) - b) < 1 ? p : b))
       const act = document.querySelector('.touch-fabs .fab-action')?.getBoundingClientRect()
@@ -1395,9 +1399,15 @@ function AchievementsView({ certId, getRect, onNext, onPrev, onBack }) {
   }, [phone, dragged])
   const a = ACHIEVEMENTS.find((x) => x.id === certId)
   const shown = a && rect && rect.id === certId ? a : null
+  // a certificate's buttons wait until it's on screen with the room blurred behind it (then stay put while you
+  // flip between certificates); while one is open, BACK TO ROOM steps aside — the way out is the wall first
+  const [certReady, setCertReady] = useState(false)
+  useEffect(() => { if (!certId) setCertReady(false); else if (shown) setCertReady(true) }, [certId, shown])
+  useEffect(() => { document.body.classList.toggle('cert-viewing', !!certId); return () => document.body.classList.remove('cert-viewing') }, [certId])
   const fabCue = useFabCueBox()
   // laptop: the keyboard's ← → do what the on-screen arrows do, on the two hackathon wins
   const certWin = !!certId && ACHIEVEMENTS.find((x) => x.id === certId)?.kind !== 'recognition'
+  winRef.current = certWin
   const [usedArrows, setUsedArrows] = useState(false)
   const goNext = () => { setUsedArrows(true); onNext?.() }, goPrev = () => { setUsedArrows(true); onPrev?.() }
   useEffect(() => {
@@ -1411,6 +1421,10 @@ function AchievementsView({ certId, getRect, onNext, onPrev, onBack }) {
     window.addEventListener('keydown', key, true)
     return () => window.removeEventListener('keydown', key, true)
   }, [phone, certWin, onNext, onPrev])
+  // phones: where the certificate's buttons start (the details box stops 16px above): the row above Nate's for the
+  // wins (arrows below, Back to certificates above), Nate's own row for a recognition (just Back to certificates)
+  const phoneTwoRows = shown ? shown.kind !== 'recognition' && ACHIEVEMENTS.filter((x) => x.kind !== 'recognition').length > 1 : false
+  const phoneBtnTop = !phone || !shown ? null : phoneTwoRows ? (actBox ? viewH() - actBox.bottom - actBox.height : null) : (fabCue ? viewH() - fabCue.bottom - fabCue.height : null)
   const nextStyle = dock ? (dock.mode === 'beside' ? { left: dock.right + 8, bottom: viewH() - dock.mid - 22 } : { right: viewW() - dock.right, bottom: viewH() - dock.top + 8 }) : undefined
   return <motion.div className="phone-overlay achv-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .2 }}>
     <AnimatePresence>{!certId && <motion.div key="wall" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .25 }}>
@@ -1439,7 +1453,7 @@ function AchievementsView({ certId, getRect, onNext, onPrev, onBack }) {
           {/* a soft blur over the room below the certificate (the frame itself stays sharp) */}
           <i className="cert-scrim-phone" aria-hidden="true" style={{ top: rect.frameBottom + 4 }}/>
           {/* fixed in place, equal gaps above and below; the text sizes itself to fit */}
-          <article className="cert-box fixed" style={{ top: rect.frameBottom + 16, bottom: viewH() - (btnTop ?? viewH() - 130) + 16 }}>
+          <article className="cert-box fixed" style={{ top: rect.frameBottom + 16, bottom: viewH() - (phoneBtnTop ?? btnTop ?? viewH() - 130) + 16 }}>
             <CertFit a={shown}/>
           </article>
         </motion.div>
@@ -1452,9 +1466,9 @@ function AchievementsView({ certId, getRect, onNext, onPrev, onBack }) {
         </div>)}</AnimatePresence>
     {/* beside the bar (laptop) or bottom-left (phone): back to the whole wall, and on to the next certificate */}
     {/* laptop: like the camera, the cue sits just above the bottom bar */}
-    <AnimatePresence>{!phone && certWin && !usedArrows && ACHIEVEMENTS.filter((x) => x.kind !== 'recognition').length > 1 && <ArrowCue key="cert-arrows-cue" title="Use the arrows to switch between the hackathon wins" hint="Click ← → or press the arrow keys"/>}</AnimatePresence>
-    {certId && !phone && <motion.div className={`resume-actions cert-next${dock ? (dock.mode === 'above' ? ' row' : '') : ' stacked'}`} style={nextStyle}
-      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .3 }}>
+    <AnimatePresence>{!phone && certReady && certWin && !usedArrows && ACHIEVEMENTS.filter((x) => x.kind !== 'recognition').length > 1 && <ArrowCue key="cert-arrows-cue" title="Use the arrows to switch between the hackathon wins" hint="Click ← → or press the arrow keys"/>}</AnimatePresence>
+    {certId && certReady && !phone && <motion.div className={`resume-actions cert-next${dock ? (dock.mode === 'above' ? ' row' : '') : ' stacked'}`} style={nextStyle}
+      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .3, delay: .3 }}>
       {/* like the résumé: the dark button on top, the white one level with the bar */}
       {(() => {
         // the hackathon wins: next / previous go between the two of them only. A certificate of recognition has
@@ -1473,21 +1487,24 @@ function AchievementsView({ certId, getRect, onNext, onPrev, onBack }) {
     </motion.div>}
     {/* phones: no third row: small square arrows beside Nate (the two wins only), and the way back to the wall
         beside BACK TO ROOM, the same height as it */}
-    {certId && phone && (() => {
+    {certId && certReady && phone && (() => {
       const win = ACHIEVEMENTS.find((x) => x.id === certId)?.kind !== 'recognition'
       const wins = ACHIEVEMENTS.filter((x) => x.kind !== 'recognition').length
       // the joystick layout has the menu button by Nate too, so less room for the cue
       const narrow = fabCue ? viewW() - fabCue.right - 14 - 2 * fabCue.height - 16 < 140 : false
       return <>
         {win && wins > 1 && fabCue && <motion.div key="cert-arrows" className="cert-arrows" style={{ left: 14, right: fabCue.right, bottom: fabCue.bottom, height: fabCue.height }}
-          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .3 }}>
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .3, delay: .3 }}>
           <button className="cert-sq dark" aria-label="Previous certificate" onClick={onPrev}>{CERT_ICONS.prev}</button>
           <button className="cert-sq dark" aria-label="Next certificate" onClick={onNext}>{CERT_ICONS.next}</button>
           {/* a small cue between the arrows and Nate: what they flip through */}
           <span className={`cert-arrow-cue${narrow ? ' narrow' : ''}`}><b>{narrow ? 'Hack wins' : 'Hackathon wins'}</b><small>Tap arrows to switch</small></span>
         </motion.div>}
-        {actBox && <motion.button key="cert-back" className="resume-btn cert-back-phone" style={{ left: 14, bottom: actBox.bottom, height: actBox.height }}
-          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .3 }} onClick={onBack}>{CERT_ICONS.all} Back to certificates</motion.button>}
+        {/* wins: a second row, full width (the bottom row has the arrows). Recognitions: the bottom row is empty
+            but for Nate, so it sits there, filling the space up to Nate */}
+        {(win && wins > 1 ? actBox : fabCue) && <motion.button key="cert-back" className="resume-btn cert-back-phone"
+          style={win && wins > 1 ? { left: 14, right: 14, bottom: actBox.bottom, height: actBox.height } : { left: 14, right: fabCue.right, bottom: fabCue.bottom, height: fabCue.height }}
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .3, delay: .3 }} onClick={onBack}>{CERT_ICONS.all} Back to certificates</motion.button>}
       </>
     })()}
   </motion.div>
