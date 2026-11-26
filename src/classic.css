@@ -273,3 +273,44 @@
 .cl-switch i{position:absolute;left:3px;top:3px;bottom:3px;width:34px;height:auto;border-radius:6px;background:#fff;color:#1f2a25;display:grid;place-items:center;transition:transform .2s ease}
 .cl-switch.on i{transform:translateX(34px);background:#fff}
 .cl-switch:focus-visible{outline:2px solid #fff;outline-offset:3px}
+
+/* ── top bar: name on the left, Settings on the right ── */
+.cl-settings{position:relative;margin-left:auto}
+.cl-set-btn{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 14px;border-radius:8px;font:600 14.5px 'DM Sans',sans-serif;color:#fff;background:rgba(0,0,0,.18);border:1px solid var(--band-line);transition:background-color .2s}
+.cl-set-btn:hover{background:rgba(0,0,0,.28)}
+.cl-set-btn.on{background:#fff;color:#1f2a25}
+.cl-set-btn:focus-visible{outline:2px solid #fff;outline-offset:3px}
+.cl-set-panel{position:absolute;right:0;top:calc(100% + 10px);width:290px;padding:16px;border-radius:10px;background:var(--surface);border:1px solid var(--line);box-shadow:0 10px 30px rgba(0,0,0,.18);display:grid;gap:14px;color:var(--ink);z-index:10}
+.cl-set-row{display:flex;align-items:center;justify-content:space-between;gap:12px;font:600 15px 'DM Sans',sans-serif}
+.cl-set-panel .cl-switch{background:var(--soft);border-color:var(--line)}
+.cl-set-panel .cl-switch-ico{color:var(--muted)}
+.cl-set-panel .cl-switch i{background:var(--ink);color:var(--bg)}
+.cl-set-panel .cl-switch.on i{background:var(--ink)}
+.cl-view-btn{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;height:44px;border-radius:8px;font:600 15px 'DM Sans',sans-serif;background:var(--ink);color:var(--bg);transition:opacity .2s}
+.cl-view-btn:hover{opacity:.88}
+.cl-view-btn:focus-visible{outline:2px solid var(--green);outline-offset:3px}
+@media (max-width:760px){.cl-bar{flex-wrap:nowrap}.cl-settings{order:3}.cl-set-panel{width:min(290px,calc(100vw - 32px))}}
+
+/* green buttons: white text in both themes (links would otherwise inherit the text colour) */
+.classic .cl-btn{color:#fff}
+.classic .cl-btn.ghost{color:var(--ink)}
+.classic .cl-btn.is-done{color:var(--bg)}
+.classic .cl-foot .cl-btn.ghost{color:#fff}
+
+/* projects: each in its own box, no illustration */
+.cl-card-body{padding:clamp(18px,2.2vw,28px) clamp(18px,2.4vw,32px)}
+
+/* skills: the chips sit against the right edge of the box (beside their group name) */
+@media (min-width:761px){.cl-skills dd{justify-content:flex-end}}
+.cl-glow{display:none}
+
+/* footer: name and where I'm based */
+.cl-foot-id{display:flex;flex-direction:column;gap:3px}
+.cl-foot-id b{font:600 18px/1.1 var(--serif);color:#fff}
+.cl-foot-id>span{font:400 12.5px 'JetBrains Mono',monospace;color:var(--band-mute)}
+.cl-city{display:inline-block}
+
+/* shown when the room was too slow to load */
+.cl-notice{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:12px;margin:16px var(--pad) 0;padding:12px 14px;border-radius:8px;background:var(--surface);border:1px solid var(--line);color:var(--ink2);font-size:14.5px}
+.cl-notice button{all:unset;cursor:pointer;display:grid;place-items:center;width:30px;height:30px;border-radius:6px;color:var(--muted);flex:none}
+.cl-notice button:hover{background:var(--soft);color:var(--ink)}

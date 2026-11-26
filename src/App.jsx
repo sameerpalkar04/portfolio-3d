@@ -164,10 +164,10 @@ function SettingsPanel({ moveMode, onMoveMode, onView, controls = true, ...time 
       <button className={moveMode === 'buttons' ? 'on' : ''} onClick={() => onMoveMode('buttons')}>Buttons</button>
     </div></div>}
     {/* the two ways to see the portfolio: this room, or the classic one-page version */}
-    <div className="mode-switch view-switch"><h4>Version</h4><div className="mood-seg">
-      <button className="on">Interactive</button>
-      <button onClick={() => onView?.('classic')}>Classic</button>
-    </div></div>
+    <button className="view-classic-btn" onClick={() => onView?.('classic')}>
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3.5V8h4.5M9 13h6M9 16.5h4"/></svg>
+      View in classic 2D
+    </button>
   </TimePanel>
 }
 function HelpPanel({ moveMode }) {
@@ -1723,6 +1723,14 @@ export default function App() {
   const updateDeskNear = useCallback((v) => setDeskNear(v), [])
   const updateSystem = useCallback((open, app) => { if (open && app) setSystemApp(app); setSystemOpen(open) }, [])
   const updateReady = useCallback(() => setSceneReady(true), [])
+  // slow or low-powered devices: if the room still hasn't loaded after 4 minutes, open the classic version
+  // instead (the room keeps loading behind it, so the 3D version is there later)
+  const [slowFallback, setSlowFallback] = useState(false)
+  useEffect(() => {
+    if (sceneReady) return undefined
+    const t = window.setTimeout(() => { setSlowFallback(true); setView('classic'); window.__classicView = true }, 4 * 60 * 1000)
+    return () => window.clearTimeout(t)
+  }, [sceneReady])
   const updateCert = useCallback((id) => setCertId(id), [])
   const [load, setLoad] = useState({ progress: 0, loaded: 0, total: 0 })
   const updateProgress = useCallback((progress, loaded, total) => setLoad((prev) => (progress - prev.progress > .005 || progress >= 1 ? { progress, loaded, total } : prev)), [])
@@ -1920,7 +1928,7 @@ export default function App() {
         ? <DeskCue key="desk" hotspot={hotspot}/>
         : hotspot && <SpotCue key={hotspot} id={hotspot}/>)}</AnimatePresence>
     </div>}
-    {view === 'classic' && <ClassicSite contacts={CONTACTS} onView={requestView} nate={<AiButton compact={isTouch()}/>}/>}
+    {view === 'classic' && <ClassicSite contacts={CONTACTS} onView={requestView} slowNotice={slowFallback} nate={<AiButton compact={isTouch()}/>}/>}
     <AnimatePresence>{switching && <SwitchLoader key="switch" to={switching} onCover={swapView} onDone={switchDone}/>}</AnimatePresence>
   </main></NateCtx.Provider>
 }

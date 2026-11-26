@@ -7,7 +7,6 @@ import { SKILL_GROUPS } from './skillIcons'
 import { OCI, SkillLogo } from './MacOS'
 import { RESUME_DOWNLOAD, RESUME_VIEW } from './resume'
 import { FloorPlan, STROKES } from './Loader'
-import { ProjectVisual } from './projectVisuals'
 import './classic.css'
 
 // The classic version: the whole portfolio as one plain, full-width scrolling page over the room.
@@ -29,6 +28,7 @@ const EXTRA = [
   { logo: '/about/iste-logo.png?v=2', role: 'Publicity Head', org: 'ISTE · VIT Chapter, Vellore', when: 'Apr 2024 – Mar 2025',
     points: ['Directed publicity campaigns across platforms, driving 5,000+ student engagements.', 'Led outreach for the Technica hackathon, coordinating a 40+ member team for seamless execution with 2,100+ participants.'] },
 ]
+const CITIES = ['bengaluru', 'gurugram'] // where I'm based, in turns (as in the room's corner)
 const LINK_LABEL = { github: 'Source code', ieee: 'IEEE paper', website: 'Website', live: 'Live site' }
 const LINK_ICON = { github: 'code', ieee: 'doc', website: 'out', live: 'out' }
 
@@ -47,6 +47,7 @@ const Icon = {
   award: I(<><circle cx="12" cy="9" r="5.5"/><path d="M8.5 13.3 7 21l5-2.5 5 2.5-1.5-7.7"/></>),
   shield: I(<><path d="M12 3 5 6v5.5c0 4.3 3 7.8 7 9.5 4-1.7 7-5.2 7-9.5V6z"/><path d="m9 12 2 2 4-4"/></>),
   close: I(<path d="M6 6l12 12M18 6 6 18"/>),
+  gear: I(<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></>),
   check: I(<path d="m5 12.5 4.5 4.5L19 7.5"/>),
   copy: I(<><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></>),
   Mail: I(<><rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="m3.5 7 8.5 6.5L20.5 7"/></>),
@@ -84,7 +85,7 @@ function FeedbackButton({ className = 'cl-btn', icon, label, done, doneLabel, on
   </Tag>
 }
 
-export function ClassicSite({ contacts = [], onView, nate }) {
+export function ClassicSite({ contacts = [], onView, nate, slowNotice = false }) {
   const [theme, setTheme] = useState(() => store.get('classic-theme') || (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'))
   useEffect(() => { store.set('classic-theme', theme) }, [theme])
   // light ↔ dark: a soft crossfade of the whole page where the browser supports it, colour transitions otherwise
@@ -95,35 +96,41 @@ export function ClassicSite({ contacts = [], onView, nate }) {
   }
   const scroller = useRef(null), [scrolled, setScrolled] = useState(false)
   const toTop = () => scroller.current?.scrollTo({ top: 0, behavior: 'smooth' })
+  const [setOpen, setSetOpen] = useState(false), setRef = useRef(null)
+  useEffect(() => {
+    if (!setOpen) return undefined
+    const off = (e) => { if (!setRef.current?.contains(e.target)) setSetOpen(false) }, esc = (e) => { if (e.key === 'Escape') setSetOpen(false) }
+    window.addEventListener('pointerdown', off); window.addEventListener('keydown', esc)
+    return () => { window.removeEventListener('pointerdown', off); window.removeEventListener('keydown', esc) }
+  }, [setOpen])
+  const [city, setCity] = useState(0), [noticeGone, setNoticeGone] = useState(false)
+  useEffect(() => { const t = window.setInterval(() => setCity((c) => (c + 1) % CITIES.length), 10000); return () => window.clearInterval(t) }, [])
   const [cert, setCert] = useState(null) // the certificate shown full size
   useEffect(() => { if (!cert) return undefined; const k = (e) => { if (e.key === 'Escape') setCert(null) }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k) }, [cert])
 
-  const glow = useRef(null)
-  useEffect(() => {
-    const el = scroller.current, g = glow.current; if (!el || !g) return undefined
-    let raf = 0, x = window.innerWidth * .7, y = window.innerHeight * .25, tx = x, ty = y
-    const move = (e) => { tx = e.clientX; ty = e.clientY; if (!raf) raf = requestAnimationFrame(step) }
-    const step = () => { x += (tx - x) * .18; y += (ty - y) * .18; g.style.setProperty('--mx', `${x.toFixed(1)}px`); g.style.setProperty('--my', `${y.toFixed(1)}px`); raf = Math.abs(tx - x) + Math.abs(ty - y) > .5 ? requestAnimationFrame(step) : 0 }
-    step(); el.addEventListener('pointermove', move); el.addEventListener('pointerdown', move)
-    return () => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerdown', move); cancelAnimationFrame(raf) }
-  }, [])
   return <div ref={scroller} className={`classic theme-${theme}`} onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 120)}>
-    <div ref={glow} className="cl-glow" aria-hidden="true"/>
     <header className={`cl-bar${scrolled ? ' is-scrolled' : ''}`}>
       <button className="cl-brand" onClick={toTop} aria-label="Sameer Palkar, back to top"><b>Sameer Palkar</b><span>software engineer</span></button>
-      <div className="cl-view">
-        <span className="cl-view-hint">View this portfolio as</span>
-        <div className="cl-seg" role="radiogroup" aria-label="Version">
-          <motion.button role="radio" aria-checked="false" onClick={() => onView?.('interactive')} {...tap}><span>Interactive 3D</span></motion.button>
-          <button role="radio" aria-checked="true" className="on"><span>Classic</span></button>
-        </div>
+      <div className="cl-settings" ref={setRef}>
+        <motion.button className={`cl-set-btn${setOpen ? ' on' : ''}`} onClick={() => setSetOpen((o) => !o)} aria-expanded={setOpen} aria-haspopup="dialog" {...tap}>{Icon.gear}<span>Settings</span></motion.button>
+        <AnimatePresence>{setOpen && <motion.div key="set" className="cl-set-panel" role="dialog" aria-label="Settings"
+          initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: .15 }}>
+          <div className="cl-set-row">
+            <span>Appearance</span>
+            <button className={`cl-switch${theme === 'dark' ? ' on' : ''}`} role="switch" aria-checked={theme === 'dark'} aria-label="Dark mode" title={theme === 'dark' ? 'Light mode' : 'Dark mode'} onClick={flipTheme}>
+              <span className="cl-switch-ico">{Icon.sun}</span><span className="cl-switch-ico">{Icon.moon}</span>
+              <i>{theme === 'dark' ? Icon.moon : Icon.sun}</i>
+            </button>
+          </div>
+          <motion.button className="cl-view-btn" onClick={() => { setSetOpen(false); onView?.('interactive') }} {...tap}>{Icon.cube}<span>View in interactive 3D</span></motion.button>
+        </motion.div>}</AnimatePresence>
       </div>
-      <button className={`cl-switch${theme === 'dark' ? ' on' : ''}`} role="switch" aria-checked={theme === 'dark'} aria-label="Dark mode" title={theme === 'dark' ? 'Light mode' : 'Dark mode'} onClick={flipTheme}>
-        <span className="cl-switch-ico">{Icon.sun}</span><span className="cl-switch-ico">{Icon.moon}</span>
-        <i>{theme === 'dark' ? Icon.moon : Icon.sun}</i>
-      </button>
     </header>
 
+    {slowNotice && !noticeGone && <div className="cl-notice" role="status">
+      <span>The 3D room was taking too long to load on this device, so here’s the classic version. It keeps loading in the background.</span>
+      <button onClick={() => setNoticeGone(true)} aria-label="Dismiss">{Icon.close}</button>
+    </div>}
     <main className="cl-page">
       <section className="cl-hero">
         <img className="cl-photo" src="/photo-frame.jpg" alt="Sameer Palkar" draggable="false"/>
@@ -151,7 +158,6 @@ export function ClassicSite({ contacts = [], onView, nate }) {
 
       <Section title="Projects" root={scroller}>
         <div className="cl-cards">{PROJECTS.map((p) => <article key={p.id} className="cl-card" style={{ '--pc': p.color }}>
-          <div className="cl-card-art"><ProjectVisual id={p.id}/></div>
           <div className="cl-card-body">
             {p.category && <span className="cl-card-kicker">{p.category}</span>}
             <h3>{p.name || p.title}</h3>
@@ -211,7 +217,7 @@ export function ClassicSite({ contacts = [], onView, nate }) {
 
     </main>
     <footer className="cl-foot">
-        <span>Sameer Palkar</span>
+        <span className="cl-foot-id"><b>Sameer Palkar</b><span>software engineer · <AnimatePresence mode="wait" initial={false}><motion.span key={city} className="cl-city" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: .3 }}>{CITIES[city]}</motion.span></AnimatePresence></span></span>
         <div className="cl-row-btns">
           <motion.button className="cl-btn ghost" onClick={toTop} {...tap}>{Icon.up}<span>Back to top</span></motion.button>
           <motion.button className="cl-btn ghost" onClick={() => onView?.('interactive')} {...tap}>{Icon.cube}<span>Explore the 3D room</span></motion.button>
@@ -243,13 +249,13 @@ const SHEET = [
   { at: [.12, .2], d: R(46, 48, 44, 54), layer: 'furn', cmd: 'RECT', what: 'placing the photo' },
   { at: [.19, .26], d: 'M102 56 H190 M102 68 H168', w: 2.2, layer: 'wall', cmd: 'LINE', what: 'writing the name' },
   { at: [.25, .33], d: 'M102 84 H192 M102 92 H186 M102 100 H160', w: .8, layer: 'obj', cmd: 'LINE', what: 'writing about me' },
-  { at: [.32, .38], d: 'M46 126 H104', w: 1.8, layer: 'label', cmd: 'TEXT', what: 'work experience' },
+  { at: [.32, .38], d: 'M46 126 H104', w: 1.8, layer: 'wall', cmd: 'TEXT', what: 'work experience' },
   { at: [.37, .44], d: 'M46 140 H192 M46 148 H184 M46 156 H150', w: .8, layer: 'obj', cmd: 'LINE', what: 'work experience' },
-  { at: [.43, .48], d: 'M46 180 H96', w: 1.8, layer: 'label', cmd: 'TEXT', what: 'technical skills' },
+  { at: [.43, .48], d: 'M46 180 H96', w: 1.8, layer: 'wall', cmd: 'TEXT', what: 'technical skills' },
   { at: [.47, .55], d: 'M46 194 H190 M46 202 H176 M46 210 H184', w: .8, layer: 'obj', cmd: 'LINE', what: 'technical skills' },
-  { at: [.54, .59], d: 'M46 234 H90', w: 1.8, layer: 'label', cmd: 'TEXT', what: 'projects' },
+  { at: [.54, .59], d: 'M46 234 H90', w: 1.8, layer: 'wall', cmd: 'TEXT', what: 'projects' },
   { at: [.58, .68], d: R(46, 246, 68, 42) + ' ' + R(124, 246, 68, 42), layer: 'furn', cmd: 'RECT', what: 'projects' },
-  { at: [.67, .72], d: 'M46 308 H112', w: 1.8, layer: 'label', cmd: 'TEXT', what: 'achievements' },
+  { at: [.67, .72], d: 'M46 308 H112', w: 1.8, layer: 'wall', cmd: 'TEXT', what: 'achievements' },
   { at: [.71, .78], d: 'M46 322 H190 M46 330 H168', w: .8, layer: 'obj', cmd: 'LINE', what: 'achievements' },
   { at: [.77, .86], d: C(54, 356, 7) + ' ' + C(76, 356, 7) + ' ' + C(98, 356, 7), layer: 'obj', cmd: 'CIRCLE', what: 'adding contact links' },
   { at: [.85, .93], d: R(140, 348, 52, 16) + ' M160 352 v8 M156 357 l4 3 4 -3', layer: 'furn', cmd: 'RECT', what: 'filing the résumé' },

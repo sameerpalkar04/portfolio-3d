@@ -562,7 +562,12 @@ function ShotViewer({ shot, onShot, onBack }) {
   const src = `/3d/${m.id}/${m.shots[i][0]}.webp`
   // on a phone held upright the desktop is turned sideways, so its left-right runs down the screen
   const along = (e) => { const d = e.currentTarget.closest('.mac-desktop'), r = d?.getBoundingClientRect(); return r && d.offsetWidth > d.offsetHeight && r.height > r.width ? e.clientY : e.clientX }
-  return <div className="shot-view" onPointerDown={(e) => { if (!e.target.closest('button')) sx.current = along(e) }} onPointerUp={(e) => { const p = along(e); if (sx.current != null && Math.abs(p - sx.current) > 40) go(p < sx.current ? 1 : -1); sx.current = null }}>
+  // phones: one tap on the photo hides the buttons and the strip, another brings them back
+  const [bare, setBare] = useState(false)
+  return <div className={`shot-view${bare ? ' is-bare' : ''}`} onPointerDown={(e) => { if (!e.target.closest('button')) sx.current = along(e) }} onPointerUp={(e) => {
+    const p = along(e); if (sx.current == null) return
+    if (Math.abs(p - sx.current) > 40) go(p < sx.current ? 1 : -1); else if (touch()) setBare((b) => !b)
+    sx.current = null }}>
     <img key={src} className={`shot-img${loaded ? ' in' : ''}`} src={src} alt={`${m.name}: ${m.shots[i][1]}`} onLoad={() => setLoaded(true)} draggable="false"/>
     {!loaded && <i className="spin shot-spin" aria-hidden="true"/>}
     <button className="shot-back" onClick={onBack}>{ico(<path d="M19 12H5M11 6l-6 6 6 6"/>, 15, 2)}{m.name}</button>
@@ -640,7 +645,8 @@ export function DesktopOS({ stageH }) {
 // drag) and it snaps to the nearest cell when let go, swapping places with an icon already there.
 const STAGE_W = 1180
 function DeskIcons({ T, stageH, sel, setSel, open }) {
-  const cw = T ? 140 : 104, ch = T ? 168 : 120, top = T ? 300 : 320, right = 16
+  // a tight, even grid like a real Mac desktop, its right edge in line with the widgets above it
+  const cw = T ? 124 : 96, ch = T ? 132 : 106, top = 316, right = 16
   // the grid is laid so a row lands exactly where the icons start (below the widgets)
   const r0 = Math.floor((top - 34) / ch), y0 = top - r0 * ch
   const cols = Math.max(1, Math.floor((STAGE_W - 2 * right) / cw)), rows = Math.max(r0 + 2, Math.floor((stageH - 96 - y0) / ch))
