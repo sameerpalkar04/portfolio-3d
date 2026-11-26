@@ -7,7 +7,7 @@ import { buildCollisionGrid, createWalkTester } from './collision'
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
 import { toLocal, isLocked } from './orientation'
 import { ACHIEVEMENTS } from './achievements'
-import { PHONE, BOOK, CAMERA_SCREEN, createOpenBook, createDigitalCamera, createTableLamp, createGlobe, createCertificateWall, createPolaroid, createModelAirplane, createPhone, createFloorPlant, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight, createFileFolder, createShihTzu, DOG_COATS, createDogBowl, createPlushDuck, FOLDER, createCubeShelf, createBackpack, createPenStand, createStickyNotes } from './props'
+import { PHONE, BOOK, CAMERA_SCREEN, createOpenBook, createDigitalCamera, createTableLamp, createGlobe, createCertificateWall, createPolaroid, createModelAirplane, createPhone, createFloorPlant, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight, createFileFolder, createShihTzu, DOG_COATS, createDogBowl, createPlushDuck, FOLDER, createCubeShelf, createBackpack, createPenStand, createStickyNotes, createWelcomeMat } from './props'
 import { createDesktopTexture, BEACH_PHOTO_URL } from './screens'
 
 const MODEL_URL = '/models/home-office.glb?v=3'
@@ -703,32 +703,53 @@ function createScene(canvas, handlers) {
         for (const o of parts) { o.getWorldPosition(w).add(shift); o.parent.updateWorldMatrix(true, false); o.position.copy(o.parent.worldToLocal(w)); o.updateMatrixWorld(true) }
       }
     }
-    // A second under-desk cabinet beside the first: same plywood door and handle, under the drawer row
+    // A second under-desk cabinet beside the first: one door as wide as the drawer above it (so its top is flush
+    // with the drawer front), with a copy of the original handle
     {
       const door = find('Cube020'), handle = find('handle003'), drawer = find('Cube007')
-      if (door && handle) {
-        const db = new THREE.Box3().setFromObject(door), dz = db.max.z - db.min.z, gap = .004
-        const topY = drawer ? new THREE.Box3().setFromObject(drawer).min.y - .006 : db.max.y
-        const dir = Math.sign((drawer ? new THREE.Box3().setFromObject(drawer).getCenter(new THREE.Vector3()).z : db.min.z - 1) - db.getCenter(new THREE.Vector3()).z) || -1
-        const zFar = dir < 0 ? db.min.z - gap : db.max.z + gap, zNear = zFar + dir * dz, zc = (zFar + zNear) / 2
-        const mat = door.material, h = topY - db.min.y
-        const newDoor = new THREE.Mesh(new THREE.BoxGeometry(db.max.x - db.min.x, h, dz), mat)
-        newDoor.position.set((db.min.x + db.max.x) / 2, db.min.y + h / 2, zc); newDoor.castShadow = newDoor.receiveShadow = true; newDoor.name = 'desk-cabinet-2'; scene.add(newDoor)
-        // carcass: the side panel facing the open knee space, a plinth and a top under the drawers
-        const back = db.max.x + .65, depth = back - db.max.x, side = new THREE.Mesh(new THREE.BoxGeometry(depth, h + (db.min.y - floorY), .018), mat)
-        side.position.set(db.max.x + depth / 2, floorY + (h + db.min.y - floorY) / 2, zNear - dir * .009); side.castShadow = side.receiveShadow = true; scene.add(side)
-        const plinth = new THREE.Mesh(new THREE.BoxGeometry(.018, db.min.y - floorY, dz), new THREE.MeshStandardMaterial({ color: '#2b2622', roughness: .8 }))
-        plinth.position.set(db.max.x + .03, floorY + (db.min.y - floorY) / 2, zc); scene.add(plinth)
-        // handle: a copy of the first one, at the same height on the opposite (knee-space) edge
-        const hb = new THREE.Box3().setFromObject(handle), h2 = handle.clone(); h2.material = handle.material
-        handle.parent.add(h2); h2.updateMatrixWorld(true)
-        const handleEdge = Math.abs(hb.getCenter(new THREE.Vector3()).z - db.min.z) < Math.abs(hb.getCenter(new THREE.Vector3()).z - db.max.z) ? 'min' : 'max'
-        const offset = handleEdge === 'min' ? hb.getCenter(new THREE.Vector3()).z - db.min.z : db.max.z - hb.getCenter(new THREE.Vector3()).z
-        const targetZ = dir < 0 ? (zNear < zFar ? zNear + offset : zNear - offset) : (zNear > zFar ? zNear - offset : zNear + offset)
-        const targetY = Math.min(hb.getCenter(new THREE.Vector3()).y, db.min.y + h * .62)
-        const w0 = new THREE.Vector3(); h2.getWorldPosition(w0)
-        const shift = new THREE.Vector3(0, targetY - hb.getCenter(new THREE.Vector3()).y, targetZ - hb.getCenter(new THREE.Vector3()).z)
-        h2.position.copy(h2.parent.worldToLocal(w0.add(shift))); h2.updateMatrixWorld(true)
+      if (door && handle && drawer) {
+        const db = new THREE.Box3().setFromObject(door), rb = new THREE.Box3().setFromObject(drawer), gap = .004
+        const topY = rb.min.y - .006, h = topY - db.min.y, mat = door.material
+        // the drawer sits on the far side of the original door (lower z here); the new doors fill the span under it
+        const dir = Math.sign(rb.getCenter(new THREE.Vector3()).z - db.getCenter(new THREE.Vector3()).z) || -1
+        const zA = dir < 0 ? db.min.z - gap : db.max.z + gap // next to the original door
+        const zB = dir < 0 ? rb.min.z : rb.max.z // the drawer's far end: the cabinet's open side
+        const span = Math.abs(zB - zA), w = span, lo = Math.min(zA, zB)
+        const hb = new THREE.Box3().setFromObject(handle), hc = hb.getCenter(new THREE.Vector3())
+        const handleOff = Math.min(hc.z - db.min.z, db.max.z - hc.z) // the handle's distance from its door edge
+        const targetY = Math.min(hc.y, db.min.y + h * .62)
+        for (let i = 0; i < 1; i++) { // one door, the full width of the drawer above it
+          const z0 = lo + i * (w + gap), z1 = z0 + w
+          const d = new THREE.Mesh(new THREE.BoxGeometry(db.max.x - db.min.x, h, w), mat)
+          d.position.set((db.min.x + db.max.x) / 2, db.min.y + h / 2, (z0 + z1) / 2); d.castShadow = d.receiveShadow = true
+          d.name = i ? 'desk-cabinet-2b' : 'desk-cabinet-2'; scene.add(d)
+          // handle: on each door's lower-z edge, like the original
+          const h2 = handle.clone(); h2.material = handle.material; handle.parent.add(h2); h2.updateMatrixWorld(true)
+          const w0 = new THREE.Vector3(); h2.getWorldPosition(w0)
+          h2.position.copy(h2.parent.worldToLocal(w0.add(new THREE.Vector3(0, targetY - hc.y, z0 + handleOff - hc.z)))); h2.updateMatrixWorld(true)
+        }
+        // carcass: the side panel on the open (knee-space) side, from the door fronts to the wall and down to the
+        // floor, and a plywood toe-kick under the doors that ends inside it
+        const zSide = dir < 0 ? lo : lo + span, inward = dir < 0 ? 1 : -1
+        const back = db.max.x + .65, front = db.min.x, depth = back - front, full = h + (db.min.y - floorY)
+        const side = new THREE.Mesh(new THREE.BoxGeometry(depth, full, .018), mat)
+        side.position.set(front + depth / 2, floorY + full / 2, zSide + inward * .009); side.castShadow = side.receiveShadow = true; scene.add(side)
+        const plinth = new THREE.Mesh(new THREE.BoxGeometry(.018, db.min.y - floorY, span - .018), mat)
+        plinth.position.set(db.max.x + .02, floorY + (db.min.y - floorY) / 2, lo + span / 2 + inward * .009); plinth.receiveShadow = true; scene.add(plinth)
+      }
+    }
+    // A welcome mat inside the door, beside the potted ficus, its lettering facing into the room
+    {
+      const doorObj = find('Door'), pot = scene.getObjectByName('ficus-pot') || find('ficus-pot')
+      if (doorObj) {
+        const dbx = new THREE.Box3().setFromObject(doorObj), wm = createWelcomeMat()
+        const intoRoom = Math.sign(((roomBounds.min.x + roomBounds.max.x) / 2) - dbx.getCenter(new THREE.Vector3()).x) || -1
+        const potB = pot ? new THREE.Box3().setFromObject(pot) : null
+        const zFar = potB ? potB.min.z - .04 : dbx.max.z, zNear = dbx.min.z + .03, zc = Math.min((zNear + zFar) / 2, dbx.max.z - .3)
+        const faceX = intoRoom < 0 ? dbx.min.x : dbx.max.x
+        wm.position.set(faceX + intoRoom * (.18 + .01), floorY + .0005, zc)
+        wm.rotation.y = intoRoom < 0 ? -Math.PI / 2 : Math.PI / 2 // its long side along the door, WELCOME read from the room
+        scene.add(wm)
       }
     }
     // A pen stand on the desk just beside the iMac, on the bonsai side, toward the wall

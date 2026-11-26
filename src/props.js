@@ -1332,3 +1332,38 @@ export function createStickyNotes(text = 'Contact Me') {
   g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })
   return g
 }
+
+// A coir welcome mat (about 55 × 36 cm): rough fibre texture, a darker border and WELCOME across it.
+export function createWelcomeMat(text = 'WELCOME') {
+  const W = .55, D = .36, T = .014
+  const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 672
+  const c = cv.getContext('2d')
+  c.fillStyle = '#a97a45'; c.fillRect(0, 0, cv.width, cv.height)
+  // coir fibres: thousands of short strokes in browns
+  const rnd = (() => { let s = 7; return () => (s = (s * 16807) % 2147483647) / 2147483647 })()
+  for (let i = 0; i < 26000; i++) {
+    const x = rnd() * cv.width, y = rnd() * cv.height, l = 3 + rnd() * 7, a = rnd() * Math.PI
+    const t = rnd(); c.strokeStyle = t < .45 ? 'rgba(120,80,40,.55)' : t < .8 ? 'rgba(196,150,95,.5)' : 'rgba(80,52,26,.45)'
+    c.lineWidth = 1 + rnd() * 1.2; c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); c.stroke()
+  }
+  // border
+  c.strokeStyle = 'rgba(58,36,18,.85)'; c.lineWidth = 26; c.strokeRect(34, 34, cv.width - 68, cv.height - 68)
+  // lettering, pressed into the fibre (slightly rough edges)
+  c.fillStyle = 'rgba(48,30,15,.92)'; c.textAlign = 'center'; c.textBaseline = 'middle'
+  // sized to sit well inside the border, with room on every side
+  let size = 150; const face = (px) => `800 ${px}px 'Iowan Old Style', 'Palatino Linotype', Georgia, serif`
+  c.font = face(size); const maxW = cv.width - 2 * 150
+  if (c.measureText(text).width > maxW) { size = Math.floor(size * maxW / c.measureText(text).width); c.font = face(size) }
+  c.fillText(text, cv.width / 2, cv.height / 2 + size * .06)
+  c.globalCompositeOperation = 'destination-out'
+  for (let i = 0; i < 2600; i++) { const x = rnd() * cv.width, y = rnd() * cv.height; c.fillStyle = `rgba(0,0,0,${.05 + rnd() * .12})`; c.fillRect(x, y, 2, 2) }
+  c.globalCompositeOperation = 'source-over'
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8
+  const top = new THREE.MeshStandardMaterial({ map: tex, roughness: 1 })
+  const edge = new THREE.MeshStandardMaterial({ color: '#6e4a26', roughness: 1 })
+  // the long side runs along x before rotating; the canvas's top edge is the mat's far (-z) side
+  const mat = new THREE.Mesh(new RoundedBoxGeometry(W, T, D, 2, .006), [edge, edge, top, edge, edge, edge])
+  mat.position.y = T / 2; mat.receiveShadow = true
+  const g = new THREE.Group(); g.name = 'welcome-mat'; g.add(mat)
+  return g
+}
