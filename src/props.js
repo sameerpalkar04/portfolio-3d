@@ -1265,3 +1265,70 @@ export function createPenStand() {
   g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })
   return g
 }
+
+// A pad of yellow sticky notes, "Contact Me" written on the top sheet by hand, its corner curling up.
+// About 7.6 cm square and 1.2 cm thick. The handwriting is Caveat (loaded on demand; drawn again once it arrives).
+export function createStickyNotes(text = 'Contact Me') {
+  const g = new THREE.Group(); g.name = 'sticky-notes'
+  const S = .076, H = .012
+  // the stack: sheet edges as fine lines down the sides
+  const side = document.createElement('canvas'); side.width = 256; side.height = 64
+  const sc = side.getContext('2d'); sc.fillStyle = '#e8c53a'; sc.fillRect(0, 0, 256, 64)
+  for (let y = 2; y < 64; y += 3) { sc.fillStyle = y % 2 ? 'rgba(255,240,150,.55)' : 'rgba(170,130,20,.18)'; sc.fillRect(0, y, 256, 1) }
+  const sideTex = new THREE.CanvasTexture(side); sideTex.colorSpace = THREE.SRGBColorSpace
+  const sideMat = new THREE.MeshStandardMaterial({ map: sideTex, roughness: .9 })
+  const plain = new THREE.MeshStandardMaterial({ color: '#f2d24a', roughness: .9, emissive: '#f2d24a', emissiveIntensity: .12 })
+  const stack = new THREE.Mesh(new THREE.BoxGeometry(S, H - .0006, S), [sideMat, sideMat, plain, plain, sideMat, sideMat])
+  stack.position.y = (H - .0006) / 2; g.add(stack)
+  // the top sheet, with the writing
+  const cv = document.createElement('canvas'); cv.width = cv.height = 512
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8
+  const draw = () => {
+    const c = cv.getContext('2d')
+    c.fillStyle = '#f7d94e'; c.fillRect(0, 0, 512, 512)
+    const grad = c.createLinearGradient(0, 0, 0, 512); grad.addColorStop(0, 'rgba(255,255,255,.10)'); grad.addColorStop(1, 'rgba(0,0,0,.04)')
+    c.fillStyle = grad; c.fillRect(0, 0, 512, 512)
+    c.save(); c.translate(256, 250); c.rotate(-.06)
+    c.fillStyle = '#1f2a44'; c.textAlign = 'center'; c.textBaseline = 'middle'
+    c.font = "700 118px Caveat, 'Bradley Hand', 'Segoe Print', 'Comic Sans MS', cursive"
+    const [a, b] = text.split(' ')
+    if (b) { c.fillText(a, -6, -58); c.fillText(b, 12, 62) } else c.fillText(a, 0, 0)
+    c.restore()
+    tex.needsUpdate = true
+  }
+  draw()
+  if (typeof document !== 'undefined' && document.fonts) {
+    const tryLoad = (n) => document.fonts.load("700 118px Caveat").then((f) => { if (f.length) draw(); else if (n > 0) setTimeout(() => tryLoad(n - 1), 1000) }).catch(() => {})
+    let l = document.getElementById('caveat-font')
+    if (!l) { l = document.createElement('link'); l.id = 'caveat-font'; l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Caveat:wght@700&display=swap'; document.head.appendChild(l) }
+    l.addEventListener('load', () => tryLoad(30)) // the stylesheet can arrive late while the room is still downloading
+    tryLoad(30)
+  }
+  // the sheet is the square minus its lifted corner; the corner curls up as a separate flap
+  const C = .022 // size of the curled corner
+  const sh = new THREE.Shape(); sh.moveTo(-S / 2, -S / 2); sh.lineTo(S / 2 - C, -S / 2); sh.lineTo(S / 2, -S / 2 + C); sh.lineTo(S / 2, S / 2); sh.lineTo(-S / 2, S / 2); sh.closePath()
+  const sheetGeo = new THREE.ShapeGeometry(sh)
+  const uv = sheetGeo.attributes.uv, pos = sheetGeo.attributes.position
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i) / S + .5, pos.getY(i) / S + .5)
+  sheetGeo.rotateX(-Math.PI / 2)
+  const sheet = new THREE.Mesh(sheetGeo, new THREE.MeshStandardMaterial({ map: tex, roughness: .85, emissive: '#ffe680', emissiveMap: tex, emissiveIntensity: .18 }))
+  sheet.position.y = H; g.add(sheet)
+  // the curl: a small bent flap lifting off the corner (front side yellow, its underside a shade darker)
+  const flapGeo = new THREE.BufferGeometry(), seg = 10, verts = [], idx = []
+  for (let i = 0; i <= seg; i++) {
+    const t = i / seg, lift = Math.sin(t * Math.PI * .5) * .009, curve = t * t * .004
+    // a strip across the fold line, from the diagonal edge towards the corner
+    const ax = S / 2 - C + t * C * .5 - curve, az = -S / 2 + t * C * .5 - curve
+    const bx = S / 2 - t * C * .5 + curve * .2, bz = -S / 2 + C - t * C * .5 + curve * .2
+    verts.push(ax, H + lift, -az, bx, H + lift, -bz)
+    if (i < seg) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2) }
+  }
+  flapGeo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3)); flapGeo.setIndex(idx); flapGeo.computeVertexNormals()
+  const flap = new THREE.Mesh(flapGeo, new THREE.MeshStandardMaterial({ color: '#efcb3e', roughness: .85, side: THREE.DoubleSide }))
+  g.add(flap)
+  // under the curl the next sheet shows
+  const under = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(S / 2 - C, -S / 2), new THREE.Vector2(S / 2, -S / 2), new THREE.Vector2(S / 2, -S / 2 + C)])), new THREE.MeshStandardMaterial({ color: '#f0d045', roughness: .9 }))
+  under.geometry.rotateX(-Math.PI / 2); under.position.y = H - .0005; g.add(under)
+  g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })
+  return g
+}

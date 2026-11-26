@@ -7,7 +7,7 @@ import { buildCollisionGrid, createWalkTester } from './collision'
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
 import { toLocal, isLocked } from './orientation'
 import { ACHIEVEMENTS } from './achievements'
-import { PHONE, BOOK, CAMERA_SCREEN, createOpenBook, createDigitalCamera, createTableLamp, createGlobe, createCertificateWall, createPolaroid, createModelAirplane, createPhone, createFloorPlant, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight, createFileFolder, createShihTzu, DOG_COATS, createDogBowl, createPlushDuck, FOLDER, createCubeShelf, createBackpack, createPenStand } from './props'
+import { PHONE, BOOK, CAMERA_SCREEN, createOpenBook, createDigitalCamera, createTableLamp, createGlobe, createCertificateWall, createPolaroid, createModelAirplane, createPhone, createFloorPlant, createSpeaker, createPictureLight, createLedStrip, createPlant, createPendant, createBonsai, createShelfContents, createNightLight, createFileFolder, createShihTzu, DOG_COATS, createDogBowl, createPlushDuck, FOLDER, createCubeShelf, createBackpack, createPenStand, createStickyNotes } from './props'
 import { createDesktopTexture, BEACH_PHOTO_URL } from './screens'
 
 const MODEL_URL = '/models/home-office.glb?v=3'
@@ -387,6 +387,11 @@ function createScene(canvas, handlers) {
       phone.position.set(lampCenter.x + towardChair * ((b.max.x - b.min.x) / 2 + .1), b.min.y + .001, lampCenter.z - .06)
       phone.rotation.y = towardChair * Math.PI / 2 + .12 // top of the phone points away from whoever stands at the desk
       scene.add(phone)
+      // a pad of sticky notes beside it: "Contact Me", in handwriting
+      const notes = createStickyNotes('Contact Me')
+      notes.position.set(phone.position.x + towardChair * .005, b.min.y + .0005, phone.position.z - .13)
+      notes.rotation.y = phone.rotation.y - .2
+      scene.add(notes)
     }
     // A fabric speaker on the low cabinet, next to the vase of white roses.
     const roses = find('white rose'), cabinet = find('Cube.009')

@@ -96,13 +96,6 @@ export function ClassicSite({ contacts = [], onView, nate, slowNotice = false })
   }
   const scroller = useRef(null), [scrolled, setScrolled] = useState(false)
   const toTop = () => scroller.current?.scrollTo({ top: 0, behavior: 'smooth' })
-  const [setOpen, setSetOpen] = useState(false), setRef = useRef(null)
-  useEffect(() => {
-    if (!setOpen) return undefined
-    const off = (e) => { if (!setRef.current?.contains(e.target)) setSetOpen(false) }, esc = (e) => { if (e.key === 'Escape') setSetOpen(false) }
-    window.addEventListener('pointerdown', off); window.addEventListener('keydown', esc)
-    return () => { window.removeEventListener('pointerdown', off); window.removeEventListener('keydown', esc) }
-  }, [setOpen])
   const [city, setCity] = useState(0), [noticeGone, setNoticeGone] = useState(false)
   useEffect(() => { const t = window.setInterval(() => setCity((c) => (c + 1) % CITIES.length), 10000); return () => window.clearInterval(t) }, [])
   const [cert, setCert] = useState(null) // the certificate shown full size
@@ -111,19 +104,12 @@ export function ClassicSite({ contacts = [], onView, nate, slowNotice = false })
   return <div ref={scroller} className={`classic theme-${theme}`} onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 120)}>
     <header className={`cl-bar${scrolled ? ' is-scrolled' : ''}`}>
       <button className="cl-brand" onClick={toTop} aria-label="Sameer Palkar, back to top"><b>Sameer Palkar</b><span>software engineer</span></button>
-      <div className="cl-settings" ref={setRef}>
-        <motion.button className={`cl-set-btn${setOpen ? ' on' : ''}`} onClick={() => setSetOpen((o) => !o)} aria-expanded={setOpen} aria-haspopup="dialog" {...tap}>{Icon.gear}<span>Settings</span></motion.button>
-        <AnimatePresence>{setOpen && <motion.div key="set" className="cl-set-panel" role="dialog" aria-label="Settings"
-          initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: .15 }}>
-          <div className="cl-set-row">
-            <span>Appearance</span>
-            <button className={`cl-switch${theme === 'dark' ? ' on' : ''}`} role="switch" aria-checked={theme === 'dark'} aria-label="Dark mode" title={theme === 'dark' ? 'Light mode' : 'Dark mode'} onClick={flipTheme}>
-              <span className="cl-switch-ico">{Icon.sun}</span><span className="cl-switch-ico">{Icon.moon}</span>
-              <i>{theme === 'dark' ? Icon.moon : Icon.sun}</i>
-            </button>
-          </div>
-          <motion.button className="cl-view-btn" onClick={() => { setSetOpen(false); onView?.('interactive') }} {...tap}>{Icon.cube}<span>View in interactive 3D</span></motion.button>
-        </motion.div>}</AnimatePresence>
+      <div className="cl-bar-tools">
+        <motion.button className="cl-view-btn" onClick={() => onView?.('interactive')} {...tap}>{Icon.cube}<span>View in interactive 3D</span></motion.button>
+        <button className={`cl-switch${theme === 'dark' ? ' on' : ''}`} role="switch" aria-checked={theme === 'dark'} aria-label="Dark mode" title={theme === 'dark' ? 'Light mode' : 'Dark mode'} onClick={flipTheme}>
+          <span className="cl-switch-ico">{Icon.sun}</span><span className="cl-switch-ico">{Icon.moon}</span>
+          <i>{theme === 'dark' ? Icon.moon : Icon.sun}</i>
+        </button>
       </div>
     </header>
 

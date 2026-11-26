@@ -382,7 +382,7 @@ function BottomBar({ hour, auto, onHour, onAuto, hotspot: hotspotNow, onGo: goNo
     <AnimatePresence>{here && !panel && <motion.button key="sheet-interact" className="fab-action sheet-interact" onClick={onOpen} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .2 }}>INTERACT <Arrow/></motion.button>}</AnimatePresence>
     <div className="onebar">
       <nav className="onebar-nav" aria-label="Controls">
-        {[['work', 'Work', workLocked], ['play', 'Life', playLocked], ['settings', 'Settings', locked], ['help', 'Help', false]].map(([id, label, off]) =>
+        {[['work', 'Work', workLocked], ['play', 'Life', playLocked], ['settings', 'Settings', locked && teach !== 'settings'], ['help', 'Help', false]].map(([id, label, off]) =>
           <button key={id} className={`ob-btn${panel === id || (!panel && atGroup === id) ? ' on' : ''}${teach === id ? ' teach' : ''}`} onClick={() => toggle(id)} disabled={off} aria-expanded={panel === id}><span className="ob-ico">{OB_ICONS[id]}</span>{label}</button>)}
       </nav>
       <div className="ob-nate"><AiButton compact locked={locked}/></div>
@@ -480,6 +480,7 @@ function SpotCue({ id }) {
 const DemoPointer = () => <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M5 3l14 8.5-6.2 1.4L9.6 19z" fill="#1d1f22" stroke="#fff" strokeWidth="1.6" strokeLinejoin="round"/></svg>
 function BarDemo({ sceneRef, startPose, onDone }) {
   const [ptr, setPtr] = useState(null) // {x, y, click}
+  const startOpen = useRef(typeof document !== 'undefined' && !!document.querySelector('.bar-spots button')) // phones: the menu is still open from the settings step
   const touch = isTouch()
   useEffect(() => {
     let alive = true; const timers = []
@@ -492,14 +493,14 @@ function BarDemo({ sceneRef, startPose, onDone }) {
     const panel = (name) => window.dispatchEvent(new CustomEvent('bar-demo', { detail: name }))
     if (touch) { // phones (joystick): tap ☰, sweep across the shortcuts it shows, tap CLOSE (~3 s)
       const menu = (v) => window.dispatchEvent(new CustomEvent('menu-demo', { detail: v }))
-      moveTo('.fab-menu', { jump: true })
-      at(300, click); at(420, () => menu(true))
-      at(650, () => moveTo('.bar-spots button', { d: .3 }))
-      at(1000, () => moveTo('.bar-spots button', { nth: 'last', d: .9, lin: true }))
-      at(1950, () => moveTo('.bar-open.is-close', { d: .3 }))
-      at(2300, click); at(2420, () => menu(false))
-      at(2600, () => setPtr(null))
-      at(2900, onDone)
+      const open = startOpen.current, o = open ? -650 : 0 // already open after the settings step
+      if (open) { menu(true); at(60, () => moveTo('.bar-spots button', { jump: true })) }
+      else { moveTo('.fab-menu', { jump: true }); at(300, click); at(420, () => menu(true)); at(650, () => moveTo('.bar-spots button', { d: .3 })) }
+      at(1000 + o, () => moveTo('.bar-spots button', { nth: 'last', d: .9, lin: true }))
+      at(1950 + o, () => moveTo('.bar-open.is-close', { d: .3 }))
+      at(2300 + o, click); at(2420 + o, () => menu(false))
+      at(2600 + o, () => setPtr(null))
+      at(2900 + o, onDone)
       return () => { alive = false; timers.forEach(window.clearTimeout); menu(false) }
     }
     const folded = !document.querySelector('.bar-spots button')
@@ -520,12 +521,44 @@ function BarDemo({ sceneRef, startPose, onDone }) {
   }, [sceneRef, startPose, onDone, touch])
   return <>
     <motion.div className={`look-cue tour-cue demo-cue${touch ? ' is-touch' : ''}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .4 }}>
-      <span className="tour-step">Step 3 of 4</span>
+      <span className="tour-step">Step 4 of 5</span>
       {touch
         ? <><b>Quick access is in the menu</b><small>Tap ☰ for every spot, Life, settings and help</small></>
         : <><b>The bar takes you anywhere</b><small>Life opens the camera, speaker and dogs · the others walk you straight there</small></>}
     </motion.div>
     <AnimatePresence>{ptr && <motion.div key="ptr" className="demo-pointer" initial={{ opacity: 0, x: ptr.x, y: ptr.y }} animate={{ opacity: 1, x: ptr.x, y: ptr.y, scale: ptr.click ? .82 : 1 }} exit={{ opacity: 0 }} transition={{ x: { duration: ptr.d ?? .35, ease: ptr.lin ? 'linear' : [.45, 0, .2, 1] }, y: { duration: ptr.d ?? .35, ease: ptr.lin ? 'linear' : [.45, 0, .2, 1] }, scale: { duration: .22, ease: 'easeOut' }, opacity: { duration: .35 } }}>{touch ? <span className="demo-tap"/> : <DemoPointer/>}</motion.div>}</AnimatePresence>
+  </>
+}
+
+// Walkthrough: where the settings are. The pointer opens them, they stay open for a moment, then close.
+function SettingsDemo({ onDone, moveMode, n }) {
+  const [ptr, setPtr] = useState(null)
+  const touch = isTouch(), buttons = touch && moveMode === 'buttons'
+  useEffect(() => {
+    let alive = true; const timers = []
+    const at = (ms, fn) => timers.push(window.setTimeout(() => { if (alive) fn() }, ms))
+    const find = () => buttons ? [...document.querySelectorAll('.ob-btn')].find((b) => /settings/i.test(b.textContent)) : document.querySelector(touch ? '.settings-btn' : '.bar-icon.is-gear')
+    const moveTo = (jump) => { const el = find(); if (!el) return; const r = el.getBoundingClientRect(); setPtr({ x: r.left + r.width * .55, y: r.top + r.height * .6, click: false, d: jump ? 0 : .35 }) }
+    const click = () => setPtr((p) => p && { ...p, click: true, d: 0 })
+    const panel = (name) => window.dispatchEvent(new CustomEvent('bar-demo', { detail: name }))
+    const menu = (v) => window.dispatchEvent(new CustomEvent('menu-demo', { detail: v }))
+    const sheet = touch && !buttons // phones (joystick): the settings button lives in the ☰ menu
+    if (sheet) menu(true)
+    at(sheet ? 450 : 150, () => moveTo(true))
+    at(sheet ? 800 : 500, click)
+    at(sheet ? 920 : 620, () => { panel(buttons ? 'settings' : 'time'); setPtr((p) => p && { ...p, click: false }) })
+    at(sheet ? 1300 : 1000, () => setPtr(null))
+    let finished = false
+    at(sheet ? 2420 : 2120, () => panel(null)) // open for 1.5 s; phones: the menu stays open, the shortcuts step carries on from here
+    at(sheet ? 2770 : 2470, () => { finished = true; onDone() })
+    return () => { alive = false; timers.forEach(window.clearTimeout); panel(null); if (sheet && !finished) menu(false) }
+  }, [onDone, touch, buttons])
+  return <>
+    <motion.div className={`look-cue tour-cue demo-cue${touch ? ' is-touch' : ''}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .4 }}>
+      <span className="tour-step">Step {n} of 5</span>
+      <b>Settings</b><small>Change the time of day, or switch between this 3D room and the classic 2D site</small>
+    </motion.div>
+    <AnimatePresence>{ptr && <motion.div key="ptr" className="demo-pointer" initial={{ opacity: 0, x: ptr.x, y: ptr.y }} animate={{ opacity: 1, x: ptr.x, y: ptr.y, scale: ptr.click ? .82 : 1 }} exit={{ opacity: 0 }} transition={{ x: { duration: ptr.d ?? .35, ease: [.45, 0, .2, 1] }, y: { duration: ptr.d ?? .35, ease: [.45, 0, .2, 1] }, scale: { duration: .22, ease: 'easeOut' }, opacity: { duration: .35 } }}>{touch ? <span className="demo-tap"/> : <DemoPointer/>}</motion.div>}</AnimatePresence>
   </>
 }
 
@@ -551,8 +584,8 @@ function TourCue({ step, onDone, moveMode, mini = false }) {
   // 'close' (tap again to close it) fades in
   const [phase, setPhase] = useState('ask'), menuOpen = phase === 'close'
   useEffect(() => {
-    if (buttons && (step === 'walk' || step === 'play')) {
-      const want = step === 'walk' ? 'work' : 'play'; let seen = false, t = 0
+    if (buttons && (step === 'walk' || step === 'play' || step === 'settings')) {
+      const want = step === 'walk' ? 'work' : step === 'play' ? 'play' : 'settings'; let seen = false, t = 0
       let swap = 0
       const onPanel = (e) => {
         if (e.detail === want) { seen = true; setPhase('out'); window.clearTimeout(swap); swap = window.setTimeout(() => setPhase((p) => (p === 'out' ? 'close' : p)), 1000) }
@@ -579,11 +612,15 @@ function TourCue({ step, onDone, moveMode, mini = false }) {
     }
     return undefined
   }, [step, onDone, buttons])
-  const n = step === 'walk' ? 1 : step === 'play' ? 2 : buttons ? 3 : 2
+  const n = step === 'walk' ? 1 : step === 'play' ? 2 : step === 'settings' ? 3 : buttons ? 4 : 2
   return <motion.div className={`look-cue tour-cue${touch ? ' is-touch' : ''}${phase !== 'ask' ? ' is-open' : ''}`} initial={{ opacity: 0, y: 10 }} animate={phase === 'out' ? { opacity: 0, y: 6 } : { opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: .4, ease: 'easeOut' }}>
-    <span className="tour-step">{mini ? (buttons ? `Buttons · ${n} of 2` : 'Joystick') : `Step ${n} of 4`}</span>
+    <span className="tour-step">{mini ? (buttons ? `Buttons · ${n} of 2` : 'Joystick') : `Step ${n} of 5`}</span>
     {menuOpen
-      ? <><span className="cue-tap">{OB_ICONS[step === 'walk' ? 'work' : 'play']}</span><b>Tap {step === 'walk' ? 'Work' : 'Life'} again to close it</b><small>{step === 'walk' ? 'These are the places you can visit' : 'A few things from outside work'}</small></>
+      ? step === 'settings'
+        ? <><span className="cue-tap">{OB_ICONS.settings}</span><b>Tap Settings again to close it</b><small>Time of day, controls, and the classic 2D site</small></>
+        : <><span className="cue-tap">{OB_ICONS[step === 'walk' ? 'work' : 'play']}</span><b>Tap {step === 'walk' ? 'Work' : 'Life'} again to close it</b><small>{step === 'walk' ? 'These are the places you can visit' : 'A few things from outside work'}</small></>
+      : step === 'settings'
+      ? <><span className="cue-tap">{OB_ICONS.settings}</span><b>Now tap Settings</b><small>Change the time of day, or switch to the classic 2D site</small></>
       : step === 'play'
       ? <><span className="cue-tap">{OB_ICONS.play}</span><b>Now tap Life</b><small>The camera, the speaker and my dogs</small></>
       : step === 'walk'
@@ -1776,8 +1813,11 @@ export default function App() {
   // a short breath between the two buttons steps
   useEffect(() => { if (mini?.step !== 'swap') return undefined; const t = window.setTimeout(() => setMini((x) => (x?.step === 'swap' ? { ...x, step: 'play' } : x)), 350); return () => window.clearTimeout(t) }, [mini])
   const dismissCue = useCallback(() => {
-    if (tourStep === 'walk' || tourStep === 'play') { const next = tourStep === 'walk' && buttonsMode ? 'play' : 'look'; setShowCue(false); window.setTimeout(() => { setTourStep(next); setShowCue(true) }, 350); return }
-    if (tourStep === 'look' && (!touchUI || moveMode === 'joystick')) { setShowCue(false); window.setTimeout(() => { setTourStep('demo'); setShowCue(true) }, 350); return }
+    if (tourStep === 'walk' || tourStep === 'play') { const next = tourStep === 'walk' && buttonsMode ? 'play' : tourStep === 'play' ? 'settings' : 'look'; setShowCue(false); window.setTimeout(() => { setTourStep(next); setShowCue(true) }, 350); return }
+    if (tourStep === 'look' && !buttonsMode) { setShowCue(false); window.setTimeout(() => { setTourStep('settings'); setShowCue(true) }, 350); return }
+    // phones in buttons mode: Work → Life → Settings → look around → things to explore
+    if (tourStep === 'settings' && buttonsMode) { setShowCue(false); window.setTimeout(() => { setTourStep('look'); setShowCue(true) }, 350); return }
+    if (tourStep === 'settings') { setShowCue(false); window.setTimeout(() => { setTourStep('demo'); setShowCue(true) }, 350); return }
     setShowCue(false); window.setTimeout(() => setShowExplore(true), 350)
   }, [tourStep, buttonsMode, touchUI, moveMode])
   // where the walkthrough starts; the laptop demo glides back here
@@ -1903,7 +1943,7 @@ export default function App() {
       : systemApp === 'resume'
       ? <ResumeView key="resume" onClose={closeSystem} getRect={getResumeRect} setInsets={setResumeInsets}/>
       : <SpotCard key={systemApp} app={systemApp} onClose={closeSystem}/>)}</AnimatePresence>
-    {!loading && <div className={`office-hud${systemOpen ? ' is-interacting' : ''}${buttonsMode ? ' is-buttons' : ''}${tourStep === 'demo' && !showExplore ? ' is-demo' : ''}`}>
+    {!loading && <div className={`office-hud${systemOpen ? ' is-interacting' : ''}${buttonsMode ? ' is-buttons' : ''}${(tourStep === 'demo' || (tourStep === 'settings' && !buttonsMode)) && !showExplore ? ' is-demo' : ''}`}>
       {introPhase !== 'hidden' && !systemOpen && <NameTag phase={introPhase}/>}
       {introPhase === 'corner' && <>
         {/* laptop: the AI assistant button sits at the far right, level with the bar (phones: beside the menu button) */}
@@ -1912,7 +1952,7 @@ export default function App() {
           onGo={(id) => { window.dispatchEvent(new CustomEvent('spot-go')); if (systemOpen) sceneRef.current?.switchTo(id); else sceneRef.current?.goTo(id) }} onOpen={() => sceneRef.current?.openSpot()}
           interacting={systemOpen} onBack={closeSystem} locked={tourStep !== 'done'}
           spotsLocked={tourStep !== 'done' && !(tourStep === 'demo' && !showExplore)} workLocked={tourStep !== 'done' && !(tourStep === 'demo' && !showExplore) && !(buttonsMode && tourStep === 'walk')} playLocked={tourStep !== 'done' && !(buttonsMode && tourStep === 'play')}
-          teach={buttonsMode && showCue ? (tourStep === 'walk' ? 'work' : tourStep === 'play' ? 'play' : null) : null}
+          teach={buttonsMode && showCue ? (tourStep === 'walk' ? 'work' : tourStep === 'play' ? 'play' : tourStep === 'settings' ? 'settings' : null) : null}
           buttonsMode={buttonsMode} moveMode={moveMode} onMoveMode={changeMode} onView={requestView}
           showDisco={systemOpen && systemApp === 'music'} disco={disco} onDisco={() => setDisco((d) => !d)}/>
         {touchUI && moveMode === 'joystick' && !systemOpen && <Joystick onStick={setStick}/>}
@@ -1920,10 +1960,11 @@ export default function App() {
       <AnimatePresence>{showCue && introPhase === 'corner' && !systemOpen && (touchUI && !moveMode && tourStep === 'walk'
         ? <ModeChoice key="mode" onPick={changeMode}/>
         : tourStep === 'demo' ? <BarDemo key="demo" sceneRef={sceneRef} startPose={startPose.current} onDone={dismissCue}/>
+        : tourStep === 'settings' && !buttonsMode ? <SettingsDemo key="settings" moveMode={moveMode} n={3} onDone={dismissCue}/>
         : <TourCue key={tourStep + (moveMode || '')} step={tourStep} onDone={dismissCue} moveMode={moveMode}/>)}</AnimatePresence>
       <AnimatePresence>{touchUI && mini && mini.step !== 'swap' && mini.mode === moveMode && tourDone && introPhase === 'corner' && !systemOpen && <TourCue key={'mini-' + mini.mode + mini.step} step={mini.step} onDone={miniDone} moveMode={mini.mode} mini/>}</AnimatePresence>
       {tourOn && <NateTour mode={touchUI ? (buttonsMode ? 'buttons' : 'joystick') : 'laptop'} getSpot={getTourSpot} onEnd={() => setTourOn(false)}/>}
-      <AnimatePresence>{showExplore && introPhase === 'corner' && !systemOpen && <ExploreCue key="explore" onDismiss={dismissExplore} total={4}/>}</AnimatePresence>
+      <AnimatePresence>{showExplore && introPhase === 'corner' && !systemOpen && <ExploreCue key="explore" onDismiss={dismissExplore} total={5}/>}</AnimatePresence>
       <AnimatePresence>{!showCue && !showExplore && !mini && tourStep === 'done' && introPhase === 'corner' && !systemOpen && (deskNear && !buttonsMode && (!hotspot || hotspot === 'projects' || hotspot === 'achievements')
         ? <DeskCue key="desk" hotspot={hotspot}/>
         : hotspot && <SpotCue key={hotspot} id={hotspot}/>)}</AnimatePresence>
